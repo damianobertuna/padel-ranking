@@ -44,12 +44,13 @@ export async function updatePlayerByAdmin(formData: FormData) {
 
     if (error) {
         console.error("Errore update admin:", error);
-        return { success: false, error: error.message };
+        throw new Error(error.message); // Invece di fare il return dell'errore, solleviamo un'eccezione
     }
 
-    // Resettiamo la cache della classifica e del profilo giocatore
+    // Resettiamo la cache per mostrare i dati aggiornati all'istante
     revalidatePath('/');
+    revalidatePath('/admin/players');
     revalidatePath(`/player/${playerId}`);
 
-    return { success: true };
+    // Rimosso il return { success: true } per accontentare TypeScript!
 }
