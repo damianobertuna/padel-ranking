@@ -20,7 +20,7 @@ interface Match {
 }
 
 export default async function Home() {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // 1. Recuperiamo i giocatori per la classifica
     const { data: players } = await supabase
