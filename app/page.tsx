@@ -95,6 +95,16 @@ export default async function Home() {
                             + Nuova Partita
                         </Link>
                     )}
+
+                    {/* Se l'utente è admin, mostriamo anche il link di gestione */}
+                    {currentUserPlayer?.role === 'admin' && (
+                        <Link
+                            href="/admin/players"
+                            className="bg-slate-800 text-white font-bold py-2 px-4 rounded hover:bg-slate-900 transition-colors text-sm shadow-sm"
+                        >
+                            ⚙️ Gestione Giocatori
+                        </Link>
+                    )}
                 </div>
 
                 {/* TABELLA CLASSIFICA */}
