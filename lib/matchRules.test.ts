@@ -92,3 +92,35 @@ describe('Ranking Updates Engine', () => {
     });
 
 });
+
+// file: lib/matchRules.test.ts (Aggiungi in fondo)
+import { canUserResolveMatch } from './matchRules'; // Aggiorna l'import in cima se necessario, o aggiungilo qui
+
+describe('Match Resolution Authorization (Self-Service Security)', () => {
+    // Una partita finta di esempio con giocatori ID: 10, 11, 12, 13
+    const mockMatch = {
+        team_a_left_id: 10,
+        team_a_right_id: 11,
+        team_b_left_id: 12,
+        team_b_right_id: 13
+    };
+
+    it('should DENY access if the user is not logged in', () => {
+        expect(canUserResolveMatch(null, mockMatch)).toBe(false);
+    });
+
+    it('should ALLOW access to an ADMIN even if they are not playing', () => {
+        const auth = { userRole: 'admin' as const, userPlayerId: 99 }; // ID 99 non è in campo
+        expect(canUserResolveMatch(auth, mockMatch)).toBe(true);
+    });
+
+    it('should ALLOW access to a USER if they are playing in the match', () => {
+        const auth = { userRole: 'user' as const, userPlayerId: 11 }; // Sta giocando in Team A Right
+        expect(canUserResolveMatch(auth, mockMatch)).toBe(true);
+    });
+
+    it('should DENY access to a USER if they are not playing in the match', () => {
+        const auth = { userRole: 'user' as const, userPlayerId: 44 }; // ID 44 è un giocatore esterno
+        expect(canUserResolveMatch(auth, mockMatch)).toBe(false);
+    });
+});

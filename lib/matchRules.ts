@@ -59,3 +59,33 @@ export function isRankingDifferenceValid(rankings: number[]): boolean {
 
     return (maxRanking - minRanking) <= 0.50;
 }
+
+// file: lib/matchRules.ts (Aggiungi in fondo)
+
+export interface AuthContext {
+    userRole: 'admin' | 'user';
+    userPlayerId: number;
+}
+
+export interface MatchPlayers {
+    team_a_left_id: number;
+    team_a_right_id: number;
+    team_b_left_id: number;
+    team_b_right_id: number;
+}
+
+export function canUserResolveMatch(auth: AuthContext | null, match: MatchPlayers): boolean {
+    // Se l'utente non è loggato, non può fare nulla
+    if (!auth) return false;
+
+    // Se è un admin, ha il via libera assoluto
+    if (auth.userRole === 'admin') return true;
+
+    // Se è un utente normale, controlliamo se il suo ID giocatore è in campo
+    return (
+        match.team_a_left_id === auth.userPlayerId ||
+        match.team_a_right_id === auth.userPlayerId ||
+        match.team_b_left_id === auth.userPlayerId ||
+        match.team_b_right_id === auth.userPlayerId
+    );
+}
