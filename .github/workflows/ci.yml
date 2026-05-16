@@ -1,0 +1,27 @@
+name: RanKING Padel CI
+
+on:
+  push:
+    branches: [ main ] # Fai partire la pipeline ogni volta che pushi su main
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Controlla il codice sorgente
+        uses: actions/checkout@v4
+
+      - name: Configura Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-size: 20
+          cache: 'npm'
+
+      - name: Installa le dipendenze
+        run: npm ci
+
+      - name: Esegui la suite di test
+        run: npm run test:run # Presuppone che tu abbia "test:run": "vitest run" nel package.json
