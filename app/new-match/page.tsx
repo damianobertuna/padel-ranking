@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 
 interface Player {
@@ -13,6 +13,7 @@ interface Player {
 }
 
 export default function NewMatch() {
+    const supabase = createClient();
     const router = useRouter();
     const [players, setPlayers] = useState<Player[]>([]);
 

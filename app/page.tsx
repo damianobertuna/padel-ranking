@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/server';
 
 // Interfacce aggiornate
 interface Player {
@@ -20,6 +20,8 @@ interface Match {
 }
 
 export default async function Home() {
+    const supabase = createClient();
+
     // 1. Recuperiamo i giocatori per la classifica
     const { data: players } = await supabase
         .from('players')

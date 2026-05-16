@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/client';
 import { useRouter, useParams } from 'next/navigation';
 import { calculateRankingUpdates, MatchContext } from '@/lib/matchRules';
 
@@ -21,6 +21,7 @@ interface Match {
 }
 
 export default function ResolveMatch() {
+    const supabase = createClient();
     const router = useRouter();
     const params = useParams();
     const matchId = params.id as string;
