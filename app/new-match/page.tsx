@@ -1,4 +1,4 @@
-'use client'; // Questo dice a Next.js che il componente deve essere interattivo sul browser
+'use client';
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -16,7 +16,6 @@ export default function NewMatch() {
     const router = useRouter();
     const [players, setPlayers] = useState<Player[]>([]);
 
-    // Stati per le selezioni del form
     const [matchDate, setMatchDate] = useState('');
     const [teamALeft, setTeamALeft] = useState('');
     const [teamARight, setTeamARight] = useState('');
@@ -24,7 +23,6 @@ export default function NewMatch() {
     const [teamBRight, setTeamBRight] = useState('');
     const [error, setError] = useState('');
 
-    // 1. Scarichiamo i giocatori all'avvio della pagina
     useEffect(() => {
         async function fetchPlayers() {
             const { data } = await supabase.from('players').select('*').order('first_name');
@@ -33,15 +31,17 @@ export default function NewMatch() {
         fetchPlayers();
     }, []);
 
-    // 2. Controllo della Regola 2 (Forbice di ±0.25)
-    // Questo significa che la differenza tra il giocatore col ranking più alto
-    // e quello col ranking più basso non può superare 0.50.
-    const isMatchValid = () => {
-        const selectedIds = [teamALeft, teamARight, teamBLeft, teamBRight];
-        // Se non ha ancora selezionato tutti e 4 i giocatori, nascondiamo l'errore
-        if (selectedIds.includes('')) return true;
+    // --- NUOVA LOGICA DI GUARDIA IN TEMPO REALE ---
 
-        // Troviamo i ranking dei 4 giocatori selezionati
+    // 1. Controlliamo se ci sono doppioni tra i giocatori attualmente selezionati
+    const selectedIds = [teamALeft, teamARight, teamBLeft, teamBRight].filter(id => id !== '');
+    const hasDuplicates = new Set(selectedIds).size !== selectedIds.length;
+
+    // 2. Controlliamo se la differenza di ranking supera 0.50 (solo se tutti e 4 sono selezionati e non ci sono doppioni)
+    let isRankingDiffInvalid = false;
+    const allSelected = selectedIds.length === 4;
+
+    if (allSelected && !hasDuplicates) {
         const selectedRankings = selectedIds.map(id => {
             const player = players.find(p => p.id.toString() === id);
             return player ? player.ranking : 0;
@@ -49,30 +49,23 @@ export default function NewMatch() {
 
         const maxRanking = Math.max(...selectedRankings);
         const minRanking = Math.min(...selectedRankings);
+        if ((maxRanking - minRanking) > 0.50) {
+            isRankingDiffInvalid = true;
+        }
+    }
 
-        return (maxRanking - minRanking) <= 0.50;
-    };
+    // Il form è valido solo se tutti i 4 giocatori sono scelti, zero doppioni e forbice ok
+    const isFormValid = allSelected && !hasDuplicates && !isRankingDiffInvalid;
 
-    // 3. Funzione di salvataggio
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
 
-        if (!isMatchValid()) {
-            setError('I giocatori selezionati non rispettano la regola della forbice di ±0.25!');
-            return;
-        }
-
-        // Assicuriamoci che un giocatore non sia selezionato due volte
-        const uniquePlayers = new Set([teamALeft, teamARight, teamBLeft, teamBRight]);
-        if (uniquePlayers.size < 4) {
-            setError('Un giocatore non può essere inserito più di una volta nella stessa partita!');
-            return;
-        }
+        if (!isFormValid) return; // Blocco di sicurezza extra
 
         const { error: insertError } = await supabase.from('matches').insert([
             {
-                match_date: matchDate || null, // Se vuoto salva null
+                match_date: matchDate || null,
                 team_a_left_id: parseInt(teamALeft),
                 team_a_right_id: parseInt(teamARight),
                 team_b_left_id: parseInt(teamBLeft),
@@ -85,7 +78,6 @@ export default function NewMatch() {
             setError('Errore durante il salvataggio della partita.');
             console.error(insertError);
         } else {
-            // Se va tutto bene, riportiamo l'utente alla home
             router.push('/');
         }
     };
@@ -93,7 +85,7 @@ export default function NewMatch() {
     return (
         <main className="min-h-screen p-8 bg-slate-100 flex flex-col items-center">
             <div className="max-w-2xl w-full bg-white p-8 rounded-lg shadow-md">
-                <h1 className="text-3xl font-bold text-slate-800 mb-6 text-center">Crea Nuova Partita</h1>
+                <h1 className="text-3xl font-bold text-slate-800 mb-6 text-center">New Match</h1>
 
                 {error && (
                     <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -104,7 +96,7 @@ export default function NewMatch() {
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Data della partita */}
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Data e Ora (Opzionale)</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Match Date (Optional)</label>
                         <input
                             type="datetime-local"
                             value={matchDate}
@@ -116,21 +108,21 @@ export default function NewMatch() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Squadra A */}
                         <div className="bg-blue-50 p-4 rounded border border-blue-100">
-                            <h3 className="font-bold text-blue-800 mb-4">Squadra A</h3>
+                            <h3 className="font-bold text-blue-800 mb-4">Team A</h3>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-500 mb-1">Giocatore Sinistra (Sx)</label>
+                                    <label className="block text-xs font-semibold text-slate-500 mb-1">Left Player</label>
                                     <select required value={teamALeft} onChange={(e) => setTeamALeft(e.target.value)} className="w-full border p-2 rounded">
-                                        <option value="">Seleziona...</option>
+                                        <option value="">Select...</option>
                                         {players.filter(p => p.preferred_side === 'Left').map(p => (
                                             <option key={p.id} value={p.id}>{p.first_name} {p.last_name} ({p.ranking.toFixed(2)})</option>
                                         ))}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-500 mb-1">Giocatore Destra (Dx)</label>
+                                    <label className="block text-xs font-semibold text-slate-500 mb-1">Right Player</label>
                                     <select required value={teamARight} onChange={(e) => setTeamARight(e.target.value)} className="w-full border p-2 rounded">
-                                        <option value="">Seleziona...</option>
+                                        <option value="">Select...</option>
                                         {players.filter(p => p.preferred_side === 'Right').map(p => (
                                             <option key={p.id} value={p.id}>{p.first_name} {p.last_name} ({p.ranking.toFixed(2)})</option>
                                         ))}
@@ -141,21 +133,21 @@ export default function NewMatch() {
 
                         {/* Squadra B */}
                         <div className="bg-red-50 p-4 rounded border border-red-100">
-                            <h3 className="font-bold text-red-800 mb-4">Squadra B</h3>
+                            <h3 className="font-bold text-red-800 mb-4">Team B</h3>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-500 mb-1">Giocatore Sinistra (Sx)</label>
+                                    <label className="block text-xs font-semibold text-slate-500 mb-1">Left Player</label>
                                     <select required value={teamBLeft} onChange={(e) => setTeamBLeft(e.target.value)} className="w-full border p-2 rounded">
-                                        <option value="">Seleziona...</option>
+                                        <option value="">Select...</option>
                                         {players.filter(p => p.preferred_side === 'Left').map(p => (
                                             <option key={p.id} value={p.id}>{p.first_name} {p.last_name} ({p.ranking.toFixed(2)})</option>
                                         ))}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-500 mb-1">Giocatore Destra (Dx)</label>
+                                    <label className="block text-xs font-semibold text-slate-500 mb-1">Right Player</label>
                                     <select required value={teamBRight} onChange={(e) => setTeamBRight(e.target.value)} className="w-full border p-2 rounded">
-                                        <option value="">Seleziona...</option>
+                                        <option value="">Select...</option>
                                         {players.filter(p => p.preferred_side === 'Right').map(p => (
                                             <option key={p.id} value={p.id}>{p.first_name} {p.last_name} ({p.ranking.toFixed(2)})</option>
                                         ))}
@@ -165,19 +157,26 @@ export default function NewMatch() {
                         </div>
                     </div>
 
-                    {/* Alert Regola 2 Dinamico */}
-                    {!isMatchValid() && (
-                        <p className="text-red-500 text-sm font-bold text-center">
-                            ⚠️ Attenzione: La differenza di livello supera il limite di 0.50!
-                        </p>
-                    )}
+                    {/* MESSAGGI DI ERRORE DINAMICI */}
+                    <div className="min-h-[24px]">
+                        {hasDuplicates && (
+                            <p className="text-red-600 text-sm font-bold text-center animate-pulse">
+                                ⚠️ Errore: Un giocatore non può sdoppiarsi! Rimuovi i duplicati.
+                            </p>
+                        )}
+                        {isRankingDiffInvalid && (
+                            <p className="text-orange-500 text-sm font-bold text-center">
+                                ⚠️ Attenzione: La differenza di livello supera il limite di 0.50!
+                            </p>
+                        )}
+                    </div>
 
                     <button
                         type="submit"
-                        disabled={!isMatchValid()}
-                        className="w-full bg-slate-800 text-white font-bold py-3 rounded hover:bg-slate-700 disabled:opacity-50 transition-colors"
+                        disabled={!isFormValid}
+                        className="w-full bg-slate-800 text-white font-bold py-3 rounded hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
-                        Crea Partita
+                        Create Match
                     </button>
                 </form>
             </div>

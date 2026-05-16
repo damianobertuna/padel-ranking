@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useParams } from 'next/navigation';
+import { calculateRankingUpdates, MatchContext } from '@/lib/matchRules';
 
 interface Player {
     id: number;
@@ -46,6 +47,7 @@ export default function ResolveMatch() {
 
     // 2. Il Motore di aggiornamento (Per ora logica base ±0.05)
     // 2. Il Motore di aggiornamento Avanzato
+    // 2. Il Motore di aggiornamento (ora usa la logica testata esterna!)
     const handleResult = async (winningTeam: 'A' | 'B') => {
         if (!match) return;
         setLoading(true);
@@ -56,58 +58,41 @@ export default function ResolveMatch() {
         const winnerIds = winningTeam === 'A' ? teamAIds : teamBIds;
         const loserIds = winningTeam === 'A' ? teamBIds : teamAIds;
 
-        // --- TROVIAMO I KING E L'ULTIMO IN CLASSIFICA ---
+        // --- TROVIAMO I RUOLI SPECIALI ---
         const leftPlayers = players.filter(p => p.preferred_side === 'Left').sort((a, b) => b.ranking - a.ranking);
         const rightPlayers = players.filter(p => p.preferred_side === 'Right').sort((a, b) => b.ranking - a.ranking);
         const allPlayersAscending = [...players].sort((a, b) => a.ranking - b.ranking);
 
-        const kingLeftId = leftPlayers.length > 0 ? leftPlayers[0].id : null;
-        const kingRightId = rightPlayers.length > 0 ? rightPlayers[0].id : null;
-        const lastPlaceId = allPlayersAscending.length > 0 ? allPlayersAscending[0].id : null;
-
-        // --- CALCOLIAMO I BONUS/MALUS (Regole 6, 7 e 9) ---
-        let winnerBonus = 0.05; // Base
-
-        // Malus personalizzati in caso i King giochino insieme e perdano
-        let loserMalusMap: Record<number, number> = {
-            [loserIds[0]]: -0.05,
-            [loserIds[1]]: -0.05
+        // Creiamo il contesto da passare alla nostra funzione pura
+        const ctx: MatchContext = {
+            winnerIds,
+            loserIds,
+            kingLeftId: leftPlayers.length > 0 ? leftPlayers[0].id : null,
+            kingRightId: rightPlayers.length > 0 ? rightPlayers[0].id : null,
+            lastPlaceId: allPlayersAscending.length > 0 ? allPlayersAscending[0].id : null,
         };
 
-        const hasLastPlaceWon = winnerIds.includes(lastPlaceId as number);
-        const hasKingLeftLost = loserIds.includes(kingLeftId as number);
-        const hasKingRightLost = loserIds.includes(kingRightId as number);
+        // --- CALCOLIAMO LE VARIAZIONI DI PUNTEGGIO ---
+        const updates = calculateRankingUpdates(ctx);
 
-        // Regola 7: Se l'ultimo vince, doppio punteggio ai vincitori (+0.10)
-        if (hasLastPlaceWon) {
-            winnerBonus = 0.10;
-        }
+        // --- SALVIAMO TUTTO SUL DATABASE ---
+        const allInvolvedIds = [...winnerIds, ...loserIds];
 
-        // Regola 6: Se cade un King, doppio punteggio ai vincitori (+0.10)
-        if (hasKingLeftLost || hasKingRightLost) {
-            winnerBonus = 0.10; // Il tetto massimo rimane 0.10 (Regola 9)
+        for (const id of allInvolvedIds) {
+            const p = getPlayer(id);
+            if (p && updates[id] !== undefined) {
+                const newRanking = p.ranking + updates[id];
 
-            // Se entrambi i King perdono giocando INSIEME
-            if (hasKingLeftLost && hasKingRightLost) {
-                loserMalusMap[kingLeftId as number] = -0.10;
-                loserMalusMap[kingRightId as number] = -0.10;
+                const { error: updateError } = await supabase
+                    .from('players')
+                    .update({ ranking: newRanking })
+                    .eq('id', id);
+
+                if (updateError) console.error(`Errore aggiornamento giocatore ${id}:`, updateError);
             }
         }
 
-        // --- SALVIAMO SUL DATABASE ---
-        // A. Aggiorniamo i Vincitori
-        for (const id of winnerIds) {
-            const p = getPlayer(id);
-            if (p) await supabase.from('players').update({ ranking: p.ranking + winnerBonus }).eq('id', id);
-        }
-
-        // B. Aggiorniamo i Perdenti
-        for (const id of loserIds) {
-            const p = getPlayer(id);
-            if (p) await supabase.from('players').update({ ranking: p.ranking + loserMalusMap[id] }).eq('id', id);
-        }
-
-        // C. Chiudiamo la partita
+        // Chiudiamo la partita
         await supabase.from('matches').update({
             status: 'completed',
             winning_team: winningTeam

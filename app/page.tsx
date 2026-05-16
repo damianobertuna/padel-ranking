@@ -39,6 +39,14 @@ export default async function Home() {
         return player ? `${player.first_name} ${player.last_name}` : 'Sconosciuto';
     };
 
+    // --- LOGICA PER IDENTIFICARE I RUOLI SPECIALI ---
+    const leftPlayers = players?.filter(p => p.preferred_side === 'Left') || [];
+    const rightPlayers = players?.filter(p => p.preferred_side === 'Right') || [];
+
+    const kingLeftId = leftPlayers.length > 0 ? leftPlayers[0].id : null;
+    const kingRightId = rightPlayers.length > 0 ? rightPlayers[0].id : null;
+    const lastPlaceId = players && players.length > 0 ? players[players.length - 1].id : null;
+
     return (
         <main className="min-h-screen p-8 bg-slate-100 flex flex-col items-center">
             <div className="max-w-4xl w-full">
@@ -71,20 +79,37 @@ export default async function Home() {
                         </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-slate-200">
-                        {players?.map((player, index) => (
-                            <tr key={player.id} className="hover:bg-slate-50">
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-500">#{index + 1}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-slate-900">
-                                    {player.first_name} {player.last_name}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-slate-600">
-                                    {player.preferred_side === 'Left' ? 'Sx' : 'Dx'}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-indigo-600">
-                                    {player.ranking.toFixed(2)}
-                                </td>
-                            </tr>
-                        ))}
+                        {players?.map((player, index) => {
+                            // Determiniamo lo stile della riga in base al ruolo
+                            let rowClass = "hover:bg-slate-50 transition-colors";
+                            let roleBadge = null;
+
+                            if (player.id === kingLeftId) {
+                                rowClass = "bg-blue-50 border-l-4 border-blue-500 hover:bg-blue-100";
+                                roleBadge = <span className="ml-2 text-xs font-bold text-blue-600 bg-blue-200 px-2 py-1 rounded-full">👑 KING Sx</span>;
+                            } else if (player.id === kingRightId) {
+                                rowClass = "bg-yellow-50 border-l-4 border-yellow-400 hover:bg-yellow-100";
+                                roleBadge = <span className="ml-2 text-xs font-bold text-yellow-700 bg-yellow-200 px-2 py-1 rounded-full">👑 KING Dx</span>;
+                            } else if (player.id === lastPlaceId) {
+                                rowClass = "bg-slate-100 border-l-4 border-slate-400";
+                                roleBadge = <span className="ml-2 text-xs font-bold text-slate-500 bg-slate-200 px-2 py-1 rounded-full">⚓ Fanalino</span>;
+                            }
+
+                            return (
+                                <tr key={player.id} className={rowClass}>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-500">#{index + 1}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-slate-900 flex items-center">
+                                        {player.first_name} {player.last_name} {roleBadge}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-slate-600">
+                                        {player.preferred_side === 'Left' ? 'Sx' : 'Dx'}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-indigo-600">
+                                        {player.ranking.toFixed(2)}
+                                    </td>
+                                </tr>
+                            );
+                        })}
                         </tbody>
                     </table>
                 </div>
