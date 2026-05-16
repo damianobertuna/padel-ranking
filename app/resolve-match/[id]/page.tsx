@@ -10,6 +10,8 @@ interface Player {
     first_name: string;
     last_name: string;
     ranking: number;
+    preferred_side: string;
+    role: string;
 }
 
 interface Match {
