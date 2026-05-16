@@ -6,13 +6,13 @@ import { revalidatePath } from 'next/cache';
 export async function updatePlayerByAdmin(formData: FormData) {
     const supabase = createClient();
 
-    // 1. Verifichiamo che chi compie l'azione sia un ADMIN
+    // 1. Verifichiamo l'ADMIN loggato
     const { data: { user } } = await (await supabase).auth.getUser();
     if (!user) throw new Error('Non autenticato');
 
     const { data: currentUserPlayer } = await (await supabase)
         .from('players')
-        .select('role')
+        .select('first_name, last_name, role')
         .eq('user_id', user.id)
         .single();
 
@@ -29,7 +29,14 @@ export async function updatePlayerByAdmin(formData: FormData) {
     const ranking = parseFloat(formData.get('ranking') as string);
     const role = formData.get('role') as string;
 
-    // 3. Eseguiamo l'UPDATE su Supabase
+    // 2b. Recuperiamo i vecchi dati del giocatore per scrivere un log preciso
+    const { data: oldPlayer } = await (await supabase)
+        .from('players')
+        .select('*')
+        .eq('id', playerId)
+        .single();
+
+    // 3. Eseguiamo l'UPDATE del giocatore
     const { error } = await (await supabase)
         .from('players')
         .update({
@@ -44,13 +51,40 @@ export async function updatePlayerByAdmin(formData: FormData) {
 
     if (error) {
         console.error("Errore update admin:", error);
-        throw new Error(error.message); // Invece di fare il return dell'errore, solleviamo un'eccezione
+        throw new Error(error.message);
     }
 
-    // Resettiamo la cache per mostrare i dati aggiornati all'istante
+    // 4. GENERIAMO IL LOG AUTOMATICO DI AUDIT
+    if (oldPlayer) {
+        const adminFullName = `${currentUserPlayer.first_name} ${currentUserPlayer.last_name}`;
+        const targetFullName = `${firstName.trim()} ${lastName.trim()}`;
+
+        // Costruiamo una descrizione testuale di cosa è cambiato
+        const modifiche: string[] = [];
+        if (oldPlayer.first_name !== firstName.trim() || oldPlayer.last_name !== lastName.trim()) modifiche.push(`Nome cambiato da "${oldPlayer.first_name} ${oldPlayer.last_name}" a "${targetFullName}"`);
+        if (oldPlayer.ranking !== ranking) modifiche.push(`Ranking modificato da ${oldPlayer.ranking} a ${ranking}`);
+        if (oldPlayer.preferred_side !== preferredSide) modifiche.push(`Lato cambiato da ${oldPlayer.preferred_side} a ${preferredSide}`);
+        if (oldPlayer.dominant_hand !== dominantHand) modifiche.push(`Mano cambiata da ${oldPlayer.dominant_hand} a ${dominantHand}`);
+        if (oldPlayer.role !== role) modifiche.push(`Ruolo cambiato da ${oldPlayer.role} a ${role}`);
+
+        const dettagliLog = modifiche.length > 0
+            ? `Modificato giocatore ${targetFullName}. Dettagli: ${modifiche.join(', ')}`
+            : `Salvato modulo giocatore ${targetFullName} senza modifiche apparenti.`;
+
+        // Inseriamo la riga nella tabella audit_logs
+        await (await supabase).from('audit_logs').insert([
+            {
+                admin_id: user.id,
+                admin_name: adminFullName,
+                action_type: 'UPDATE_PLAYER',
+                target_player_id: playerId,
+                details: dettagliLog
+            }
+        ]);
+    }
+
+    // Resettiamo le cache
     revalidatePath('/');
     revalidatePath('/admin/players');
-    revalidatePath(`/player/${playerId}`);
-
-    // Rimosso il return { success: true } per accontentare TypeScript!
+    revalidatePath('/admin/logs');
 }
