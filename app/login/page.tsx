@@ -13,12 +13,12 @@ export default function Login() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
 
-    // Nuovi Stati per i dati del Giocatore
+    // Stati per i dati del Giocatore
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
     const [preferredSide, setPreferredSide] = useState('Left');
     const [dominantHand, setDominantHand] = useState('Destro');
-    const [initialRanking, setInitialRanking] = useState('4.5'); // Stato per il ranking iniziale scelto dall'utente
+    const [initialRanking, setInitialRanking] = useState('4.50'); // Default ufficiale del regolamento
 
     // Stati per la UX
     const [error, setError] = useState('');
@@ -38,8 +38,7 @@ export default function Login() {
                 return;
             }
 
-            // Convertiamo il ranking inserito in un numero float, se non è valido mettiamo 1000 di paracadute
-            const parsedRanking = parseFloat(initialRanking) || 1000.00;
+            const parsedRanking = parseFloat(initialRanking) || 4.50;
 
             // 1. Creiamo le credenziali d'accesso
             const { data: authData, error: signUpError } = await supabase.auth.signUp({
@@ -64,7 +63,7 @@ export default function Login() {
                             last_name: lastName.trim(),
                             preferred_side: preferredSide,
                             dominant_hand: dominantHand,
-                            ranking: parsedRanking, // <-- Usiamo il valore dinamico qui!
+                            ranking: parsedRanking,
                             role: 'user'
                         }
                     ]);
@@ -76,7 +75,7 @@ export default function Login() {
                     setMessage('Profilo creato e inserito in classifica con il tuo ranking! Ora puoi fare il login.');
                     setFirstName('');
                     setLastName('');
-                    setInitialRanking('1000');
+                    setInitialRanking('4.50');
                     setIsSignUp(false);
                 }
             }
@@ -155,21 +154,39 @@ export default function Login() {
                                 />
                             </div>
 
-                            {/* Ranking Iniziale */}
+                            {/* Ranking Iniziale + Guida Autovalutazione */}
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Ranking Punti Iniziale</label>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Livello / Ranking Iniziale</label>
                                 <input
                                     type="number"
                                     required
-                                    min="0"
-                                    max="5000"
+                                    min="1.00"
+                                    max="7.00"
                                     step="0.01"
                                     value={initialRanking}
                                     onChange={(e) => setInitialRanking(e.target.value)}
-                                    className="w-full border border-slate-300 rounded p-2 bg-white text-slate-950 font-mono"
-                                    placeholder="Es. 1000"
+                                    className="w-full border border-slate-300 rounded p-2 bg-white text-slate-950 font-mono text-lg font-bold text-indigo-600"
                                 />
-                                <p className="text-xs text-slate-400 mt-1">Scegli il tuo punteggio di partenza (es. 1000 standard, o più alto se sei esperto).</p>
+
+                                {/* Box Informativo Regolamento */}
+                                <div className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded text-xs text-slate-600 space-y-1.5">
+                                    <p className="font-semibold text-slate-700">📖 Regolamento di Autovalutazione:</p>
+                                    <p>
+                                        Per stabilire il tuo livello iniziale, fai riferimento alla guida ufficiale dei livelli cliccando qui:{' '}
+                                        <a
+                                            href="https://www.padelnuestro.com/it/blog/livelli-del-padel"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-indigo-600 underline font-semibold hover:text-indigo-800"
+                                        >
+                                            Guida Livelli Padel Nuestro
+                                        </a>.
+                                    </p>
+                                    <p className="italic text-slate-500">
+                                        Nota: Se non conosci il tuo livello, lascia pure il valore di default di <strong>4.50</strong>.
+                                        Ricorda che il valore RanKING serve a garantire partite equilibrate (forbice massima di ±0.25 tra i giocatori di un match). Sarà poi il campo a delineare il tuo reale valore!
+                                    </p>
+                                </div>
                             </div>
 
                             {/* Lato Preferito */}
