@@ -3,29 +3,31 @@
 import { createClient } from "@/lib/supabase/server";
 
 export async function logUserLogin(userId: string) {
-    const supabase = createClient();
+    try {
+        console.log("🚀 Server Action logUserLogin invocata");
 
-    // 1. Recuperiamo il profilo del giocatore che si è appena loggato
-    const { data: player } = await (await supabase)
-        .from('players')
-        .select('first_name, last_name, role')
-        .eq('user_id', userId)
-        .single();
+        // Risolviamo il client con il doppio await protetto, esattamente come in match-actions
+        const supabase = await (await createClient());
 
-    if (!player) {
-        console.error(`Impossibile scrivere il log di login: Profilo non trovato per user_id ${userId}`);
-        return;
-    }
+        // 1. Recuperiamo il profilo del giocatore
+        const { data: player, error: playerError } = await supabase
+            .from('players')
+            .select('first_name, last_name, role')
+            .eq('user_id', userId)
+            .single();
 
-    const operatore = `${player.first_name} ${player.last_name}`;
-    const logDescription = player.role === 'admin'
-        ? `L'admin ${operatore} ha effettuato l'accesso al sistema.`
-        : `Il giocatore ${operatore} ha effettuato l'accesso alla bacheca.`;
+        if (playerError || !player) {
+            console.error("⚠️ Profilo non trovato o errore DB per user:", userId);
+            return;
+        }
 
-    // 2. Scrittura del log nella tabella audit_logs
-    const { error: logError } = await (await supabase)
-        .from('audit_logs')
-        .insert([
+        const operatore = `${player.first_name} ${player.last_name}`;
+        const logDescription = player.role === 'admin'
+            ? `L'admin ${operatore} ha effettuato l'accesso al sistema.`
+            : `Il giocatore ${operatore} ha effettuato l'accesso alla bacheca.`;
+
+        // 2. Scrittura nel registro delle attività
+        await supabase.from('audit_logs').insert([
             {
                 admin_id: userId,
                 admin_name: operatore,
@@ -35,7 +37,9 @@ export async function logUserLogin(userId: string) {
             }
         ]);
 
-    if (logError) {
-        console.error("❌ ERRORE SCRITTURA LOG LOGIN:", logError.message);
+        console.log(`✅ Log di login registrato per: ${operatore}`);
+
+    } catch (err) {
+        console.error("💥 Errore controllato nella action logUserLogin:", err);
     }
 }

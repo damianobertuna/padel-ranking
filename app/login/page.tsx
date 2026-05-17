@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
-import { logUserLogin } from '@/actions/auth-actions'; // <-- AGGIUNTO L'IMPORT PULITO
+import { logUserLogin } from '@/actions/auth-actions'; // <-- Verifica che questo percorso sia corretto rispetto a dove si trova auth-actions.ts
 
 export default function Login() {
     const supabase = createClient();
@@ -34,94 +34,107 @@ export default function Login() {
         setMessage('');
         setLoading(true);
 
-        if (isSignUp) {
-            if (!firstName.trim() || !lastName.trim()) {
-                setError('Nome e Cognome sono obbligatori!');
-                setLoading(false);
-                return;
-            }
+        console.log("Submit inviato! Modalità SignUp:", isSignUp);
 
-            if (!phone.trim()) {
-                setError('Il numero di telefono è obbligatorio!');
-                setLoading(false);
-                return;
-            }
-
-            if (!privacyAccepted) {
-                setError('Devi accettare l\'Informativa sulla Privacy per registrarti.');
-                setLoading(false);
-                return;
-            }
-
-            const parsedRanking = parseFloat(initialRanking) || 4.50;
-
-            // 1. Creiamo le credenziali d'accesso
-            const { data: authData, error: signUpError } = await supabase.auth.signUp({
-                email,
-                password,
-            });
-
-            if (signUpError) {
-                setError(signUpError.message);
-                setLoading(false);
-                return;
-            }
-
-            if (authData?.user) {
-                // 2. Creiamo il giocatore includendo il numero di telefono
-                const { error: playerError } = await supabase
-                    .from('players')
-                    .insert([
-                        {
-                            user_id: authData.user.id,
-                            first_name: firstName.trim(),
-                            last_name: lastName.trim(),
-                            preferred_side: preferredSide,
-                            dominant_hand: dominantHand,
-                            ranking: parsedRanking,
-                            phone: phone.trim(),
-                            role: 'user'
-                        }
-                    ]);
-
-                if (playerError) {
-                    setError("Account creato, ma c'è stato un errore nella creazione del profilo di gioco.");
-                    console.error(playerError);
-                } else {
-                    setMessage('Profilo creato con successo! Ora puoi fare il login.');
-                    setFirstName('');
-                    setLastName('');
-                    setPhone('');
-                    setInitialRanking('4.50');
-                    setPrivacyAccepted(false);
-                    setIsSignUp(false);
+        try {
+            if (isSignUp) {
+                if (!firstName.trim() || !lastName.trim()) {
+                    setError('Nome e Cognome sono obbligatori!');
+                    setLoading(false);
+                    return;
                 }
-            }
-        } else {
-            // --- LOGICA DI ACCESSO / LOGIN ---
-            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-                email,
-                password,
-            });
 
-            if (signInError) {
-                setError('Email o password errate.');
-            } else {
-                // --- AGGIUNTO: SE IL LOGIN HA SUCCESSO, TRACCIAMO L'ATTIVITÀ ---
-                if (signInData?.user) {
-                    try {
-                        await logUserLogin(signInData.user.id);
-                    } catch (logErr) {
-                        // Non blocchiamo l'ingresso dell'utente se fallisce solo la scrittura del log
-                        console.error("Errore durante la registrazione del log di login:", logErr);
+                if (!phone.trim()) {
+                    setError('Il numero di telefono è obbligatorio!');
+                    setLoading(false);
+                    return;
+                }
+
+                if (!privacyAccepted) {
+                    setError('Devi accettare l\'Informativa sulla Privacy per registrarti.');
+                    setLoading(false);
+                    return;
+                }
+
+                const parsedRanking = parseFloat(initialRanking) || 4.50;
+
+                // 1. Creiamo le credenziali d'accesso
+                const { data: authData, error: signUpError } = await supabase.auth.signUp({
+                    email,
+                    password,
+                });
+
+                if (signUpError) {
+                    setError(signUpError.message);
+                    setLoading(false);
+                    return;
+                }
+
+                if (authData?.user) {
+                    // 2. Creiamo il giocatore
+                    const { error: playerError } = await supabase
+                        .from('players')
+                        .insert([
+                            {
+                                user_id: authData.user.id,
+                                first_name: firstName.trim(),
+                                last_name: lastName.trim(),
+                                preferred_side: preferredSide,
+                                dominant_hand: dominantHand,
+                                ranking: parsedRanking,
+                                phone: phone.trim(),
+                                role: 'user'
+                            }
+                        ]);
+
+                    if (playerError) {
+                        setError("Account creato, ma c'è stato un errore nella creazione del profilo di gioco.");
+                        console.error(playerError);
+                    } else {
+                        setMessage('Profilo creato con successo! Ora puoi fare il login.');
+                        setFirstName('');
+                        setLastName('');
+                        setPhone('');
+                        setInitialRanking('4.50');
+                        setPrivacyAccepted(false);
+                        setIsSignUp(false);
                     }
                 }
+            } else {
+                // --- LOGICA DI ACCESSO / LOGIN ---
+                console.log("Tento il login con Supabase per:", email);
+                const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+                    email,
+                    password,
+                });
 
-                router.push('/');
-                router.refresh();
+                if (signInError) {
+                    console.error("Errore login Supabase:", signInError.message);
+                    setError('Email o password errate.');
+                } else {
+                    console.log("Login Supabase completato con successo! User ID:", signInData?.user?.id);
+
+                    if (signInData?.user) {
+                        try {
+                            // Chiamiamo la action di log in modalità "fire and forget" senza bloccare il thread client
+                            logUserLogin(signInData.user.id).catch(err =>
+                                console.error("Errore asincrono nella Server Action di log:", err)
+                            );
+                        } catch (logErr) {
+                            console.error("Errore blocco catch per logUserLogin:", logErr);
+                        }
+                    }
+
+                    window.location.href = '/';
+                    return; // Usciamo subito
+                }
             }
+        } catch (globalCatch) {
+            console.error("Crash globale nel client handler:", globalCatch);
+            setError("Si è verificato un errore imprevisto.");
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     return (
@@ -151,7 +164,7 @@ export default function Login() {
                 </h2>
 
                 {error && <div className="bg-red-100 text-red-700 p-3 rounded mb-4 text-sm font-semibold">{error}</div>}
-                {message && <div className="bg-green- green-700 p-3 rounded mb-4 text-sm font-semibold">{message}</div>}
+                {message && <div className="bg-green-100 text-green-700 p-3 rounded mb-4 text-sm font-semibold">{message}</div>}
 
                 <form onSubmit={handleAuth} className="space-y-4">
 
