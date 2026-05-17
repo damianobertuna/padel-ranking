@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
+import { logUserLogin } from '@/actions/auth-actions'; // <-- AGGIUNTO L'IMPORT PULITO
 
 export default function Login() {
     const supabase = createClient();
@@ -19,8 +20,8 @@ export default function Login() {
     const [preferredSide, setPreferredSide] = useState('Left');
     const [dominantHand, setDominantHand] = useState('Destro');
     const [initialRanking, setInitialRanking] = useState('4.50');
-    const [phone, setPhone] = useState(''); // <-- STATO AGGIUNTO PER RISOLVERE L'ERRORE
-    const [privacyAccepted, setPrivacyAccepted] = useState(false); // <-- STATO AGGIUNTO PER LA PRIVACY
+    const [phone, setPhone] = useState('');
+    const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
     // Stati per la UX
     const [error, setError] = useState('');
@@ -78,7 +79,7 @@ export default function Login() {
                             preferred_side: preferredSide,
                             dominant_hand: dominantHand,
                             ranking: parsedRanking,
-                            phone: phone.trim(), // <-- INVIAMO IL TELEFONO AL DATABASE
+                            phone: phone.trim(),
                             role: 'user'
                         }
                     ]);
@@ -97,7 +98,8 @@ export default function Login() {
                 }
             }
         } else {
-            const { error: signInError } = await supabase.auth.signInWithPassword({
+            // --- LOGICA DI ACCESSO / LOGIN ---
+            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
                 email,
                 password,
             });
@@ -105,6 +107,16 @@ export default function Login() {
             if (signInError) {
                 setError('Email o password errate.');
             } else {
+                // --- AGGIUNTO: SE IL LOGIN HA SUCCESSO, TRACCIAMO L'ATTIVITÀ ---
+                if (signInData?.user) {
+                    try {
+                        await logUserLogin(signInData.user.id);
+                    } catch (logErr) {
+                        // Non blocchiamo l'ingresso dell'utente se fallisce solo la scrittura del log
+                        console.error("Errore durante la registrazione del log di login:", logErr);
+                    }
+                }
+
                 router.push('/');
                 router.refresh();
             }
@@ -139,7 +151,7 @@ export default function Login() {
                 </h2>
 
                 {error && <div className="bg-red-100 text-red-700 p-3 rounded mb-4 text-sm font-semibold">{error}</div>}
-                {message && <div className="bg-green-100 text-green-700 p-3 rounded mb-4 text-sm font-semibold">{message}</div>}
+                {message && <div className="bg-green- green-700 p-3 rounded mb-4 text-sm font-semibold">{message}</div>}
 
                 <form onSubmit={handleAuth} className="space-y-4">
 

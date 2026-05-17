@@ -271,98 +271,128 @@ export async function resolveMatchWithLog(data: {
 export async function resolveMatchWithRanking(data: {
     matchId: string;
     winningTeam: 'A' | 'B';
-    rankingUpdates: Record<number, number>; // Riceve la mappa degli incrementi/decrementi
+    rankingUpdates: Record<number, number>;
 }) {
     const supabase = createClient();
 
-    // 1. Controlliamo l'autenticazione
-    const { data: { user } } = await (await supabase).auth.getUser();
-    if (!user) throw new Error("Utente non autenticato");
+    try {
+        console.log("🚀 Server Action avviata per Match:", data.matchId);
 
-    // 2. Profilo dell'operatore
-    const { data: currentUserPlayer } = await (await supabase)
-        .from('players')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-    if (!currentUserPlayer) throw new Error("Profilo giocatore non trovato");
+        // 1. Controlliamo l'autenticazione
+        const { data: { user } } = await (await supabase).auth.getUser();
+        if (!user) throw new Error("Utente non autenticato");
 
-    // 3. Recuperiamo il match prima di chiuderlo
-    const { data: match } = await (await supabase)
-        .from('matches')
-        .select('*')
-        .eq('id', data.matchId)
-        .single();
-    if (!match) throw new Error("Partita non trovata");
-    if (match.status !== 'pending') throw new Error("Questa partita è già stata risolta");
+        // 2. Profilo dell'operatore
+        const { data: currentUserPlayer } = await (await supabase)
+            .from('players')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
+        if (!currentUserPlayer) throw new Error("Profilo giocatore non trovato");
 
-    // 4. Aggiorniamo il ranking di tutti i giocatori coinvolti
-    const allInvolvedIds = [
-        match.team_a_left_id, match.team_a_right_id,
-        match.team_b_left_id, match.team_b_right_id
-    ];
+        // 3. Recuperiamo il match prima di chiuderlo
+        const { data: match } = await (await supabase)
+            .from('matches')
+            .select('*')
+            .eq('id', data.matchId)
+            .single();
+        if (!match) throw new Error("Partita non trovata nel database");
+        if (match.status !== 'pending') throw new Error("Questa partita è già stata risolta");
 
-    for (const id of allInvolvedIds) {
-        const updateValue = data.rankingUpdates[id];
-        if (updateValue !== undefined) {
-            // Recuperiamo il ranking attuale sul server per evitare disallineamenti client/server
-            const { data: p } = await (await supabase).from('players').select('ranking').eq('id', id).single();
-            if (p) {
-                const newRanking = p.ranking + updateValue;
-                await (await supabase).from('players').update({ ranking: newRanking }).eq('id', id);
+        const allInvolvedIds = [
+            match.team_a_left_id, match.team_a_right_id,
+            match.team_b_left_id, match.team_b_right_id
+        ];
+
+        console.log("👥 Giocatori coinvolti (ID numerici):", allInvolvedIds);
+        console.log("📈 Aggiornamenti ranking ricevuti:", data.rankingUpdates);
+
+        // 4. Aggiorniamo il ranking di tutti i giocatori coinvolti
+        for (const id of allInvolvedIds) {
+            const updateValue = data.rankingUpdates[id];
+            console.log(`Eseguo update per giocatore ID ${id}. Variazione: ${updateValue}`);
+
+            if (updateValue !== undefined) {
+                const { data: p, error: pError } = await (await supabase)
+                    .from('players')
+                    .select('ranking')
+                    .eq('id', id)
+                    .single();
+
+                if (pError) {
+                    console.error(`❌ Errore recupero giocatore ${id}:`, pError.message);
+                    continue;
+                }
+
+                if (p) {
+                    const newRanking = p.ranking + updateValue;
+                    console.log(`-> Vecchio ranking: ${p.ranking}, Nuovo: ${newRanking}`);
+
+                    const { error: upError } = await (await supabase)
+                        .from('players')
+                        .update({ ranking: newRanking })
+                        .eq('id', id);
+
+                    if (upError) console.error(`❌ Errore salvataggio ranking giocatore ${id}:`, upError.message);
+                }
             }
         }
+
+        // 5. Chiudiamo la partita impostando il vincitore
+        console.log("💾 Aggiorno lo stato del match in completed...");
+        const { error: matchError } = await (await supabase)
+            .from('matches')
+            .update({
+                status: 'completed',
+                winning_team: data.winningTeam
+            })
+            .eq('id', data.matchId);
+
+        if (matchError) throw new Error(`Errore chiusura partita: ${matchError.message}`);
+
+        // 6. RECUPERIAMO I NOMI DEI GIOCATORI PER L'AUDIT LOG
+        const { data: playersInMatch } = await (await supabase)
+            .from('players')
+            .select('id, first_name, last_name')
+            .in('id', allInvolvedIds);
+
+        const getName = (id: number) => {
+            const p = playersInMatch?.find(pl => pl.id === id);
+            return p ? `${p.first_name} ${p.last_name}` : 'Sconosciuto';
+        };
+
+        const nomeTeamA = `${getName(match.team_a_left_id)}/${getName(match.team_a_right_id)}`;
+        const nomeTeamB = `${getName(match.team_b_left_id)}/${getName(match.team_b_right_id)}`;
+
+        const esitoCampioni = data.winningTeam === 'A'
+            ? `Vince Team A (${nomeTeamA}) contro Team B (${nomeTeamB})`
+            : `Vince Team B (${nomeTeamB}) contro Team A (${nomeTeamA})`;
+
+        const operatore = `${currentUserPlayer.first_name} ${currentUserPlayer.last_name}`;
+        const logDescription = currentUserPlayer.role === 'admin'
+            ? `L'admin ${operatore} ha inserito il risultato: ${esitoCampioni}`
+            : `Il giocatore ${operatore} ha inserito il risultato del suo match: ${esitoCampioni}`;
+
+        // 7. SCRITTURA LOG DI AUDIT
+        const { error: logError } = await (await supabase)
+            .from('audit_logs')
+            .insert([
+                {
+                    admin_id: user.id,
+                    admin_name: operatore,
+                    action_type: 'RESOLVE_MATCH',
+                    target_player_id: null,
+                    details: logDescription
+                }
+            ]);
+
+        if (logError) console.error("❌ Errore scrittura log attività:", logError.message);
+
+        console.log("✅ Server Action completata con successo!");
+        revalidatePath('/');
+
+    } catch (globalError: any) {
+        console.error("💥 CRASH GLOBALE SERVER ACTION:", globalError.message);
+        throw new Error(globalError.message || "Errore interno del server");
     }
-
-    // 5. Chiudiamo la partita impostando il vincitore
-    const { error: matchError } = await (await supabase)
-        .from('matches')
-        .update({
-            status: 'completed',
-            winning_team: data.winningTeam
-        })
-        .eq('id', data.matchId);
-
-    if (matchError) throw new Error(`Errore chiusura partita: ${matchError.message}`);
-
-    // 6. RECUPERIAMO I NOMI DEI GIOCATORI PER L'AUDIT LOG
-    const { data: playersInMatch } = await (await supabase)
-        .from('players')
-        .select('id, first_name, last_name')
-        .in('id', allInvolvedIds);
-
-    const getName = (id: number) => {
-        const p = playersInMatch?.find(pl => pl.id === id);
-        return p ? `${p.first_name} ${p.last_name}` : 'Sconosciuto';
-    };
-
-    const nomeTeamA = `${getName(match.team_a_left_id)}/${getName(match.team_a_right_id)}`;
-    const nomeTeamB = `${getName(match.team_b_left_id)}/${getName(match.team_b_right_id)}`;
-
-    const esitoCampioni = data.winningTeam === 'A'
-        ? `Vince Team A (${nomeTeamA}) contro Team B (${nomeTeamB})`
-        : `Vince Team B (${nomeTeamB}) contro Team A (${nomeTeamA})`;
-
-    const operatore = `${currentUserPlayer.first_name} ${currentUserPlayer.last_name}`;
-    const logDescription = currentUserPlayer.role === 'admin'
-        ? `L'admin ${operatore} ha inserito il risultato: ${esitoCampioni}`
-        : `Il giocatore ${operatore} ha inserito il risultato del suo match: ${esitoCampioni}`;
-
-    // 7. SCRITTURA LOG DI AUDIT
-    const { error: logError } = await (await supabase)
-        .from('audit_logs')
-        .insert([
-            {
-                admin_id: user.id,
-                admin_name: operatore,
-                action_type: 'RESOLVE_MATCH',
-                target_player_id: null,
-                details: logDescription
-            }
-        ]);
-
-    if (logError) console.error("❌ Errore scrittura log attività:", logError.message);
-
-    // Resettiamo le cache della Home
-    redirect('/');
 }

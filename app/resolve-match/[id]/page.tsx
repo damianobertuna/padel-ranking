@@ -16,7 +16,7 @@ interface Player {
 }
 
 interface Match {
-    id: number; // Convertito in numero coerentemente con le relazioni
+    id: string;
     team_a_left_id: number;
     team_a_right_id: number;
     team_b_left_id: number;
@@ -38,15 +38,32 @@ export default function ResolveMatch() {
     // 1. Carichiamo la partita e i giocatori
     useEffect(() => {
         async function fetchData() {
-            const { data: matchData } = await supabase.from('matches').select('*').eq('id', matchId).single();
-            const { data: playersData } = await supabase.from('players').select('*');
+            try {
+                // 1. Scarichiamo i dati del match singolo usando maybeSingle
+                const { data: matchData } = await supabase
+                    .from('matches')
+                    .select('*')
+                    .eq('id', matchId)
+                    .maybeSingle();
 
-            if (matchData) setMatch(matchData);
-            if (playersData) setPlayers(playersData);
-            setLoading(false);
+                // 2. Scarichiamo la lista di tutti i giocatori
+                const { data: playersData } = await supabase
+                    .from('players')
+                    .select('*');
+
+                if (matchData) setMatch(matchData);
+                if (playersData) setPlayers(playersData);
+            } catch (err) {
+                console.error("Errore nel fetch dei dati:", err);
+            } finally {
+                setLoading(false);
+            }
         }
-        fetchData();
-    }, [matchId]);
+
+        if (matchId) {
+            fetchData();
+        }
+    }, [matchId, supabase]);
 
     const getPlayer = (id: number) => players.find((p) => p.id === id);
 
@@ -62,7 +79,6 @@ export default function ResolveMatch() {
         const winnerIds = winningTeam === 'A' ? teamAIds : teamBIds;
         const loserIds = winningTeam === 'A' ? teamBIds : teamAIds;
 
-        // --- TROVIAMO I RUOLI SPECIALI (Logica originale) ---
         const leftPlayers = players.filter(p => p.preferred_side === 'Left').sort((a, b) => b.ranking - a.ranking);
         const rightPlayers = players.filter(p => p.preferred_side === 'Right').sort((a, b) => b.ranking - a.ranking);
         const allPlayersAscending = [...players].sort((a, b) => a.ranking - b.ranking);
@@ -75,16 +91,19 @@ export default function ResolveMatch() {
             lastPlaceId: allPlayersAscending.length > 0 ? allPlayersAscending[0].id : null,
         };
 
-        // Calcoliamo le variazioni tramite il file delle regole
         const updates = calculateRankingUpdates(ctx);
 
         try {
-            // Chiamiamo la nuova Server Action centralizzata
+            // Chiamiamo la Server Action passandogli l'ID stringa (UUID)
             await resolveMatchWithRanking({
                 matchId: match.id,
                 winningTeam: winningTeam,
                 rankingUpdates: updates
             });
+
+            // Eseguiamo il reindirizzamento sul client per evitare eccezioni NEXT_REDIRECT
+            router.push('/');
+            router.refresh();
         } catch (err: any) {
             setError(err.message || 'Errore durante la risoluzione del match.');
             setLoading(false);
@@ -113,7 +132,7 @@ export default function ResolveMatch() {
                     >
                         <h2 className="text-xl font-bold text-blue-800 mb-2 group-hover:scale-105 transition-transform">🏆 Vince Squadra A</h2>
                         <p className="text-sm text-slate-600">
-                            {getPlayer(match.team_a_left_id)?.first_name} e {getPlayer(match.team_a_right_id)?.first_name}
+                            {getPlayer(match.team_a_left_id)?.first_name || 'Caricamento...'} e {getPlayer(match.team_a_right_id)?.first_name || 'Caricamento...'}
                         </p>
                     </button>
 
@@ -124,7 +143,7 @@ export default function ResolveMatch() {
                     >
                         <h2 className="text-xl font-bold text-red-800 mb-2 group-hover:scale-105 transition-transform">🏆 Vince Squadra B</h2>
                         <p className="text-sm text-slate-600">
-                            {getPlayer(match.team_b_left_id)?.first_name} e {getPlayer(match.team_b_right_id)?.first_name}
+                            {getPlayer(match.team_b_left_id)?.first_name || 'Caricamento...'} e {getPlayer(match.team_b_right_id)?.first_name || 'Caricamento...'}
                         </p>
                     </button>
                 </div>
