@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
+import { createPendingMatch } from '@/actions/match-actions';
 
 interface Player {
     id: number;
@@ -32,13 +33,13 @@ export default function NewMatch() {
         fetchPlayers();
     }, []);
 
-    // --- NUOVA LOGICA DI GUARDIA IN TEMPO REALE ---
+    // --- LOGICA DI GUARDIA IN TEMPO REALE ---
 
     // 1. Controlliamo se ci sono doppioni tra i giocatori attualmente selezionati
     const selectedIds = [teamALeft, teamARight, teamBLeft, teamBRight].filter(id => id !== '');
     const hasDuplicates = new Set(selectedIds).size !== selectedIds.length;
 
-    // 2. Controlliamo se la differenza di ranking supera 0.50 (solo se tutti e 4 sono selezionati e non ci sono doppioni)
+    // 2. Controlliamo se la differenza di ranking supera 0.50
     let isRankingDiffInvalid = false;
     const allSelected = selectedIds.length === 4;
 
@@ -64,22 +65,22 @@ export default function NewMatch() {
 
         if (!isFormValid) return; // Blocco di sicurezza extra
 
-        const { error: insertError } = await supabase.from('matches').insert([
-            {
-                match_date: matchDate || null,
-                team_a_left_id: parseInt(teamALeft),
-                team_a_right_id: parseInt(teamARight),
-                team_b_left_id: parseInt(teamBLeft),
-                team_b_right_id: parseInt(teamBRight),
-                status: 'pending'
-            }
-        ]);
+        try {
+            // Eseguiamo la Server Action passando i dati puliti convertiti in numeri
+            await createPendingMatch({
+                matchDate: matchDate || null,
+                teamALeft: parseInt(teamALeft),
+                teamARight: parseInt(teamARight),
+                teamBLeft: parseInt(teamBLeft),
+                teamBRight: parseInt(teamBRight)
+            });
 
-        if (insertError) {
-            setError('Errore durante il salvataggio della partita.');
-            console.error(insertError);
-        } else {
+            // Se l'azione (e l'audit log) va a buon fine, torniamo alla Home rinfrescata
             router.push('/');
+            router.refresh();
+        } catch (insertError: any) {
+            setError(insertError.message || 'Errore durante il salvataggio della partita e dell\'audit log.');
+            console.error(insertError);
         }
     };
 

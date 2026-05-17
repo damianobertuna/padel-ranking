@@ -41,12 +41,6 @@ export default async function AdminPlayersManagement() {
                     <div>
                         <Link href="/" className="text-sm font-semibold text-indigo-600 hover:underline">← Torna alla Classifica</Link>
                         <h1 className="text-3xl font-bold text-slate-800 mt-2">Gestione Giocatori (Admin)</h1>
-                        <Link
-                            href="/admin/logs"
-                            className="bg-indigo-600 text-white font-bold py-2 px-4 rounded hover:bg-indigo-700 transition-colors text-sm shadow-sm"
-                        >
-                            📋 Vedi Registro Attività
-                        </Link>
                     </div>
                 </div>
 

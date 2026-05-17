@@ -141,7 +141,14 @@ export default async function Home() {
                             >
                                 ⚙️ Gestione Giocatori
                             </Link>
-                        )}
+                        ) && (
+                            <Link
+                                href="/admin/logs"
+                                className="bg-indigo-600 text-white font-bold py-2 px-4 rounded hover:bg-indigo-700 transition-colors text-sm shadow-sm"
+                            >
+                                📋 Vedi Registro Attività
+                            </Link>
+                            )}
                     </div>
                 </div>
 

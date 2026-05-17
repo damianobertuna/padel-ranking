@@ -33,7 +33,7 @@ export default async function AdminAuditLogs() {
             <div className="max-w-5xl w-full">
 
                 <div className="mb-6">
-                    <Link href="/admin/players" className="text-sm font-semibold text-indigo-600 hover:underline">← Torna a Gestione Giocatori</Link>
+                    <Link href="/" className="text-sm font-semibold text-indigo-600 hover:underline">← Torna alla Home</Link>
                     <h1 className="text-3xl font-bold text-slate-800 mt-2">Registro Attività (Audit Logs)</h1>
                     <p className="text-sm text-slate-500">Cronologia in tempo reale di tutte le modifiche amministrative apportate al sistema.</p>
                 </div>

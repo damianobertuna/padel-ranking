@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter, useParams } from 'next/navigation';
 import { calculateRankingUpdates, MatchContext } from '@/lib/matchRules';
+import { resolveMatchWithRanking } from '@/actions/match-actions';
 
 interface Player {
     id: number;
@@ -15,11 +16,12 @@ interface Player {
 }
 
 interface Match {
-    id: string;
+    id: number; // Convertito in numero coerentemente con le relazioni
     team_a_left_id: number;
     team_a_right_id: number;
     team_b_left_id: number;
     team_b_right_id: number;
+    status: string;
 }
 
 export default function ResolveMatch() {
@@ -31,8 +33,9 @@ export default function ResolveMatch() {
     const [match, setMatch] = useState<Match | null>(null);
     const [players, setPlayers] = useState<Player[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
 
-    // 1. Carichiamo la partita e tutti i giocatori
+    // 1. Carichiamo la partita e i giocatori
     useEffect(() => {
         async function fetchData() {
             const { data: matchData } = await supabase.from('matches').select('*').eq('id', matchId).single();
@@ -45,15 +48,13 @@ export default function ResolveMatch() {
         fetchData();
     }, [matchId]);
 
-    // Helper per trovare i dati di un giocatore
     const getPlayer = (id: number) => players.find((p) => p.id === id);
 
-    // 2. Il Motore di aggiornamento (Per ora logica base ±0.05)
-    // 2. Il Motore di aggiornamento Avanzato
-    // 2. Il Motore di aggiornamento (ora usa la logica testata esterna!)
+    // 2. Gestione della risoluzione del match
     const handleResult = async (winningTeam: 'A' | 'B') => {
         if (!match) return;
         setLoading(true);
+        setError('');
 
         const teamAIds = [match.team_a_left_id, match.team_a_right_id];
         const teamBIds = [match.team_b_left_id, match.team_b_right_id];
@@ -61,12 +62,11 @@ export default function ResolveMatch() {
         const winnerIds = winningTeam === 'A' ? teamAIds : teamBIds;
         const loserIds = winningTeam === 'A' ? teamBIds : teamAIds;
 
-        // --- TROVIAMO I RUOLI SPECIALI ---
+        // --- TROVIAMO I RUOLI SPECIALI (Logica originale) ---
         const leftPlayers = players.filter(p => p.preferred_side === 'Left').sort((a, b) => b.ranking - a.ranking);
         const rightPlayers = players.filter(p => p.preferred_side === 'Right').sort((a, b) => b.ranking - a.ranking);
         const allPlayersAscending = [...players].sort((a, b) => a.ranking - b.ranking);
 
-        // Creiamo il contesto da passare alla nostra funzione pura
         const ctx: MatchContext = {
             winnerIds,
             loserIds,
@@ -75,33 +75,20 @@ export default function ResolveMatch() {
             lastPlaceId: allPlayersAscending.length > 0 ? allPlayersAscending[0].id : null,
         };
 
-        // --- CALCOLIAMO LE VARIAZIONI DI PUNTEGGIO ---
+        // Calcoliamo le variazioni tramite il file delle regole
         const updates = calculateRankingUpdates(ctx);
 
-        // --- SALVIAMO TUTTO SUL DATABASE ---
-        const allInvolvedIds = [...winnerIds, ...loserIds];
-
-        for (const id of allInvolvedIds) {
-            const p = getPlayer(id);
-            if (p && updates[id] !== undefined) {
-                const newRanking = p.ranking + updates[id];
-
-                const { error: updateError } = await supabase
-                    .from('players')
-                    .update({ ranking: newRanking })
-                    .eq('id', id);
-
-                if (updateError) console.error(`Errore aggiornamento giocatore ${id}:`, updateError);
-            }
+        try {
+            // Chiamiamo la nuova Server Action centralizzata
+            await resolveMatchWithRanking({
+                matchId: match.id,
+                winningTeam: winningTeam,
+                rankingUpdates: updates
+            });
+        } catch (err: any) {
+            setError(err.message || 'Errore durante la risoluzione del match.');
+            setLoading(false);
         }
-
-        // Chiudiamo la partita
-        await supabase.from('matches').update({
-            status: 'completed',
-            winning_team: winningTeam
-        }).eq('id', match.id);
-
-        router.push('/');
     };
 
     if (loading) return <div className="p-8 text-center text-slate-500">Caricamento...</div>;
@@ -111,6 +98,12 @@ export default function ResolveMatch() {
         <main className="min-h-screen p-8 bg-slate-100 flex flex-col items-center">
             <div className="max-w-xl w-full bg-white p-8 rounded-lg shadow-md">
                 <h1 className="text-2xl font-bold text-slate-800 mb-6 text-center">Chi ha vinto al meglio dei 3 set?</h1>
+
+                {error && (
+                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 text-sm">
+                        {error}
+                    </div>
+                )}
 
                 <div className="space-y-4">
                     {/* Pulsante Vittoria Squadra A */}
