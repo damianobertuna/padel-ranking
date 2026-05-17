@@ -18,7 +18,9 @@ export default function Login() {
     const [lastName, setLastName] = useState('');
     const [preferredSide, setPreferredSide] = useState('Left');
     const [dominantHand, setDominantHand] = useState('Destro');
-    const [initialRanking, setInitialRanking] = useState('4.50'); // Default ufficiale del regolamento
+    const [initialRanking, setInitialRanking] = useState('4.50');
+    const [phone, setPhone] = useState(''); // <-- STATO AGGIUNTO PER RISOLVERE L'ERRORE
+    const [privacyAccepted, setPrivacyAccepted] = useState(false); // <-- STATO AGGIUNTO PER LA PRIVACY
 
     // Stati per la UX
     const [error, setError] = useState('');
@@ -38,6 +40,18 @@ export default function Login() {
                 return;
             }
 
+            if (!phone.trim()) {
+                setError('Il numero di telefono è obbligatorio!');
+                setLoading(false);
+                return;
+            }
+
+            if (!privacyAccepted) {
+                setError('Devi accettare l\'Informativa sulla Privacy per registrarti.');
+                setLoading(false);
+                return;
+            }
+
             const parsedRanking = parseFloat(initialRanking) || 4.50;
 
             // 1. Creiamo le credenziali d'accesso
@@ -53,7 +67,7 @@ export default function Login() {
             }
 
             if (authData?.user) {
-                // 2. Creiamo il giocatore usando il ranking scelto dall'utente
+                // 2. Creiamo il giocatore includendo il numero di telefono
                 const { error: playerError } = await supabase
                     .from('players')
                     .insert([
@@ -64,6 +78,7 @@ export default function Login() {
                             preferred_side: preferredSide,
                             dominant_hand: dominantHand,
                             ranking: parsedRanking,
+                            phone: phone.trim(), // <-- INVIAMO IL TELEFONO AL DATABASE
                             role: 'user'
                         }
                     ]);
@@ -72,10 +87,12 @@ export default function Login() {
                     setError("Account creato, ma c'è stato un errore nella creazione del profilo di gioco.");
                     console.error(playerError);
                 } else {
-                    setMessage('Profilo creato e inserito in classifica con il tuo ranking! Ora puoi fare il login.');
+                    setMessage('Profilo creato con successo! Ora puoi fare il login.');
                     setFirstName('');
                     setLastName('');
+                    setPhone('');
                     setInitialRanking('4.50');
+                    setPrivacyAccepted(false);
                     setIsSignUp(false);
                 }
             }
@@ -154,7 +171,21 @@ export default function Login() {
                                 />
                             </div>
 
-                            {/* Ranking Iniziale + Guida Autovalutazione */}
+                            {/* Numero di Telefono */}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Numero di Telefono (WhatsApp)</label>
+                                <input
+                                    type="tel"
+                                    required
+                                    value={phone}
+                                    onChange={(e) => setPhone(e.target.value)}
+                                    className="w-full border border-slate-300 rounded p-2 bg-white text-slate-950 font-mono"
+                                    placeholder="Es. +39 347 1234567"
+                                />
+                                <p className="text-xs text-slate-400 mt-1">Necessario per le future funzioni di coordinamento via WhatsApp.</p>
+                            </div>
+
+                            {/* Ranking Iniziale */}
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Livello / Ranking Iniziale</label>
                                 <input
@@ -168,11 +199,10 @@ export default function Login() {
                                     className="w-full border border-slate-300 rounded p-2 bg-white text-slate-950 font-mono text-lg font-bold text-indigo-600"
                                 />
 
-                                {/* Box Informativo Regolamento */}
                                 <div className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded text-xs text-slate-600 space-y-1.5">
                                     <p className="font-semibold text-slate-700">📖 Regolamento di Autovalutazione:</p>
                                     <p>
-                                        Per stabilire il tuo livello iniziale, fai riferimento alla guida ufficiale dei livelli cliccando qui:{' '}
+                                        Per stabilire il tuo livello iniziale, fai riferimento alla guida ufficiale cliccando qui:{' '}
                                         <a
                                             href="https://www.padelnuestro.com/it/blog/livelli-del-padel"
                                             target="_blank"
@@ -183,8 +213,7 @@ export default function Login() {
                                         </a>.
                                     </p>
                                     <p className="italic text-slate-500">
-                                        Nota: Se non conosci il tuo livello, lascia pure il valore di default di <strong>4.50</strong>.
-                                        Ricorda che il valore RanKING serve a garantire partite equilibrate (forbice massima di ±0.25 tra i giocatori di un match). Sarà poi il campo a delineare il tuo reale valore!
+                                        Nota: Se non conosci il tuo livello, lascia pure il valore di 4.50. Il valore RanKING serve a garantire partite equilibrate (forbice massima di ±0.25).
                                     </p>
                                 </div>
                             </div>
@@ -213,6 +242,25 @@ export default function Login() {
                                     <option value="Destro">Destro</option>
                                     <option value="Mancino">Mancino</option>
                                 </select>
+                            </div>
+
+                            {/* Checkbox Privacy */}
+                            <div className="flex items-start mt-4 p-1">
+                                <div className="flex items-center h-5">
+                                    <input
+                                        id="privacy"
+                                        type="checkbox"
+                                        required
+                                        checked={privacyAccepted}
+                                        onChange={(e) => setPrivacyAccepted(e.target.checked)}
+                                        className="h-4 w-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+                                    />
+                                </div>
+                                <div className="ml-3 text-xs">
+                                    <label htmlFor="privacy" className="font-medium text-slate-700 cursor-pointer">
+                                        Accetto il trattamento dei dati personali secondo la nostra Informativa sulla Privacy.
+                                    </label>
+                                </div>
                             </div>
 
                             <hr className="border-slate-200 my-4" />
