@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
-import WinRateWidget from '@/components/WinRateWidget'; // <-- 1. IMPORTIAMO IL NUOVO WIDGET
+import WinRateWidget from '@/components/WinRateWidget';
+import StreakWidget from '@/components/StreakWidget';
 
 interface PageProps {
     params: Promise<{ id: string }>;
@@ -98,6 +99,8 @@ export default async function PlayerProfile({ params }: PageProps) {
                 {/* Sezione Statistiche Avanzate (Sostituisce i vecchi 3 quadratini piatti) */}
                 <div className="mb-8 flex justify-center sm:justify-start">
                     <WinRateWidget stats={statsForWidget} />
+                    {/* Gli passiamo la lista completa dei match arricchiti, ci pensa lui a prendere gli ultimi 5 */}
+                    <StreakWidget enrichedMatches={enrichedMatches} />
                 </div>
 
                 {/* Elenco Storico Partite del Singolo Giocatore */}
