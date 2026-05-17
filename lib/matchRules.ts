@@ -89,3 +89,51 @@ export function canUserResolveMatch(auth: AuthContext | null, match: MatchPlayer
         match.team_b_right_id === auth.userPlayerId
     );
 }
+
+export interface PlayerWinRateStats {
+    totalPlayed: number;
+    totalWon: number;
+    totalLost: number;
+    winRate: number; // Valore percentuale (es. 65.4)
+}
+
+/**
+ * Calcola il Win Rate di un singolo giocatore partendo dallo storico dei suoi match completati
+ */
+export function calculatePlayerWinRate(playerId: number, completedMatches: any[]): PlayerWinRateStats {
+    let totalWon = 0;
+    let totalLost = 0;
+
+    // Filtriamo solo i match in cui il giocatore è sceso in campo
+    const playerMatches = completedMatches.filter(match =>
+            match.status === 'completed' && (
+                match.team_a_left_id === playerId ||
+                match.team_a_right_id === playerId ||
+                match.team_b_left_id === playerId ||
+                match.team_b_right_id === playerId
+            )
+    );
+
+    playerMatches.forEach(match => {
+        // Determiniamo se il giocatore era in Squadra A o Squadra B
+        const isTeamA = match.team_a_left_id === playerId || match.team_a_right_id === playerId;
+        const winner = match.winning_team; // Può essere 'A' o 'B'
+
+        if ((isTeamA && winner === 'A') || (!isTeamA && winner === 'B')) {
+            totalWon++;
+        } else {
+            totalLost++;
+        }
+    });
+
+    const totalPlayed = totalWon + totalLost;
+    // Evitiamo la divisione per zero se il giocatore non ha ancora partite completate
+    const winRate = totalPlayed > 0 ? parseFloat(((totalWon / totalPlayed) * 100).toFixed(1)) : 0;
+
+    return {
+        totalPlayed,
+        totalWon,
+        totalLost,
+        winRate
+    };
+}

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
+import WinRateWidget from '@/components/WinRateWidget'; // <-- 1. IMPORTIAMO IL NUOVO WIDGET
 
 interface PageProps {
     params: Promise<{ id: string }>;
@@ -43,15 +44,12 @@ export default async function PlayerProfile({ params }: PageProps) {
         .or(`team_a_left_id.eq.${playerId},team_a_right_id.eq.${playerId},team_b_left_id.eq.${playerId},team_b_right_id.eq.${playerId}`)
         .order('created_at', { ascending: false });
 
-    // 4. CALCOLO STATISTICHE
+    // 4. CALCOLO STATISTICHE NATIE
     let victories = 0;
     let defeats = 0;
 
     const enrichedMatches = (matches || []).map(match => {
-        // Capiamo in che squadra giocava il giocatore in questo specifico match
         const isTeamA = [match.team_a_left_id, match.team_a_right_id].includes(playerId);
-
-        // Ha vinto se (giocava nel team A e ha vinto A) OPPURE (giocava nel team B e ha vinto B)
         const won = (isTeamA && match.winning_team === 'A') || (!isTeamA && match.winning_team === 'B');
 
         if (won) victories++;
@@ -64,7 +62,15 @@ export default async function PlayerProfile({ params }: PageProps) {
     });
 
     const totalMatches = victories + defeats;
-    const winRate = totalMatches > 0 ? (victories / totalMatches) * 100 : 0;
+    const winRate = totalMatches > 0 ? parseFloat(((victories / totalMatches) * 100).toFixed(1)) : 0;
+
+    // 2. ADASSIAMO I TUOI DATI PER IL FORMATO RICHIESTO DAL WIDGET
+    const statsForWidget = {
+        totalPlayed: totalMatches,
+        totalWon: victories,
+        totalLost: defeats,
+        winRate: winRate
+    };
 
     return (
         <main className="min-h-screen p-8 bg-slate-100 flex flex-col items-center">
@@ -89,33 +95,9 @@ export default async function PlayerProfile({ params }: PageProps) {
                     </div>
                 </div>
 
-                {/* Griglia dei Widget delle Statistiche */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-
-                    {/* Giocate */}
-                    <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 text-center">
-                        <div className="text-xs font-bold text-slate-400 uppercase">Partite Giocate</div>
-                        <div className="text-3xl font-bold text-slate-800 mt-2">{totalMatches}</div>
-                    </div>
-
-                    {/* Bilancio V/S */}
-                    <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 text-center">
-                        <div className="text-xs font-bold text-slate-400 uppercase">Bilancio (V / S)</div>
-                        <div className="text-3xl font-bold text-slate-800 mt-2">
-                            <span className="text-green-600">{victories}</span>
-                            <span className="text-slate-300 mx-2">/</span>
-                            <span className="text-red-600">{defeats}</span>
-                        </div>
-                    </div>
-
-                    {/* Win Rate */}
-                    <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 text-center">
-                        <div className="text-xs font-bold text-slate-400 uppercase">Percentuale Vittorie</div>
-                        <div className={`text-3xl font-bold mt-2 ${winRate >= 50 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                            {winRate.toFixed(0)}%
-                        </div>
-                    </div>
-
+                {/* Sezione Statistiche Avanzate (Sostituisce i vecchi 3 quadratini piatti) */}
+                <div className="mb-8 flex justify-center sm:justify-start">
+                    <WinRateWidget stats={statsForWidget} />
                 </div>
 
                 {/* Elenco Storico Partite del Singolo Giocatore */}
