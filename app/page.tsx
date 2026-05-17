@@ -145,7 +145,7 @@ export default async function Home() {
                 </div>
 
                 {/* TABELLA CLASSIFICA */}
-                <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-12 border border-slate-200">
+                <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-8 border border-slate-200">
                     <table className="w-full text-left border-collapse">
                         <thead>
                         <tr className="bg-slate-800 text-white text-sm uppercase">
@@ -197,6 +197,36 @@ export default async function Home() {
                     </table>
                 </div>
 
+                {/* BANNER PUBBLICITARIO SPONSOR - BIONUTRIMED */}
+                {/* BANNER PUBBLICITARIO SPONSOR - BIONUTRIMED */}
+                <div className="w-full bg-gradient-to-r from-indigo-950 to-slate-900 text-white p-6 rounded-lg shadow-sm mb-12 flex flex-col md:flex-row items-center justify-between gap-6 border border-slate-700">
+                    <div className="flex items-center gap-4 text-center md:text-left flex-col md:flex-row">
+                        {/* Contenitore bianco per far risaltare il logo scuro */}
+                        <div className="bg-white p-2 rounded-md flex items-center justify-center shadow-sm max-w-[140px] shrink-0">
+                            <img
+                                src="https://www.bionutrimed.it/templates/rt_gemini/custom/images/loghi/bionutrimed_logo_small.png"
+                                alt="BioNutriMed Logo"
+                                className="h-10 w-auto object-contain select-none"
+                            />
+                        </div>
+
+                        <div>
+                            <h3 className="text-base font-bold tracking-wide text-slate-100">Vuoi scalare il Ranking? Cura la tua nutrizione!</h3>
+                            <p className="text-xs text-slate-300 max-w-xl mt-1 leading-relaxed">
+                                Scopri come un'alimentazione strategica su misura può aumentare la tua resistenza nei match più lunghi e velocizzare il recovery muscolare.
+                            </p>
+                        </div>
+                    </div>
+                    <a
+                        href="https://www.bionutrimed.it/prenota/prenota-visita-in-studio.html"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs uppercase tracking-wider py-3 px-5 rounded transition-all shadow-sm hover:scale-[1.02] text-center w-full md:w-auto"
+                    >
+                        🌐 Prenota una visita su Bionutrimed
+                    </a>
+                </div>
+
                 {/* SEZIONE 1: PARTITE IN PROGRAMMA */}
                 <h2 className="text-2xl font-bold text-slate-800 mb-4">Partite in Programma</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
@@ -228,7 +258,6 @@ export default async function Home() {
 
                                     {/* BLOCCO BOTTONI DI AZIONE */}
                                     <div className="flex flex-col gap-2">
-                                        {/* Tasto condivisone WhatsApp sempre accessibile */}
                                         <a
                                             href={generaLinkWhatsApp(match)}
                                             target="_blank"
