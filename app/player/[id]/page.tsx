@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import WinRateWidget from '@/components/WinRateWidget';
 import StreakWidget from '@/components/StreakWidget';
+import PartnersAndNemesisWidget from '@/components/PartnersAndNemesisWidget';
 
 interface PageProps {
     params: Promise<{ id: string }>;
@@ -101,6 +102,12 @@ export default async function PlayerProfile({ params }: PageProps) {
                     <WinRateWidget stats={statsForWidget} />
                     {/* Gli passiamo la lista completa dei match arricchiti, ci pensa lui a prendere gli ultimi 5 */}
                     <StreakWidget enrichedMatches={enrichedMatches} />
+                    {/* Nuovo widget relazionale */}
+                    <PartnersAndNemesisWidget
+                        playerId={playerId}
+                        enrichedMatches={enrichedMatches}
+                        allPlayers={allPlayers || []}
+                    />
                 </div>
 
                 {/* Elenco Storico Partite del Singolo Giocatore */}
