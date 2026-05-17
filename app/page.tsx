@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import { canUserResolveMatch } from '@/lib/matchRules';
+import DeleteMatchButton from '@/components/DeleteMatchButton';
 
 export const revalidate = 0;
 
@@ -258,6 +259,7 @@ export default async function Home() {
 
                                     {/* BLOCCO BOTTONI DI AZIONE */}
                                     <div className="flex flex-col gap-2">
+                                        {/* Tasto condivisone WhatsApp sempre accessibile */}
                                         <a
                                             href={generaLinkWhatsApp(match)}
                                             target="_blank"
@@ -270,18 +272,25 @@ export default async function Home() {
                                             Convoca su WhatsApp
                                         </a>
 
-                                        {canResolve ? (
-                                            <Link
-                                                href={`/resolve-match/${match.id}`}
-                                                className="w-full text-center bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold py-2 rounded transition-colors shadow-sm"
-                                            >
-                                                Inserisci Risultato
-                                            </Link>
-                                        ) : (
-                                            <div className="w-full text-center bg-slate-100 text-slate-400 text-xs py-2 rounded italic select-none border border-slate-200">
-                                                Sola lettura (non sei in campo)
-                                            </div>
-                                        )}
+                                        <div className="flex gap-2 w-full">
+                                            {canResolve ? (
+                                                <Link
+                                                    href={`/resolve-match/${match.id}`}
+                                                    className="flex-1 text-center bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold py-2 rounded transition-colors shadow-sm"
+                                                >
+                                                    Inserisci Risultato
+                                                </Link>
+                                            ) : (
+                                                <div className="flex-1 text-center bg-slate-100 text-slate-400 text-xs py-2 rounded italic select-none border border-slate-200 flex items-center justify-center">
+                                                    Sola lettura (non sei in campo)
+                                                </div>
+                                            )}
+
+                                            {/* CANCELLAZIONE SICURA TRAMITE IL CLIENT COMPONENT ESTRATTO */}
+                                            {canResolve && (
+                                                <DeleteMatchButton matchId={match.id} />
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             );

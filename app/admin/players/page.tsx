@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { updatePlayerByAdmin } from '../player-actions';
+import { updatePlayerByAdmin } from '../../../actions/player-actions';
 
 export const revalidate = 0; // Evita cache aggressiva
 
