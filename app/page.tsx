@@ -4,11 +4,6 @@ import { canUserResolveMatch } from '@/lib/matchRules';
 
 export const revalidate = 0;
 
-const sideTranslations: Record<string, string> = {
-    'Left': 'SX',
-    'Right': 'DX',
-};
-
 export default async function Home() {
     const supabase = await createClient();
 
@@ -39,25 +34,65 @@ export default async function Home() {
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
-    // 5. NUOVO: Recuperiamo lo STORICO delle ultime 10 partite completate (completed)
+    // 5. Recuperiamo lo STORICO delle ultime 10 partite completate (completed)
     const { data: completedMatches, error: matchError } = await supabase
         .from('matches')
         .select('*')
         .eq('status', 'completed')
-        .order('updated_at', { ascending: false }) // Ordinate dalla più recente alla più vecchia
+        .order('updated_at', { ascending: false })
         .limit(10);
+
     console.log("=== DEBUG MATCH COMPLETATI ===");
     console.log("Errore query:", matchError);
     console.log("Quanti match trovati con 'completed':", completedMatches?.length);
+
     const leftPlayers = players?.filter(p => p.preferred_side === 'Left') || [];
     const rightPlayers = players?.filter(p => p.preferred_side === 'Right') || [];
     const kingLeftId = leftPlayers.length > 0 ? leftPlayers[0].id : null;
     const kingRightId = rightPlayers.length > 0 ? rightPlayers[0].id : null;
     const lastPlaceId = players && players.length > 0 ? players[players.length - 1].id : null;
 
+    // Helper per recuperare nome e cognome
     const getPlayerName = (id: number) => {
         const p = players?.find(player => player.id === id);
         return p ? `${p.first_name} ${p.last_name}` : 'Sconosciuto';
+    };
+
+    // Helper per recuperare l'oggetto giocatore completo (serve per il ranking del link WhatsApp)
+    const getPlayerObj = (id: number) => {
+        return players?.find(player => player.id === id) || null;
+    };
+
+    // FUNZIONE GENERATRICE LINK WHATSAPP (SOLUZIONE 1)
+    const generaLinkWhatsApp = (match: any) => {
+        const pA1 = getPlayerObj(match.team_a_left_id);
+        const pA2 = getPlayerObj(match.team_a_right_id);
+        const pB1 = getPlayerObj(match.team_b_left_id);
+        const pB2 = getPlayerObj(match.team_b_right_id);
+
+        const dataFormattata = new Date(match.created_at).toLocaleString('it-IT', {
+            day: '2-digit',
+            month: 'short',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        const testo =
+            `🎾 *RanKING Padel - Convocazione Match* 🎾
+
+📅 *Data d'organizzazione:* ${dataFormattata}
+
+👥 *SQUADRA A:*
+• ${pA1 ? `${pA1.first_name} ${pA1.last_name}` : 'Sconosciuto'} (${pA1 ? pA1.ranking.toFixed(2) : '0.00'})
+• ${pA2 ? `${pA2.first_name} ${pA2.last_name}` : 'Sconosciuto'} (${pA2 ? pA2.ranking.toFixed(2) : '0.00'})
+
+👥 *SQUADRA B:*
+• ${pB1 ? `${pB1.first_name} ${pB1.last_name}` : 'Sconosciuto'} (${pB1 ? pB1.ranking.toFixed(2) : '0.00'})
+• ${pB2 ? `${pB2.first_name} ${pB2.last_name}` : 'Sconosciuto'} (${pB2 ? pB2.ranking.toFixed(2) : '0.00'})
+
+👉 Accedi all'app per inserire il risultato a fine partita!`;
+
+        return `https://wa.me/?text=${encodeURIComponent(testo)}`;
     };
 
     return (
@@ -90,25 +125,27 @@ export default async function Home() {
                 {/* INTESTAZIONE CLASSIFICA */}
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-3xl font-bold text-slate-800">RanKING Padel</h1>
-                    {user && (
-                        <Link href="/new-match" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded transition-colors text-sm">
-                            + Nuova Partita
-                        </Link>
-                    )}
+                    <div className="flex gap-2">
+                        {user && (
+                            <Link href="/new-match" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded transition-colors text-sm shadow-sm">
+                                + Nuova Partita
+                            </Link>
+                        )}
 
-                    {/* Se l'utente è admin, mostriamo anche il link di gestione */}
-                    {currentUserPlayer?.role === 'admin' && (
-                        <Link
-                            href="/admin/players"
-                            className="bg-slate-800 text-white font-bold py-2 px-4 rounded hover:bg-slate-900 transition-colors text-sm shadow-sm"
-                        >
-                            ⚙️ Gestione Giocatori
-                        </Link>
-                    )}
+                        {/* Se l'utente è admin, mostriamo anche il link di gestione */}
+                        {currentUserPlayer?.role === 'admin' && (
+                            <Link
+                                href="/admin/players"
+                                className="bg-slate-800 text-white font-bold py-2 px-4 rounded hover:bg-slate-900 transition-colors text-sm shadow-sm"
+                            >
+                                ⚙️ Gestione Giocatori
+                            </Link>
+                        )}
+                    </div>
                 </div>
 
                 {/* TABELLA CLASSIFICA */}
-                <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-12">
+                <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-12 border border-slate-200">
                     <table className="w-full text-left border-collapse">
                         <thead>
                         <tr className="bg-slate-800 text-white text-sm uppercase">
@@ -173,32 +210,50 @@ export default async function Home() {
                             const canResolve = canUserResolveMatch(authCtx, match);
 
                             return (
-                                <div key={match.id} className="bg-white p-6 rounded-lg shadow-sm border border-slate-200 flex flex-col justify-between">
-                                    <div className="grid grid-cols-2 gap-4 text-center mb-4">
-                                        <div className="bg-blue-50 p-3 rounded">
-                                            <div className="text-xs font-bold text-blue-600 uppercase mb-1">Coppia A</div>
-                                            <div className="text-sm font-semibold text-slate-800">{getPlayerName(match.team_a_left_id)}</div>
-                                            <div className="text-sm font-semibold text-slate-800">{getPlayerName(match.team_a_right_id)}</div>
-                                        </div>
-                                        <div className="bg-emerald-50 p-3 rounded">
-                                            <div className="text-xs font-bold text-emerald-600 uppercase mb-1">Coppia B</div>
-                                            <div className="text-sm font-semibold text-slate-800">{getPlayerName(match.team_b_left_id)}</div>
-                                            <div className="text-sm font-semibold text-slate-800">{getPlayerName(match.team_b_right_id)}</div>
+                                <div key={match.id} className="bg-white p-6 rounded-lg shadow-sm border border-slate-200 flex flex-col justify-between gap-4">
+                                    <div>
+                                        <div className="grid grid-cols-2 gap-4 text-center mb-4">
+                                            <div className="bg-blue-50 p-3 rounded border border-blue-100">
+                                                <div className="text-xs font-bold text-blue-600 uppercase mb-1">Coppia A</div>
+                                                <div className="text-sm font-semibold text-slate-800">{getPlayerName(match.team_a_left_id)}</div>
+                                                <div className="text-sm font-semibold text-slate-800">{getPlayerName(match.team_a_right_id)}</div>
+                                            </div>
+                                            <div className="bg-emerald-50 p-3 rounded border border-emerald-100">
+                                                <div className="text-xs font-bold text-emerald-600 uppercase mb-1">Coppia B</div>
+                                                <div className="text-sm font-semibold text-slate-800">{getPlayerName(match.team_b_left_id)}</div>
+                                                <div className="text-sm font-semibold text-slate-800">{getPlayerName(match.team_b_right_id)}</div>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {canResolve ? (
-                                        <Link
-                                            href={`/resolve-match/${match.id}`}
-                                            className="mt-2 w-full text-center bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold py-2 rounded transition-colors"
+                                    {/* BLOCCO BOTTONI DI AZIONE */}
+                                    <div className="flex flex-col gap-2">
+                                        {/* Tasto condivisone WhatsApp sempre accessibile */}
+                                        <a
+                                            href={generaLinkWhatsApp(match)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded text-sm transition-colors shadow-sm"
                                         >
-                                            Inserisci Risultato
-                                        </Link>
-                                    ) : (
-                                        <div className="mt-2 w-full text-center bg-slate-100 text-slate-400 text-xs py-2 rounded italic select-none">
-                                            Sola lettura (non sei in campo)
-                                        </div>
-                                    )}
+                                            <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                                                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397 0 11.948 0c3.173.001 6.154 1.24 8.396 3.486 2.242 2.246 3.479 5.23 3.477 8.406-.003 6.557-5.338 11.907-11.89 11.907-2.013-.001-3.99-.51-5.741-1.48L0 24zm6.59-4.846c1.66.986 3.288 1.447 4.805 1.448 5.41-.001 9.814-4.415 9.816-9.83.001-2.624-1.012-5.09-2.856-6.937C16.569 1.988 14.09 1.05 11.47 1.05c-5.416 0-9.821 4.415-9.824 9.83-.001 2.05.534 3.513 1.41 5.03L2.025 21.93l6.222-1.63z" />
+                                            </svg>
+                                            Convoca su WhatsApp
+                                        </a>
+
+                                        {canResolve ? (
+                                            <Link
+                                                href={`/resolve-match/${match.id}`}
+                                                className="w-full text-center bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold py-2 rounded transition-colors shadow-sm"
+                                            >
+                                                Inserisci Risultato
+                                            </Link>
+                                        ) : (
+                                            <div className="w-full text-center bg-slate-100 text-slate-400 text-xs py-2 rounded italic select-none border border-slate-200">
+                                                Sola lettura (non sei in campo)
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             );
                         })
@@ -207,12 +262,12 @@ export default async function Home() {
                     )}
                 </div>
 
-                {/* NUOVA SEZIONE 2: STORICO RISULTATI RECENTI */}
+                {/* SEZIONE 2: STORICO RISULTATI RECENTI */}
                 <h2 className="text-2xl font-bold text-slate-800 mb-4">Risultati Recenti</h2>
                 <div className="space-y-4">
                     {completedMatches && completedMatches.length > 0 ? (
                         completedMatches.map((match) => {
-                            const winner = match.winning_team; // 'A' o 'B'
+                            const winner = match.winning_team;
 
                             return (
                                 <div key={match.id} className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
