@@ -5,13 +5,24 @@ import DeleteMatchButton from '@/components/DeleteMatchButton';
 
 export const revalidate = 0;
 
-export default async function Home() {
+// Definiamo il numero di match da mostrare per pagina nello storico
+const MATCHES_PER_PAGE = 5;
+
+interface PageProps {
+    searchParams: Promise<{ page?: string }>;
+}
+
+export default async function Home({ searchParams }: PageProps) {
     const supabase = await createClient();
 
-    // 1. Recuperiamo la sessione dell'utente loggato
+    // 1. Intercettiamo la pagina corrente dai parametri dell'URL (Next.js 15 richiede l'await)
+    const resolvedParams = await searchParams;
+    const currentPage = parseInt(resolvedParams.page || '1', 10) || 1;
+
+    // 2. Recuperiamo la sessione dell'utente loggato
     const { data: { user } } = await supabase.auth.getUser();
 
-    // 2. Se l'utente è loggato, recuperiamo il suo profilo giocatore
+    // 3. Se l'utente è loggato, recuperiamo il suo profilo giocatore
     let currentUserPlayer = null;
     if (user) {
         const { data: playerData } = await supabase
@@ -22,30 +33,36 @@ export default async function Home() {
         currentUserPlayer = playerData;
     }
 
-    // 3. Recuperiamo la classifica completa
+    // 4. Recuperiamo la classifica completa
     const { data: players } = await supabase
         .from('players')
         .select('*')
         .order('ranking', { ascending: false });
 
-    // 4. Recuperiamo le partite IN PROGRAMMA (pending)
+    // 5. Recuperiamo le partite IN PROGRAMMA (pending)
     const { data: pendingMatches } = await supabase
         .from('matches')
         .select('*')
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
-    // 5. Recuperiamo lo STORICO delle ultime 10 partite completate (completed)
-    const { data: completedMatches, error: matchError } = await supabase
+    // 6. PAGINAZIONE RISULTATI: Calcoliamo gli indici per la query Supabase
+    const fromRange = (currentPage - 1) * MATCHES_PER_PAGE;
+    const toRange = fromRange + MATCHES_PER_PAGE - 1;
+
+    // Recuperiamo i match completati all'interno del range e il conteggio totale (count: 'exact')
+    const { data: completedMatches, count: totalCompletedCount, error: matchError } = await supabase
         .from('matches')
-        .select('*')
+        .select('*', { count: 'exact' })
         .eq('status', 'completed')
         .order('updated_at', { ascending: false })
-        .limit(10);
+        .range(fromRange, toRange);
 
-    console.log("=== DEBUG MATCH COMPLETATI ===");
-    console.log("Errore query:", matchError);
-    console.log("Quanti match trovati con 'completed':", completedMatches?.length);
+    const totalPages = totalCompletedCount ? Math.ceil(totalCompletedCount / MATCHES_PER_PAGE) : 1;
+
+    console.log(`=== DEBUG PAGINAZIONE (Pagina ${currentPage}/${totalPages}) ===`);
+    console.log("Match trovati in questo range:", completedMatches?.length);
+    console.log("Totale match completati nel DB:", totalCompletedCount);
 
     const leftPlayers = players?.filter(p => p.preferred_side === 'Left') || [];
     const rightPlayers = players?.filter(p => p.preferred_side === 'Right') || [];
@@ -79,19 +96,7 @@ export default async function Home() {
         });
 
         const testo =
-            `🎾 *RanKING Padel - Convocazione Match* 🎾
-
-📅 *Data d'organizzazione:* ${dataFormattata}
-
-👥 *SQUADRA A:*
-• ${pA1 ? `${pA1.first_name} ${pA1.last_name}` : 'Sconosciuto'} (${pA1 ? pA1.ranking.toFixed(2) : '0.00'})
-• ${pA2 ? `${pA2.first_name} ${pA2.last_name}` : 'Sconosciuto'} (${pA2 ? pA2.ranking.toFixed(2) : '0.00'})
-
-👥 *SQUADRA B:*
-• ${pB1 ? `${pB1.first_name} ${pB1.last_name}` : 'Sconosciuto'} (${pB1 ? pB1.ranking.toFixed(2) : '0.00'})
-• ${pB2 ? `${pB2.first_name} ${pB2.last_name}` : 'Sconosciuto'} (${pB2 ? pB2.ranking.toFixed(2) : '0.00'})
-
-👉 Accedi all'app per inserire il risultato a fine partita!`;
+            `🎾 *RanKING Padel - Convocazione Match* 🎾\n\n📅 *Data d'organizzazione:* ${dataFormattata}\n\n👥 *SQUADRA A:*\n• ${pA1 ? `${pA1.first_name} ${pA1.last_name}` : 'Sconosciuto'} (${pA1 ? pA1.ranking.toFixed(2) : '0.00'})\n• ${pA2 ? `${pA2.first_name} ${pA2.last_name}` : 'Sconosciuto'} (${pA2 ? pA2.ranking.toFixed(2) : '0.00'})\n\n👥 *SQUADRA B:*\n• ${pB1 ? `${pB1.first_name} ${pB1.last_name}` : 'Sconosciuto'} (${pB1 ? pB1.ranking.toFixed(2) : '0.00'})\n• ${pB2 ? `${pB2.first_name} ${pB2.last_name}` : 'Sconosciuto'} (${pB2 ? pB2.ranking.toFixed(2) : '0.00'})\n\n👉 Accedi all'app per inserire il risultato a fine partita!`;
 
         return `https://wa.me/?text=${encodeURIComponent(testo)}`;
     };
@@ -145,7 +150,7 @@ export default async function Home() {
                     </div>
                 </div>
 
-                {/* NUOVA SEZIONE: CLASSIFICA CARD OTTIMIZZATA PER MOBILE */}
+                {/* CLASSIFICA CARD OTTIMIZZATA PER MOBILE */}
                 <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Classifica Ufficiale</h2>
                 <div className="flex flex-col gap-2.5 mb-8">
                     {players?.map((player, index) => {
@@ -160,7 +165,6 @@ export default async function Home() {
                                 href={`/player/${player.id}`}
                                 className="w-full bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between transition-all active:bg-slate-50 active:scale-[0.99] touch-manipulation"
                             >
-                                {/* Parte Sinistra: Posizione e Info Giocatore */}
                                 <div className="flex items-center gap-3 min-w-0">
                                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black font-mono shrink-0 ${
                                         rankIndex === 1 ? 'bg-amber-100 text-amber-700 border border-amber-300' :
@@ -190,18 +194,12 @@ export default async function Home() {
                                     </div>
                                 </div>
 
-                                {/* Parte Destra: Ranking e Freccia Mobile */}
                                 <div className="flex items-center gap-3 shrink-0">
                                     <div className="text-right">
                                         <div className="text-lg font-mono font-black text-indigo-600 leading-none">
                                             {player.ranking.toFixed(2)}
                                         </div>
                                         <span className="text-[9px] text-slate-400 uppercase tracking-tight font-bold">Punti</span>
-                                    </div>
-                                    <div className="text-slate-300 bg-slate-50 p-1.5 rounded-lg border border-slate-100 sm:block hidden">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5 text-slate-400">
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                                        </svg>
                                     </div>
                                 </div>
                             </Link>
@@ -283,14 +281,16 @@ export default async function Home() {
                     )}
                 </div>
 
-                {/* SEZIONE 2: STORICO RISULTATI RECENTI CON SET */}
-                <h2 className="text-2xl font-bold text-slate-800 mb-4">Risultati Recenti</h2>
+                {/* SEZIONE 2: STORICO RISULTATI RECENTI PAGINATO */}
+                <div className="flex justify-between items-baseline mb-4">
+                    <h2 className="text-2xl font-bold text-slate-800">Risultati Recenti</h2>
+                    <span className="text-xs font-semibold text-slate-400 font-mono">Pagina {currentPage} di {totalPages}</span>
+                </div>
+
                 <div className="space-y-3">
                     {completedMatches && completedMatches.length > 0 ? (
                         completedMatches.map((match) => {
                             const winner = match.winning_team;
-
-                            // Recuperiamo l'array dei set (se vuoto mettiamo un fallback)
                             const sets = (match.score || []) as Array<{team_a: number, team_b: number}>;
 
                             return (
@@ -335,17 +335,45 @@ export default async function Home() {
 
                                     </div>
 
-                                    {/* Data di chiusura match in piccolo sul fondo della card */}
                                     <div className="text-[10px] text-slate-400 text-center sm:text-left font-medium border-t border-slate-50 pt-2">
-                                        Disputata il {new Date(match.updated_at).toLocaleDateString('it-IT')} alle {new Date(match.updated_at).toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})}
+                                        Disputata il {new Date(match.updated_at).toLocaleDateString('it-IT')}
                                     </div>
                                 </div>
                             );
                         })
                     ) : (
-                        <p className="text-slate-500 italic">Nessun match disputato finora.</p>
+                        <p className="text-slate-500 italic">Nessun match completato in questa pagina.</p>
                     )}
                 </div>
+
+                {/* CONTROLLI DI PAGINAZIONE (BOTTONI AVANTI / DIETRO) */}
+                {totalPages > 1 && (
+                    <div className="flex justify-center items-center gap-4 mt-6">
+                        <Link
+                            href={`/?page=${currentPage - 1}`}
+                            scroll={false}
+                            className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all active:scale-95 ${
+                                currentPage <= 1 ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'
+                            }`}
+                        >
+                            ← Precedente
+                        </Link>
+
+                        <div className="text-xs font-bold text-slate-500 font-mono">
+                            {currentPage} / {totalPages}
+                        </div>
+
+                        <Link
+                            href={`/?page=${currentPage + 1}`}
+                            scroll={false}
+                            className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all active:scale-95 ${
+                                currentPage >= totalPages ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'
+                            }`}
+                        >
+                            Successiva →
+                        </Link>
+                    </div>
+                )}
 
             </div>
         </main>
