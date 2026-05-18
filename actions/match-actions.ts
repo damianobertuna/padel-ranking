@@ -1,18 +1,26 @@
 'use server';
 
-import {createClient} from "@/lib/supabase/server";
-import {revalidatePath} from "next/cache";
-import { redirect } from 'next/navigation';
+import { createClient } from "@/lib/supabase/server";
+import { revalidatePath } from "next/cache";
 
+// Interfaccia per la struttura del set
+export interface SetScore {
+    team_a: number;
+    team_b: number;
+}
+
+/**
+ * 1. CANCELLAZIONE DI UN MATCH IN PROGRAMMA
+ */
 export async function deletePendingMatch(matchId: number) {
-    const supabase = createClient();
+    const supabase = await createClient();
 
-    // 1. Controlliamo che l'utente sia loggato
-    const { data: { user } } = await (await supabase).auth.getUser();
+    // Controlliamo l'autenticazione
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Utente non autenticato");
 
-    // 2. Recuperiamo il suo profilo giocatore
-    const { data: currentUserPlayer } = await (await supabase)
+    // Recuperiamo il profilo del giocatore operativo
+    const { data: currentUserPlayer } = await supabase
         .from('players')
         .select('*')
         .eq('user_id', user.id)
@@ -20,8 +28,8 @@ export async function deletePendingMatch(matchId: number) {
 
     if (!currentUserPlayer) throw new Error("Profilo giocatore non trovato");
 
-    // 3. Recuperiamo la partita per verificare lo stato e i partecipanti
-    const { data: match } = await (await supabase)
+    // Recuperiamo la partita per verificare lo stato e i partecipanti
+    const { data: match } = await supabase
         .from('matches')
         .select('*')
         .eq('id', matchId)
@@ -41,7 +49,8 @@ export async function deletePendingMatch(matchId: number) {
         throw new Error("Non hai i permessi per cancellare questa partita");
     }
 
-    const { data: playersInMatch } = await (await supabase)
+    // Recuperiamo i nomi dei giocatori coinvolti per costruire la stringa di Log
+    const { data: playersInMatch } = await supabase
         .from('players')
         .select('id, first_name, last_name')
         .in('id', [match.team_a_left_id, match.team_a_right_id, match.team_b_left_id, match.team_b_right_id]);
@@ -54,42 +63,40 @@ export async function deletePendingMatch(matchId: number) {
     const dettagliMatch = `${getName(match.team_a_left_id)}/${getName(match.team_a_right_id)} VS ${getName(match.team_b_left_id)}/${getName(match.team_b_right_id)}`;
     const operatore = `${currentUserPlayer.first_name} ${currentUserPlayer.last_name}`;
 
-    // Costruiamo la descrizione in base al ruolo (se è l'admin a cancellare o un giocatore stesso)
     const logDescription = currentUserPlayer.role === 'admin'
         ? `L'admin ${operatore} ha annullato la partita in programma: ${dettagliMatch}`
         : `Il giocatore ${operatore} ha annullato la propria partita in programma: ${dettagliMatch}`;
 
-    // === NUOVO: SCRITTURA NELL'AUDIT LOG ===
-    const { error: logError } = await (await supabase).from('audit_logs').insert([
+    // Scrittura nel registro delle attività (Audit Log)
+    const { error: logError } = await supabase.from('audit_logs').insert([
         {
             admin_id: user.id,
             admin_name: operatore,
-            action_type: 'DELETE_MATCH',
-            target_player_id: null, // Esplicitiamo a null visto che non è un update giocatore
+            action_type: 'MATCH_DELETED',
+            target_player_id: null,
             details: logDescription
         }
     ]);
 
     if (logError) {
-        console.error("❌ ERRORE CRITICO SCRITTURA AUDIT LOG:", logError.message);
-        throw new Error(`Impossibile procedere: Errore nel registro delle attività (${logError.message})`);
+        console.error("❌ ERRORE CRITICO SCRITTURA AUDIT LOG CANCELLAZIONE:", logError.message);
+        throw new Error(`Impossibile procedere: Errore nel registro delle attività`);
     }
 
-    // 4. Cancelliamo il match dal database
-    const { error } = await (await supabase)
+    // Cancelliamo fisicamente il match
+    const { error } = await supabase
         .from('matches')
         .delete()
         .eq('id', matchId);
 
-    if (error) {
-        console.error("Errore cancellazione match:", error);
-        throw new Error(error.message);
-    }
+    if (error) throw new Error(error.message);
 
-    // Resettiamo la cache della Home per far sparire la partita all'istante
     revalidatePath('/');
 }
 
+/**
+ * 2. CREAZIONE DI UN NUOVO MATCH IN PROGRAMMA
+ */
 export async function createPendingMatch(data: {
     matchDate: string | null;
     teamALeft: number;
@@ -97,14 +104,13 @@ export async function createPendingMatch(data: {
     teamBLeft: number;
     teamBRight: number;
 }) {
-    const supabase = createClient();
+    const supabase = await createClient();
 
-    // 1. Controlliamo l'autenticazione dell'utente che crea il match
-    const { data: { user } } = await (await supabase).auth.getUser();
+    // Controlliamo l'autenticazione
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Utente non autenticato");
 
-    // 2. Recuperiamo il profilo di chi sta creando la partita
-    const { data: currentUserPlayer } = await (await supabase)
+    const { data: currentUserPlayer } = await supabase
         .from('players')
         .select('*')
         .eq('user_id', user.id)
@@ -112,8 +118,8 @@ export async function createPendingMatch(data: {
 
     if (!currentUserPlayer) throw new Error("Profilo giocatore non trovato");
 
-    // 3. Inseriamo il nuovo match in stato 'pending'
-    const { error: matchError } = await (await supabase)
+    // Inseriamo il match in stato pending
+    const { error: matchError } = await supabase
         .from('matches')
         .insert([
             {
@@ -126,13 +132,10 @@ export async function createPendingMatch(data: {
             }
         ]);
 
-    if (matchError) {
-        console.error("Errore creazione match:", matchError.message);
-        throw new Error(`Errore database: ${matchError.message}`);
-    }
+    if (matchError) throw new Error(`Errore database: ${matchError.message}`);
 
-    // 4. RECUPERIAMO I NOMI DEI GIOCATORI COINVOLTI PER L'AUDIT LOG
-    const { data: playersInMatch } = await (await supabase)
+    // Recuperiamo i nomi per la compilazione del log
+    const { data: playersInMatch } = await supabase
         .from('players')
         .select('id, first_name, last_name')
         .in('id', [data.teamALeft, data.teamARight, data.teamBLeft, data.teamBRight]);
@@ -149,209 +152,114 @@ export async function createPendingMatch(data: {
         ? `L'admin ${operatore} ha creato una nuova partita in programma: ${dettagliMatch}`
         : `Il giocatore ${operatore} ha organizzato una nuova partita in programma: ${dettagliMatch}`;
 
-    // 5. SCRITTURA DEL LOG DI AUDIT
-    const { error: logError } = await (await supabase)
-        .from('audit_logs')
-        .insert([
-            {
-                admin_id: user.id,
-                admin_name: operatore,
-                action_type: 'CREATE_MATCH',
-                target_player_id: null,
-                details: logDescription
-            }
-        ]);
+    // Scrittura Audit Log
+    const { error: logError } = await supabase.from('audit_logs').insert([
+        {
+            admin_id: user.id,
+            admin_name: operatore,
+            action_type: 'MATCH_CREATED',
+            target_player_id: null,
+            details: logDescription
+        }
+    ]);
 
-    if (logError) {
-        console.error("❌ ERRORE SCRITTURA LOG CREAZIONE MATCH:", logError.message);
-        throw new Error(`Errore registro attività: ${logError.message}`);
-    }
+    if (logError) console.error("❌ ERRORE LOG CREAZIONE MATCH:", logError.message);
 
-    // Svuota la cache della home in modo che veda la nuova partita al rientro
     revalidatePath('/');
 }
 
-export async function resolveMatchWithLog(data: {
-    matchId: number;
-    setsWonA: number;
-    setsWonB: number;
-}) {
-    const supabase = createClient();
-
-    // 1. Controlliamo l'autenticazione dell'utente
-    const { data: { user } } = await (await supabase).auth.getUser();
-    if (!user) throw new Error("Utente non autenticato");
-
-    // 2. Recuperiamo il profilo di chi sta inserendo il risultato
-    const { data: currentUserPlayer } = await (await supabase)
-        .from('players')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-    if (!currentUserPlayer) throw new Error("Profilo giocatore non trovato");
-
-    // 3. Recuperiamo i dettagli del match prima di modificarlo per sapere chi ha giocato
-    const { data: match } = await (await supabase)
-        .from('matches')
-        .select('*')
-        .eq('id', data.matchId)
-        .single();
-
-    if (!match) throw new Error("Partita non trovata");
-    if (match.status !== 'pending') throw new Error("Questa partita è già stata risolta");
-
-    // 4. Aggiorniamo lo stato del match su Supabase con il risultato
-    const winnerTeam = data.setsWonA > data.setsWonB ? 'A' : 'B';
-    const { error: matchError } = await (await supabase)
-        .from('matches')
-        .update({
-            sets_won_a: data.setsWonA,
-            sets_won_b: data.setsWonB,
-            winner_team: winnerTeam,
-            status: 'completed',
-            resolved_at: new Date().toISOString(),
-            resolved_by_profile_id: currentUserPlayer.id
-        })
-        .eq('id', data.matchId);
-
-    if (matchError) {
-        console.error("Errore durante la risoluzione del match:", matchError.message);
-        throw new Error(`Errore database: ${matchError.message}`);
-    }
-
-    // === RECUPERIAMO I NOMI DEI GIOCATORI PER IL LOG ===
-    const { data: playersInMatch } = await (await supabase)
-        .from('players')
-        .select('id, first_name, last_name')
-        .in('id', [match.team_a_left_id, match.team_a_right_id, match.team_b_left_id, match.team_b_right_id]);
-
-    const getName = (id: number) => {
-        const p = playersInMatch?.find(pl => pl.id === id);
-        return p ? `${p.first_name} ${p.last_name}` : 'Sconosciuto';
-    };
-
-    const nomeTeamA = `${getName(match.team_a_left_id)}/${getName(match.team_a_right_id)}`;
-    const nomeTeamB = `${getName(match.team_b_left_id)}/${getName(match.team_b_right_id)}`;
-
-    // Costruiamo una stringa del risultato (es: 2 - 1)
-    const punteggio = `${data.setsWonA}-${data.setsWonB}`;
-    const esitoCampioni = winnerTeam === 'A'
-        ? `Vince Team A (${nomeTeamA}) contro Team B (${nomeTeamB})`
-        : `Vince Team B (${nomeTeamB}) contro Team A (${nomeTeamA})`;
-
-    const operatore = `${currentUserPlayer.first_name} ${currentUserPlayer.last_name}`;
-    const logDescription = currentUserPlayer.role === 'admin'
-        ? `L'admin ${operatore} ha registrato il risultato: ${esitoCampioni} con punteggio ${punteggio}`
-        : `Il giocatore ${operatore} ha registrato il risultato del suo match: ${esitoCampioni} con punteggio ${punteggio}`;
-
-    // === SCRITTURA DEL LOG DI AUDIT ===
-    const { error: logError } = await (await supabase)
-        .from('audit_logs')
-        .insert([
-            {
-                admin_id: user.id,
-                admin_name: operatore,
-                action_type: 'RESOLVE_MATCH', // Nuovo action type specifico
-                target_player_id: null,
-                details: logDescription
-            }
-        ]);
-
-    if (logError) {
-        console.error("❌ ERRORE SCRITTURA LOG RISOLUZIONE MATCH:", logError.message);
-        throw new Error(`Errore registro attività: ${logError.message}`);
-    }
-
-    // Aggiorniamo le cache della Home e delle pagine admin/log
-    revalidatePath('/');
-    revalidatePath('/admin/logs');
-}
-
+/**
+ * 3. RISOLUZIONE DI UN MATCH CON CALCOLO RANKING, SET FACOLTATIVI E AUDIT LOG (VERSIONE DEFINITIVA)
+ */
 export async function resolveMatchWithRanking(data: {
     matchId: string;
-    winningTeam: 'A' | 'B';
+    score: SetScore[];
+    winningTeam?: 'A' | 'B'; // Facoltativo, usato come fallback se lo score è vuoto
     rankingUpdates: Record<number, number>;
 }) {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     try {
-        console.log("🚀 Server Action avviata per Match:", data.matchId);
+        console.log("🚀 Server Action avviata per Risoluzione Match ID:", data.matchId);
 
-        // 1. Controlliamo l'autenticazione
-        const { data: { user } } = await (await supabase).auth.getUser();
+        // Controllo Autenticazione ed Identità
+        const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("Utente non autenticato");
 
-        // 2. Profilo dell'operatore
-        const { data: currentUserPlayer } = await (await supabase)
+        const { data: currentUserPlayer } = await supabase
             .from('players')
             .select('*')
             .eq('user_id', user.id)
             .single();
         if (!currentUserPlayer) throw new Error("Profilo giocatore non trovato");
 
-        // 3. Recuperiamo il match prima di chiuderlo
-        const { data: match } = await (await supabase)
+        // Recupero info della partita da chiudere
+        const { data: match } = await supabase
             .from('matches')
             .select('*')
             .eq('id', data.matchId)
             .single();
+
         if (!match) throw new Error("Partita non trovata nel database");
         if (match.status !== 'pending') throw new Error("Questa partita è già stata risolta");
 
+        // DETERMINAZIONE DELLA SQUADRA VINCITRICE
+        let finalWinningTeam: 'A' | 'B' | null = null;
+        let stringaPunteggio = "Punteggio non inserito (Risoluzione Rapida)";
+
+        if (data.score && data.score.length > 0) {
+            // Algoritmo di calcolo automatico basato sui game dei Set inseriti
+            let setsWonA = 0;
+            let setsWonB = 0;
+
+            data.score.forEach(set => {
+                if (set.team_a > set.team_b) setsWonA++;
+                else if (set.team_b > set.team_a) setsWonB++;
+            });
+
+            if (setsWonA !== 0 || setsWonB !== 0) {
+                finalWinningTeam = setsWonA > setsWonB ? 'A' : 'B';
+                stringaPunteggio = data.score.map(s => `${s.team_a}-${s.team_b}`).join(" / ");
+            }
+        }
+
+        // Fallback: se i set sono vuoti, usiamo la selezione manuale proveniente dal form
+        if (!finalWinningTeam) {
+            if (!data.winningTeam) throw new Error("Devi compilare i parziali dei set o indicare la coppia vincitrice.");
+            finalWinningTeam = data.winningTeam;
+        }
+
+        // AGGIORNAMENTO DEL RANKING DEI SINGOLI GIOCATORI
         const allInvolvedIds = [
             match.team_a_left_id, match.team_a_right_id,
             match.team_b_left_id, match.team_b_right_id
         ];
 
-        console.log("👥 Giocatori coinvolti (ID numerici):", allInvolvedIds);
-        console.log("📈 Aggiornamenti ranking ricevuti:", data.rankingUpdates);
-
-        // 4. Aggiorniamo il ranking di tutti i giocatori coinvolti
         for (const id of allInvolvedIds) {
             const updateValue = data.rankingUpdates[id];
-            console.log(`Eseguo update per giocatore ID ${id}. Variazione: ${updateValue}`);
-
             if (updateValue !== undefined) {
-                const { data: p, error: pError } = await (await supabase)
-                    .from('players')
-                    .select('ranking')
-                    .eq('id', id)
-                    .single();
-
-                if (pError) {
-                    console.error(`❌ Errore recupero giocatore ${id}:`, pError.message);
-                    continue;
-                }
-
+                const { data: p } = await supabase.from('players').select('ranking').eq('id', id).single();
                 if (p) {
                     const newRanking = p.ranking + updateValue;
-                    console.log(`-> Vecchio ranking: ${p.ranking}, Nuovo: ${newRanking}`);
-
-                    const { error: upError } = await (await supabase)
-                        .from('players')
-                        .update({ ranking: newRanking })
-                        .eq('id', id);
-
-                    if (upError) console.error(`❌ Errore salvataggio ranking giocatore ${id}:`, upError.message);
+                    await supabase.from('players').update({ ranking: newRanking }).eq('id', id);
                 }
             }
         }
 
-        // 5. Chiudiamo la partita impostando il vincitore
-        console.log("💾 Aggiorno lo stato del match in completed...");
-        const { error: matchError } = await (await supabase)
+        // AGGIORNAMENTO RECORD DEL MATCH (Salvataggio in stato 'completed')
+        const { error: matchError } = await supabase
             .from('matches')
             .update({
                 status: 'completed',
-                winning_team: data.winningTeam
+                winning_team: finalWinningTeam,
+                score: data.score || [] // Scrittura sicura dentro il campo JSONB
             })
             .eq('id', data.matchId);
 
         if (matchError) throw new Error(`Errore chiusura partita: ${matchError.message}`);
 
-        // 6. RECUPERIAMO I NOMI DEI GIOCATORI PER L'AUDIT LOG
-        const { data: playersInMatch } = await (await supabase)
+        // GENERAZIONE STRINGHE E SCRITTURA NELL'AUDIT LOG
+        const { data: playersInMatch } = await supabase
             .from('players')
             .select('id, first_name, last_name')
             .in('id', allInvolvedIds);
@@ -361,38 +269,37 @@ export async function resolveMatchWithRanking(data: {
             return p ? `${p.first_name} ${p.last_name}` : 'Sconosciuto';
         };
 
-        const nomeTeamA = `${getName(match.team_a_left_id)}/${getName(match.team_a_right_id)}`;
-        const nomeTeamB = `${getName(match.team_b_left_id)}/${getName(match.team_b_right_id)}`;
+        const nomeTeamA = `${getName(match.team_a_left_id)} / ${getName(match.team_a_right_id)}`;
+        const nomeTeamB = `${getName(match.team_b_left_id)} / ${getName(match.team_b_right_id)}`;
 
-        const esitoCampioni = data.winningTeam === 'A'
-            ? `Vince Team A (${nomeTeamA}) contro Team B (${nomeTeamB})`
-            : `Vince Team B (${nomeTeamB}) contro Team A (${nomeTeamA})`;
+        const esitoDescrizione = finalWinningTeam === 'A'
+            ? `Vince il Team A (${nomeTeamA}) contro il Team B (${nomeTeamB})`
+            : `Vince il Team B (${nomeTeamB}) contro il Team A (${nomeTeamA})`;
 
         const operatore = `${currentUserPlayer.first_name} ${currentUserPlayer.last_name}`;
-        const logDescription = currentUserPlayer.role === 'admin'
-            ? `L'admin ${operatore} ha inserito il risultato: ${esitoCampioni}`
-            : `Il giocatore ${operatore} ha inserito il risultato del suo match: ${esitoCampioni}`;
 
-        // 7. SCRITTURA LOG DI AUDIT
-        const { error: logError } = await (await supabase)
-            .from('audit_logs')
-            .insert([
-                {
-                    admin_id: user.id,
-                    admin_name: operatore,
-                    action_type: 'RESOLVE_MATCH',
-                    target_player_id: null,
-                    details: logDescription
-                }
-            ]);
+        const logDetails = currentUserPlayer.role === 'admin'
+            ? `L'admin ${operatore} ha registrato il risultato: ${esitoDescrizione} [${stringaPunteggio}]`
+            : `Il giocatore ${operatore} ha registrato il risultato del proprio match: ${esitoDescrizione} [${stringaPunteggio}]`;
 
-        if (logError) console.error("❌ Errore scrittura log attività:", logError.message);
+        const { error: logError } = await supabase.from('audit_logs').insert([
+            {
+                admin_id: user.id,
+                admin_name: operatore,
+                action_type: 'MATCH_RESOLVED',
+                target_player_id: null,
+                details: logDetails
+            }
+        ]);
+
+        if (logError) console.error("❌ ERRORE SCRITTURA LOG RISOLUZIONE MATCH:", logError.message);
 
         console.log("✅ Server Action completata con successo!");
         revalidatePath('/');
+        revalidatePath('/admin/logs');
 
     } catch (globalError: any) {
-        console.error("💥 CRASH GLOBALE SERVER ACTION:", globalError.message);
+        console.error("💥 ERRORE SERVER ACTION:", globalError.message);
         throw new Error(globalError.message || "Errore interno del server");
     }
 }
