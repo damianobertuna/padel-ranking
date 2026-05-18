@@ -5,24 +5,22 @@ import DeleteMatchButton from '@/components/DeleteMatchButton';
 
 export const revalidate = 0;
 
-// Definiamo il numero di match da mostrare per pagina nello storico
 const MATCHES_PER_PAGE = 5;
 
 interface PageProps {
-    searchParams: Promise<{ page?: string }>;
+    searchParams: Promise<{ page?: string; sort?: string }>;
 }
 
 export default async function Home({ searchParams }: PageProps) {
     const supabase = await createClient();
 
-    // 1. Intercettiamo la pagina corrente dai parametri dell'URL (Next.js 15 richiede l'await)
+    // 1. Recuperiamo i parametri dall'URL
     const resolvedParams = await searchParams;
     const currentPage = parseInt(resolvedParams.page || '1', 10) || 1;
+    const currentSort = resolvedParams.sort || 'ranking'; // 'ranking', 'played', 'winrate'
 
-    // 2. Recuperiamo la sessione dell'utente loggato
+    // 2. Autenticazione e Profilo
     const { data: { user } } = await supabase.auth.getUser();
-
-    // 3. Se l'utente è loggato, recuperiamo il suo profilo giocatore
     let currentUserPlayer = null;
     if (user) {
         const { data: playerData } = await supabase
@@ -33,25 +31,70 @@ export default async function Home({ searchParams }: PageProps) {
         currentUserPlayer = playerData;
     }
 
-    // 4. Recuperiamo la classifica completa
-    const { data: players } = await supabase
-        .from('players')
-        .select('*')
-        .order('ranking', { ascending: false });
+    // 3. Recuperiamo i dati base per la classifica e TUTTI i match completati
+    // Ci servono tutti i match storici per calcolare al volo partite giocate e win rate di ognuno
+    const { data: rawPlayers } = await supabase.from('players').select('*');
+    const { data: allCompletedMatches } = await supabase.from('matches').select('*').eq('status', 'completed');
 
-    // 5. Recuperiamo le partite IN PROGRAMMA (pending)
+    // 4. ELABORAZIONE STATISTICHE GIOCATORI IN TEMPO REALE
+    const playersWithStats = (rawPlayers || []).map(player => {
+        // Contiamo quanti match ha giocato e quanti ne ha vinti
+        let played = 0;
+        let won = 0;
+
+        (allCompletedMatches || []).forEach(match => {
+            const isTeamA = [match.team_a_left_id, match.team_a_right_id].includes(player.id);
+            const isTeamB = [match.team_b_left_id, match.team_b_right_id].includes(player.id);
+
+            if (isTeamA || isTeamB) {
+                played++;
+                if (isTeamA && match.winning_team === 'A') won++;
+                if (isTeamB && match.winning_team === 'B') won++;
+            }
+        });
+
+        const winRate = played > 0 ? (won / played) * 100 : 0;
+
+        return {
+            ...player,
+            total_played: played,
+            win_rate: winRate
+        };
+    });
+
+    // 5. APPLICAZIONE DELL'ORDINAMENTO DINAMICO (SORT)
+    const sortedPlayers = [...playersWithStats].sort((a, b) => {
+        if (currentSort === 'played') {
+            // Ordina per partite giocate (se pari, spareggio per ranking)
+            return b.total_played - a.total_played || b.ranking - a.ranking;
+        }
+        if (currentSort === 'winrate') {
+            // Ordina per Win Rate (se pari, spareggio per partite giocate)
+            return b.win_rate - a.win_rate || b.total_played - a.total_played;
+        }
+        // Default: Ordinamento classico per Punti Ranking
+        return b.ranking - a.ranking;
+    });
+
+    // Identifichiamo i ruoli speciali basandoci sul ranking puro (anche se la classifica cambia ordine)
+    const leftPlayers = sortedPlayers.filter(p => p.preferred_side === 'Left').sort((a,b) => b.ranking - a.ranking);
+    const rightPlayers = sortedPlayers.filter(p => p.preferred_side === 'Right').sort((a,b) => b.ranking - a.ranking);
+    const kingLeftId = leftPlayers.length > 0 ? leftPlayers[0].id : null;
+    const kingRightId = rightPlayers.length > 0 ? rightPlayers[0].id : null;
+    const lastPlaceId = [...sortedPlayers].sort((a,b) => a.ranking - b.ranking).length > 0 ? [...sortedPlayers].sort((a,b) => a.ranking - b.ranking)[0].id : null;
+
+    // 6. Recuperiamo le partite IN PROGRAMMA (pending)
     const { data: pendingMatches } = await supabase
         .from('matches')
         .select('*')
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
-    // 6. PAGINAZIONE RISULTATI: Calcoliamo gli indici per la query Supabase
+    // 7. PAGINAZIONE RISULTATI STORICI RECENTI
     const fromRange = (currentPage - 1) * MATCHES_PER_PAGE;
     const toRange = fromRange + MATCHES_PER_PAGE - 1;
 
-    // Recuperiamo i match completati all'interno del range e il conteggio totale (count: 'exact')
-    const { data: completedMatches, count: totalCompletedCount, error: matchError } = await supabase
+    const { data: completedMatches, count: totalCompletedCount } = await supabase
         .from('matches')
         .select('*', { count: 'exact' })
         .eq('status', 'completed')
@@ -60,44 +103,20 @@ export default async function Home({ searchParams }: PageProps) {
 
     const totalPages = totalCompletedCount ? Math.ceil(totalCompletedCount / MATCHES_PER_PAGE) : 1;
 
-    console.log(`=== DEBUG PAGINAZIONE (Pagina ${currentPage}/${totalPages}) ===`);
-    console.log("Match trovati in questo range:", completedMatches?.length);
-    console.log("Totale match completati nel DB:", totalCompletedCount);
-
-    const leftPlayers = players?.filter(p => p.preferred_side === 'Left') || [];
-    const rightPlayers = players?.filter(p => p.preferred_side === 'Right') || [];
-    const kingLeftId = leftPlayers.length > 0 ? leftPlayers[0].id : null;
-    const kingRightId = rightPlayers.length > 0 ? rightPlayers[0].id : null;
-    const lastPlaceId = players && players.length > 0 ? players[players.length - 1].id : null;
-
     // Helper per recuperare nome e cognome
     const getPlayerName = (id: number) => {
-        const p = players?.find(player => player.id === id);
+        const p = rawPlayers?.find(player => player.id === id);
         return p ? `${p.first_name} ${p.last_name}` : 'Sconosciuto';
     };
 
-    // Helper per recuperare l'oggetto giocatore completo (serve per il ranking del link WhatsApp)
-    const getPlayerObj = (id: number) => {
-        return players?.find(player => player.id === id) || null;
-    };
+    const getPlayerObj = (id: number) => rawPlayers?.find(player => player.id === id) || null;
 
     // FUNZIONE GENERATRICE LINK WHATSAPP
     const generaLinkWhatsApp = (match: any) => {
-        const pA1 = getPlayerObj(match.team_a_left_id);
-        const pA2 = getPlayerObj(match.team_a_right_id);
-        const pB1 = getPlayerObj(match.team_b_left_id);
-        const pB2 = getPlayerObj(match.team_b_right_id);
-
-        const dataFormattata = new Date(match.created_at).toLocaleString('it-IT', {
-            day: '2-digit',
-            month: 'short',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-
-        const testo =
-            `🎾 *RanKING Padel - Convocazione Match* 🎾\n\n📅 *Data d'organizzazione:* ${dataFormattata}\n\n👥 *SQUADRA A:*\n• ${pA1 ? `${pA1.first_name} ${pA1.last_name}` : 'Sconosciuto'} (${pA1 ? pA1.ranking.toFixed(2) : '0.00'})\n• ${pA2 ? `${pA2.first_name} ${pA2.last_name}` : 'Sconosciuto'} (${pA2 ? pA2.ranking.toFixed(2) : '0.00'})\n\n👥 *SQUADRA B:*\n• ${pB1 ? `${pB1.first_name} ${pB1.last_name}` : 'Sconosciuto'} (${pB1 ? pB1.ranking.toFixed(2) : '0.00'})\n• ${pB2 ? `${pB2.first_name} ${pB2.last_name}` : 'Sconosciuto'} (${pB2 ? pB2.ranking.toFixed(2) : '0.00'})\n\n👉 Accedi all'app per inserire il risultato a fine partita!`;
-
+        const pA1 = getPlayerObj(match.team_a_left_id); const pA2 = getPlayerObj(match.team_a_right_id);
+        const pB1 = getPlayerObj(match.team_b_left_id); const pB2 = getPlayerObj(match.team_b_right_id);
+        const dataFormattata = new Date(match.created_at).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+        const testo = `🎾 *RanKING Padel - Convocazione Match* 🎾\n\n📅 *Data d'organizzazione:* ${dataFormattata}\n\n👥 *SQUADRA A:*\n• ${pA1 ? `${pA1.first_name} ${pA1.last_name}` : 'Sconosciuto'} (${pA1 ? pA1.ranking.toFixed(2) : '0.00'})\n• ${pA2 ? `${pA2.first_name} ${pA2.last_name}` : 'Sconosciuto'} (${pA2 ? pA2.ranking.toFixed(2) : '0.00'})\n\n👥 *SQUADRA B:*\n• ${pB1 ? `${pB1.first_name} ${pB1.last_name}` : 'Sconosciuto'} (${pB1 ? pB1.ranking.toFixed(2) : '0.00'})\n• ${pB2 ? `${pB2.first_name} ${pB2.last_name}` : 'Sconosciuto'} (${pB2 ? pB2.ranking.toFixed(2) : '0.00'})\n\n👉 Accedi all'app per inserire il risultato a fine partita!`;
         return `https://wa.me/?text=${encodeURIComponent(testo)}`;
     };
 
@@ -105,7 +124,7 @@ export default async function Home({ searchParams }: PageProps) {
         <main className="min-h-screen p-4 sm:p-8 bg-slate-100 flex flex-col items-center">
             <div className="max-w-4xl w-full">
 
-                {/* BARRA DI AUTENTICAZIONE IN ALTO */}
+                {/* BARRA DI AUTENTICAZIONE */}
                 <div className="w-full flex justify-between items-center mb-6 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                     <div className="min-w-0">
                         {user ? (
@@ -128,7 +147,7 @@ export default async function Home({ searchParams }: PageProps) {
                     </div>
                 </div>
 
-                {/* INTESTAZIONE CLASSIFICA */}
+                {/* INTESTAZIONE */}
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
                     <h1 className="text-3xl font-black text-slate-800 tracking-tight">RanKING Padel</h1>
                     <div className="flex gap-2 w-full sm:w-auto">
@@ -150,10 +169,25 @@ export default async function Home({ searchParams }: PageProps) {
                     </div>
                 </div>
 
-                {/* CLASSIFICA CARD OTTIMIZZATA PER MOBILE */}
-                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Classifica Ufficiale</h2>
+                {/* FILTRI DI ORDINAMENTO DINAMICI (Pulsanti in stile tab) */}
+                <div className="flex justify-between items-center mb-3">
+                    <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Classifica Ufficiale</h2>
+                    <div className="flex gap-1.5 bg-slate-200/60 p-1 rounded-xl border border-slate-200 text-[11px] font-bold">
+                        <Link href={`/?sort=ranking`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'ranking' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>
+                            Punti
+                        </Link>
+                        <Link href={`/?sort=played`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'played' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>
+                            Giocate
+                        </Link>
+                        <Link href={`/?sort=winrate`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'winrate' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>
+                            Win Rate
+                        </Link>
+                    </div>
+                </div>
+
+                {/* CLASSIFICA CARD */}
                 <div className="flex flex-col gap-2.5 mb-8">
-                    {players?.map((player, index) => {
+                    {sortedPlayers.map((player, index) => {
                         const rankIndex = index + 1;
                         const isKingLeft = player.id === kingLeftId;
                         const isKingRight = player.id === kingRightId;
@@ -184,22 +218,32 @@ export default async function Home({ searchParams }: PageProps) {
                                             {isKingRight && <span className="bg-yellow-100 text-yellow-800 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shrink-0">King DX</span>}
                                             {isLastPlace && <span className="bg-red-100 text-red-800 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shrink-0">Fanalino</span>}
                                         </div>
-                                        <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5 font-medium">
-                                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${player.preferred_side === 'Left' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                                                Lato {player.preferred_side === 'Left' ? 'SX' : 'DX'}
+
+                                        {/* Badge e Dati secondari sotto il nome */}
+                                        <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-1 font-medium flex-wrap">
+                                            <span className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${player.preferred_side === 'Left' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                                                {player.preferred_side === 'Left' ? 'SX' : 'DX'}
                                             </span>
+                                            <span>Match: <strong className="text-slate-600">{player.total_played}</strong></span>
                                             <span className="text-slate-200">•</span>
-                                            <span className="text-indigo-500 font-semibold">Vedi statistiche →</span>
+                                            <span>Win Rate: <strong className="text-slate-600">{player.win_rate.toFixed(1)}%</strong></span>
                                         </div>
                                     </div>
                                 </div>
 
+                                {/* Valore in risalto a destra dinamico basato sul filtro selezionato */}
                                 <div className="flex items-center gap-3 shrink-0">
                                     <div className="text-right">
                                         <div className="text-lg font-mono font-black text-indigo-600 leading-none">
-                                            {player.ranking.toFixed(2)}
+                                            {currentSort === 'played' ? player.total_played :
+                                                currentSort === 'winrate' ? `${player.win_rate.toFixed(1)}%` :
+                                                    player.ranking.toFixed(2)}
                                         </div>
-                                        <span className="text-[9px] text-slate-400 uppercase tracking-tight font-bold">Punti</span>
+                                        <span className="text-[9px] text-slate-400 uppercase tracking-tight font-bold">
+                                            {currentSort === 'played' ? 'Partite' :
+                                                currentSort === 'winrate' ? 'Rate' :
+                                                    'Punti'}
+                                        </span>
                                     </div>
                                 </div>
                             </Link>
@@ -230,11 +274,7 @@ export default async function Home({ searchParams }: PageProps) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
                     {pendingMatches && pendingMatches.length > 0 ? (
                         pendingMatches.map((match) => {
-                            const authCtx = currentUserPlayer ? {
-                                userRole: currentUserPlayer.role as 'admin' | 'user',
-                                userPlayerId: currentUserPlayer.id
-                            } : null;
-
+                            const authCtx = currentUserPlayer ? { userRole: currentUserPlayer.role as 'admin' | 'user', userPlayerId: currentUserPlayer.id } : null;
                             const canResolve = canUserResolveMatch(authCtx, match);
 
                             return (
@@ -253,13 +293,11 @@ export default async function Home({ searchParams }: PageProps) {
                                             </div>
                                         </div>
                                     </div>
-
                                     <div className="flex flex-col gap-2">
                                         <a href={generaLinkWhatsApp(match)} target="_blank" rel="noopener noreferrer" className="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl text-sm transition-colors shadow-sm">
                                             <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397 0 11.948 0c3.173.001 6.154 1.24 8.396 3.486 2.242 2.246 3.479 5.23 3.477 8.406-.003 6.557-5.338 11.907-11.89 11.907-2.013-.001-3.99-.51-5.741-1.48L0 24zm6.59-4.846c1.66.986 3.288 1.447 4.805 1.448 5.41-.001 9.814-4.415 9.816-9.83.001-2.624-1.012-5.09-2.856-6.937C16.569 1.988 14.09 1.05 11.47 1.05c-5.416 0-9.821 4.415-9.824 9.83-.001 2.05.534 3.513 1.41 5.03L2.025 21.93l6.222-1.63z" /></svg>
                                             Convoca su WhatsApp
                                         </a>
-
                                         <div className="flex gap-2 w-full">
                                             {canResolve ? (
                                                 <Link href={`/resolve-match/${match.id}`} className="flex-1 text-center bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold py-2.5 rounded-xl transition-colors shadow-sm">
@@ -296,82 +334,38 @@ export default async function Home({ searchParams }: PageProps) {
                             return (
                                 <div key={match.id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-3">
                                     <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-
-                                        {/* Team A */}
                                         <div className={`flex flex-col items-center sm:items-start p-3 rounded-xl w-full sm:w-5/12 ${winner === 'A' ? 'bg-green-50 border-l-4 border-l-green-500 font-semibold' : 'opacity-60'}`}>
-                                            <div className="flex items-center gap-1.5 mb-1">
-                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Coppia A</span>
-                                                {winner === 'A' && <span className="bg-green-200 text-green-800 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">WIN 🎉</span>}
-                                            </div>
+                                            <div className="flex items-center gap-1.5 mb-1"><span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Coppia A</span>{winner === 'A' && <span className="bg-green-200 text-green-800 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">WIN 🎉</span>}</div>
                                             <div className="text-sm text-slate-800 truncate w-full text-center sm:text-left">{getPlayerName(match.team_a_left_id)}</div>
                                             <div className="text-sm text-slate-800 truncate w-full text-center sm:text-left">{getPlayerName(match.team_a_right_id)}</div>
                                         </div>
-
-                                        {/* Punteggio dei Set al centro */}
                                         <div className="flex flex-col items-center justify-center shrink-0">
                                             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 select-none">Punteggio</div>
                                             <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 font-mono font-black text-sm text-indigo-600 shadow-inner">
-                                                {sets.length > 0 ? (
-                                                    sets.map((set, sIdx) => (
-                                                        <span key={sIdx} className="bg-white px-1.5 py-0.5 rounded border border-slate-200/60 shadow-sm">
-                                                            {set.team_a}-{set.team_b}
-                                                        </span>
-                                                    ))
-                                                ) : (
-                                                    <span className="text-xs font-normal text-slate-400 italic">Dato pre-set</span>
-                                                )}
+                                                {sets.length > 0 ? sets.map((set, sIdx) => (<span key={sIdx} className="bg-white px-1.5 py-0.5 rounded border border-slate-200/60 shadow-sm">{set.team_a}-{set.team_b}</span>)) : <span className="text-xs font-normal text-slate-400 italic">Dato pre-set</span>}
                                             </div>
                                         </div>
-
-                                        {/* Team B */}
                                         <div className={`flex flex-col items-center sm:items-end p-3 rounded-xl w-full sm:w-5/12 text-center sm:text-right ${winner === 'B' ? 'bg-green-50 border-r-4 border-r-green-500 font-semibold' : 'opacity-60'}`}>
-                                            <div className="flex items-center sm:flex-row-reverse gap-1.5 mb-1">
-                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Coppia B</span>
-                                                {winner === 'B' && <span className="bg-green-200 text-green-800 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">WIN 🎉</span>}
-                                            </div>
+                                            <div className="flex items-center sm:flex-row-reverse gap-1.5 mb-1"><span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Coppia B</span>{winner === 'B' && <span className="bg-green-200 text-green-800 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">WIN 🎉</span>}</div>
                                             <div className="text-sm text-slate-800 truncate w-full text-center sm:text-right">{getPlayerName(match.team_b_left_id)}</div>
                                             <div className="text-sm text-slate-800 truncate w-full text-center sm:text-right">{getPlayerName(match.team_b_right_id)}</div>
                                         </div>
-
                                     </div>
-
-                                    <div className="text-[10px] text-slate-400 text-center sm:text-left font-medium border-t border-slate-50 pt-2">
-                                        Disputata il {new Date(match.updated_at).toLocaleDateString('it-IT')}
-                                    </div>
+                                    <div className="text-[10px] text-slate-400 text-center sm:text-left font-medium border-t border-slate-50 pt-2">Disputata il {new Date(match.updated_at).toLocaleDateString('it-IT')}</div>
                                 </div>
                             );
                         })
                     ) : (
-                        <p className="text-slate-500 italic">Nessun match completato in questa pagina.</p>
+                        <p className="text-slate-500 italic">Nessun match completato.</p>
                     )}
                 </div>
 
-                {/* CONTROLLI DI PAGINAZIONE (BOTTONI AVANTI / DIETRO) */}
+                {/* CONTROLLI DI PAGINAZIONE */}
                 {totalPages > 1 && (
                     <div className="flex justify-center items-center gap-4 mt-6">
-                        <Link
-                            href={`/?page=${currentPage - 1}`}
-                            scroll={false}
-                            className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all active:scale-95 ${
-                                currentPage <= 1 ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'
-                            }`}
-                        >
-                            ← Precedente
-                        </Link>
-
-                        <div className="text-xs font-bold text-slate-500 font-mono">
-                            {currentPage} / {totalPages}
-                        </div>
-
-                        <Link
-                            href={`/?page=${currentPage + 1}`}
-                            scroll={false}
-                            className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all active:scale-95 ${
-                                currentPage >= totalPages ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'
-                            }`}
-                        >
-                            Successiva →
-                        </Link>
+                        <Link href={`/?page=${currentPage - 1}&sort=${currentSort}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all active:scale-95 ${currentPage <= 1 ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}>← Precedente</Link>
+                        <div className="text-xs font-bold text-slate-500 font-mono">{currentPage} / {totalPages}</div>
+                        <Link href={`/?page=${currentPage + 1}&sort=${currentSort}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all active:scale-95 ${currentPage >= totalPages ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}>Successiva →</Link>
                     </div>
                 )}
 
