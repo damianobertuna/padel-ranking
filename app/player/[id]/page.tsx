@@ -3,6 +3,7 @@ import Link from 'next/link';
 import WinRateWidget from '@/components/WinRateWidget';
 import StreakWidget from '@/components/StreakWidget';
 import PartnersAndNemesisWidget from '@/components/PartnersAndNemesisWidget';
+import GameAverageWidget from '@/components/GameAverageWidget';
 
 export const revalidate = 0;
 
@@ -136,32 +137,17 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
                     </div>
                 </div>
 
-                {/* CRONOLOGIA / WIDGET NUOVO: STATISTICHE AVANZATE SET & GAME */}
-                <div className="bg-slate-800 text-white p-5 rounded-xl shadow-sm border border-slate-700 mb-6">
-                    <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Analisi Avanzata Set & Game</h2>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-                        <div className="bg-slate-900/40 p-3 rounded-lg border border-slate-700/60">
-                            <div className="text-xl font-mono font-black text-emerald-400">{totalSetsWon}-{totalSetsLost}</div>
-                            <div className="text-[10px] text-slate-400 uppercase font-semibold mt-0.5">Bilancio Set</div>
-                        </div>
-                        <div className="bg-slate-900/40 p-3 rounded-lg border border-slate-700/60">
-                            <div className="text-xl font-mono font-black text-indigo-400">{totalGamesWon}-{totalGamesLost}</div>
-                            <div className="text-[10px] text-slate-400 uppercase font-semibold mt-0.5">Bilancio Game</div>
-                        </div>
-                        <div className="bg-slate-900/40 p-3 rounded-lg border border-slate-700/60">
-                            <div className="text-xl font-mono font-black text-amber-400">{avgGamesWonPerMatch}</div>
-                            <div className="text-[10px] text-slate-400 uppercase font-semibold mt-0.5">Media Game/Match</div>
-                        </div>
-                        <div className="bg-slate-900/40 p-3 rounded-lg border border-slate-700/60">
-                            <div className="text-xl font-mono font-black text-sky-400">{gameWinPercentage}%</div>
-                            <div className="text-[10px] text-slate-400 uppercase font-semibold mt-0.5">% Game Vinti</div>
-                        </div>
-                    </div>
-                </div>
-
                 {/* Griglia Widget Storici */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 w-full">
                     <WinRateWidget stats={statsForWidget} />
+                    <GameAverageWidget
+                        totalSetsWon={totalSetsWon}
+                        totalSetsLost={totalSetsLost}
+                        totalGamesWon={totalGamesWon}
+                        totalGamesLost={totalGamesLost}
+                        avgGamesWonPerMatch={avgGamesWonPerMatch}
+                        gameWinPercentage={gameWinPercentage}
+                    />
                     <StreakWidget enrichedMatches={enrichedMatches} />
                     <PartnersAndNemesisWidget playerId={playerId} enrichedMatches={enrichedMatches} allPlayers={allPlayers || []} />
                 </div>
