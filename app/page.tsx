@@ -64,7 +64,7 @@ export default async function Home() {
         return players?.find(player => player.id === id) || null;
     };
 
-    // FUNZIONE GENERATRICE LINK WHATSAPP (SOLUZIONE 1)
+    // FUNZIONE GENERATRICE LINK WHATSAPP
     const generaLinkWhatsApp = (match: any) => {
         const pA1 = getPlayerObj(match.team_a_left_id);
         const pA2 = getPlayerObj(match.team_a_right_id);
@@ -97,127 +97,124 @@ export default async function Home() {
     };
 
     return (
-        <main className="min-h-screen p-8 bg-slate-100 flex flex-col items-center">
+        <main className="min-h-screen p-4 sm:p-8 bg-slate-100 flex flex-col items-center">
             <div className="max-w-4xl w-full">
 
                 {/* BARRA DI AUTENTICAZIONE IN ALTO */}
-                <div className="w-full flex justify-between items-center mb-6 bg-white p-4 rounded-lg shadow-sm">
-                    <div>
+                <div className="w-full flex justify-between items-center mb-6 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <div className="min-w-0">
                         {user ? (
-                            <p className="text-sm text-slate-600">
+                            <p className="text-sm text-slate-600 truncate">
                                 Connesso come: <strong className="text-slate-900">{currentUserPlayer?.first_name} {currentUserPlayer?.last_name}</strong>
-                                <span className="ml-2 text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full font-bold uppercase">{currentUserPlayer?.role}</span>
+                                <span className="ml-2 text-[10px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full font-bold uppercase">{currentUserPlayer?.role}</span>
                             </p>
                         ) : (
                             <p className="text-sm text-slate-500">Modalità sola lettura</p>
                         )}
                     </div>
-                    <div>
+                    <div className="shrink-0 pl-2">
                         {user ? (
                             <form action="/auth/signout" method="post">
-                                <button type="submit" className="text-sm font-semibold text-red-600 hover:underline">Esci (Logout)</button>
+                                <button type="submit" className="text-sm font-semibold text-red-600 hover:underline">Esci</button>
                             </form>
                         ) : (
-                            <Link href="/login" className="text-sm font-bold text-indigo-600 hover:underline">Accedi / Registrati</Link>
+                            <Link href="/login" className="text-sm font-bold text-indigo-600 hover:underline">Accedi</Link>
                         )}
                     </div>
                 </div>
 
                 {/* INTESTAZIONE CLASSIFICA */}
-                <div className="flex justify-between items-center mb-6">
-                    <h1 className="text-3xl font-bold text-slate-800">RanKING Padel</h1>
-                    <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+                    <h1 className="text-3xl font-black text-slate-800 tracking-tight">RanKING Padel</h1>
+                    <div className="flex gap-2 w-full sm:w-auto">
                         {user && (
-                            <Link href="/new-match" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded transition-colors text-sm shadow-sm">
+                            <Link href="/new-match" className="flex-1 sm:flex-none text-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-xl transition-colors text-sm shadow-sm">
                                 + Nuova Partita
                             </Link>
                         )}
-
-                        {/* Se l'utente è admin, mostriamo anche il link di gestione */}
                         {currentUserPlayer?.role === 'admin' && (
-                            <Link
-                                href="/admin/players"
-                                className="bg-slate-800 text-white font-bold py-2 px-4 rounded hover:bg-slate-900 transition-colors text-sm shadow-sm"
-                            >
-                                ⚙️ Gestione Giocatori
-                            </Link>
-                        ) && (
-                            <Link
-                                href="/admin/logs"
-                                className="bg-indigo-600 text-white font-bold py-2 px-4 rounded hover:bg-indigo-700 transition-colors text-sm shadow-sm"
-                            >
-                                📋 Vedi Registro Attività
-                            </Link>
-                            )}
+                            <>
+                                <Link href="/admin/players" className="bg-slate-800 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-slate-900 transition-colors text-sm shadow-sm text-center">
+                                    ⚙️ Giocatori
+                                </Link>
+                                <Link href="/admin/logs" className="bg-indigo-600 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-indigo-700 transition-colors text-sm shadow-sm text-center">
+                                    📋 Log
+                                </Link>
+                            </>
+                        )}
                     </div>
                 </div>
 
-                {/* TABELLA CLASSIFICA */}
-                <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-8 border border-slate-200">
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                        <tr className="bg-slate-800 text-white text-sm uppercase">
-                            <th className="p-4">Pos</th>
-                            <th className="p-4">Giocatore</th>
-                            <th className="p-4">Lato</th>
-                            <th className="p-4 text-right">Ranking</th>
-                            <th className="p-4 text-center">Ruoli</th>
-                        </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200">
-                        {players?.map((player, index) => {
-                            const isKingLeft = player.id === kingLeftId;
-                            const isKingRight = player.id === kingRightId;
-                            const isLastPlace = player.id === lastPlaceId;
+                {/* NUOVA SEZIONE: CLASSIFICA CARD OTTIMIZZATA PER MOBILE */}
+                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Classifica Ufficiale</h2>
+                <div className="flex flex-col gap-2.5 mb-8">
+                    {players?.map((player, index) => {
+                        const rankIndex = index + 1;
+                        const isKingLeft = player.id === kingLeftId;
+                        const isKingRight = player.id === kingRightId;
+                        const isLastPlace = player.id === lastPlaceId;
 
-                            return (
-                                <tr key={player.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="p-4 font-bold text-slate-500">{index + 1}°</td>
-                                    <td className="p-4 font-semibold text-slate-800">
-                                        <Link
-                                            href={`/player/${player.id}`}
-                                            className="font-semibold text-slate-800 hover:text-indigo-600 hover:underline transition-colors"
-                                        >
-                                            {player.first_name} {player.last_name}
-                                        </Link>
-                                    </td>
-                                    <td className="p-4 text-sm">
-                                        {player.preferred_side === 'Left' ? (
-                                            <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-1 rounded border border-blue-200">SX</span>
-                                        ) : player.preferred_side === 'Right' ? (
-                                            <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2.5 py-1 rounded border border-emerald-200">DX</span>
-                                        ) : (
-                                            <span className="text-slate-400 font-italic">-</span>
-                                        )}
-                                    </td>
-                                    <td className="p-4 text-right font-mono font-bold text-indigo-600">
-                                        {player.ranking.toFixed(2)}
-                                    </td>
-                                    <td className="p-4 flex gap-1 justify-center">
-                                        {isKingLeft && <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2 py-0.5 rounded-full border border-amber-300">👑 King SX</span>}
-                                        {isKingRight && <span className="bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-0.5 rounded-full border border-yellow-300">👑 King DX</span>}
-                                        {isLastPlace && <span className="bg-red-100 text-red-800 text-xs font-bold px-2 py-0.5 rounded-full border border-red-300">🐌 Fanalino</span>}
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                        </tbody>
-                    </table>
+                        return (
+                            <Link
+                                key={player.id}
+                                href={`/player/${player.id}`}
+                                className="w-full bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between transition-all active:bg-slate-50 active:scale-[0.99] touch-manipulation"
+                            >
+                                {/* Parte Sinistra: Posizione e Info Giocatore */}
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black font-mono shrink-0 ${
+                                        rankIndex === 1 ? 'bg-amber-100 text-amber-700 border border-amber-300' :
+                                            rankIndex === 2 ? 'bg-slate-100 text-slate-600 border border-slate-300' :
+                                                rankIndex === 3 ? 'bg-orange-100 text-orange-700 border border-orange-300' :
+                                                    'bg-slate-50 text-slate-400'
+                                    }`}>
+                                        {rankIndex}°
+                                    </div>
+
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span className="font-bold text-slate-800 text-base truncate">
+                                                {player.first_name} {player.last_name}
+                                            </span>
+                                            {isKingLeft && <span className="bg-amber-100 text-amber-800 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shrink-0">King SX</span>}
+                                            {isKingRight && <span className="bg-yellow-100 text-yellow-800 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shrink-0">King DX</span>}
+                                            {isLastPlace && <span className="bg-red-100 text-red-800 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shrink-0">Fanalino</span>}
+                                        </div>
+                                        <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5 font-medium">
+                                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${player.preferred_side === 'Left' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                                                Lato {player.preferred_side === 'Left' ? 'SX' : 'DX'}
+                                            </span>
+                                            <span className="text-slate-200">•</span>
+                                            <span className="text-indigo-500 font-semibold">Vedi statistiche →</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Parte Destra: Ranking e Freccia Mobile */}
+                                <div className="flex items-center gap-3 shrink-0">
+                                    <div className="text-right">
+                                        <div className="text-lg font-mono font-black text-indigo-600 leading-none">
+                                            {player.ranking.toFixed(2)}
+                                        </div>
+                                        <span className="text-[9px] text-slate-400 uppercase tracking-tight font-bold">Punti</span>
+                                    </div>
+                                    <div className="text-slate-300 bg-slate-50 p-1.5 rounded-lg border border-slate-100 sm:block hidden">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5 text-slate-400">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                                        </svg>
+                                    </div>
+                                </div>
+                            </Link>
+                        );
+                    })}
                 </div>
 
-                {/* BANNER PUBBLICITARIO SPONSOR - BIONUTRIMED */}
-                {/* BANNER PUBBLICITARIO SPONSOR - BIONUTRIMED */}
-                <div className="w-full bg-gradient-to-r from-indigo-950 to-slate-900 text-white p-6 rounded-lg shadow-sm mb-12 flex flex-col md:flex-row items-center justify-between gap-6 border border-slate-700">
+                {/* BANNER PUBBLICITARIO SPONSOR */}
+                <div className="w-full bg-gradient-to-r from-indigo-950 to-slate-900 text-white p-5 rounded-xl shadow-sm mb-12 flex flex-col md:flex-row items-center justify-between gap-6 border border-slate-700">
                     <div className="flex items-center gap-4 text-center md:text-left flex-col md:flex-row">
-                        {/* Contenitore bianco per far risaltare il logo scuro */}
                         <div className="bg-white p-2 rounded-md flex items-center justify-center shadow-sm max-w-[140px] shrink-0">
-                            <img
-                                src="https://www.bionutrimed.it/templates/rt_gemini/custom/images/loghi/bionutrimed_logo_small.png"
-                                alt="BioNutriMed Logo"
-                                className="h-10 w-auto object-contain select-none"
-                            />
+                            <img src="https://www.bionutrimed.it/templates/rt_gemini/custom/images/loghi/bionutrimed_logo_small.png" alt="BioNutriMed Logo" className="h-10 w-auto object-contain select-none" />
                         </div>
-
                         <div>
                             <h3 className="text-base font-bold tracking-wide text-slate-100">Vuoi scalare il Ranking? Cura la tua nutrizione!</h3>
                             <p className="text-xs text-slate-300 max-w-xl mt-1 leading-relaxed">
@@ -225,13 +222,8 @@ export default async function Home() {
                             </p>
                         </div>
                     </div>
-                    <a
-                        href="https://www.bionutrimed.it/prenota/prenota-visita-in-studio.html"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs uppercase tracking-wider py-3 px-5 rounded transition-all shadow-sm hover:scale-[1.02] text-center w-full md:w-auto"
-                    >
-                        🌐 Prenota una visita su Bionutrimed
+                    <a href="https://www.bionutrimed.it/prenota/prenota-visita-in-studio.html" target="_blank" rel="noopener noreferrer" className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs uppercase tracking-wider py-3 px-5 rounded-lg transition-all shadow-sm text-center w-full md:w-auto shrink-0">
+                        🌐 Prenota una visita
                     </a>
                 </div>
 
@@ -248,55 +240,39 @@ export default async function Home() {
                             const canResolve = canUserResolveMatch(authCtx, match);
 
                             return (
-                                <div key={match.id} className="bg-white p-6 rounded-lg shadow-sm border border-slate-200 flex flex-col justify-between gap-4">
+                                <div key={match.id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between gap-4">
                                     <div>
-                                        <div className="grid grid-cols-2 gap-4 text-center mb-4">
-                                            <div className="bg-blue-50 p-3 rounded border border-blue-100">
-                                                <div className="text-xs font-bold text-blue-600 uppercase mb-1">Coppia A</div>
-                                                <div className="text-sm font-semibold text-slate-800">{getPlayerName(match.team_a_left_id)}</div>
-                                                <div className="text-sm font-semibold text-slate-800">{getPlayerName(match.team_a_right_id)}</div>
+                                        <div className="grid grid-cols-2 gap-3 text-center">
+                                            <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-100">
+                                                <div className="text-[10px] font-bold text-blue-600 uppercase mb-1">Coppia A</div>
+                                                <div className="text-sm font-bold text-slate-800 truncate">{getPlayerName(match.team_a_left_id)}</div>
+                                                <div className="text-sm font-bold text-slate-800 truncate">{getPlayerName(match.team_a_right_id)}</div>
                                             </div>
-                                            <div className="bg-emerald-50 p-3 rounded border border-emerald-100">
-                                                <div className="text-xs font-bold text-emerald-600 uppercase mb-1">Coppia B</div>
-                                                <div className="text-sm font-semibold text-slate-800">{getPlayerName(match.team_b_left_id)}</div>
-                                                <div className="text-sm font-semibold text-slate-800">{getPlayerName(match.team_b_right_id)}</div>
+                                            <div className="bg-emerald-50/50 p-3 rounded-lg border border-emerald-100">
+                                                <div className="text-[10px] font-bold text-emerald-600 uppercase mb-1">Coppia B</div>
+                                                <div className="text-sm font-bold text-slate-800 truncate">{getPlayerName(match.team_b_left_id)}</div>
+                                                <div className="text-sm font-bold text-slate-800 truncate">{getPlayerName(match.team_b_right_id)}</div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* BLOCCO BOTTONI DI AZIONE */}
                                     <div className="flex flex-col gap-2">
-                                        {/* Tasto condivisone WhatsApp sempre accessibile */}
-                                        <a
-                                            href={generaLinkWhatsApp(match)}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded text-sm transition-colors shadow-sm"
-                                        >
-                                            <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                                                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397 0 11.948 0c3.173.001 6.154 1.24 8.396 3.486 2.242 2.246 3.479 5.23 3.477 8.406-.003 6.557-5.338 11.907-11.89 11.907-2.013-.001-3.99-.51-5.741-1.48L0 24zm6.59-4.846c1.66.986 3.288 1.447 4.805 1.448 5.41-.001 9.814-4.415 9.816-9.83.001-2.624-1.012-5.09-2.856-6.937C16.569 1.988 14.09 1.05 11.47 1.05c-5.416 0-9.821 4.415-9.824 9.83-.001 2.05.534 3.513 1.41 5.03L2.025 21.93l6.222-1.63z" />
-                                            </svg>
+                                        <a href={generaLinkWhatsApp(match)} target="_blank" rel="noopener noreferrer" className="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl text-sm transition-colors shadow-sm">
+                                            <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397 0 11.948 0c3.173.001 6.154 1.24 8.396 3.486 2.242 2.246 3.479 5.23 3.477 8.406-.003 6.557-5.338 11.907-11.89 11.907-2.013-.001-3.99-.51-5.741-1.48L0 24zm6.59-4.846c1.66.986 3.288 1.447 4.805 1.448 5.41-.001 9.814-4.415 9.816-9.83.001-2.624-1.012-5.09-2.856-6.937C16.569 1.988 14.09 1.05 11.47 1.05c-5.416 0-9.821 4.415-9.824 9.83-.001 2.05.534 3.513 1.41 5.03L2.025 21.93l6.222-1.63z" /></svg>
                                             Convoca su WhatsApp
                                         </a>
 
                                         <div className="flex gap-2 w-full">
                                             {canResolve ? (
-                                                <Link
-                                                    href={`/resolve-match/${match.id}`}
-                                                    className="flex-1 text-center bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold py-2 rounded transition-colors shadow-sm"
-                                                >
+                                                <Link href={`/resolve-match/${match.id}`} className="flex-1 text-center bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold py-2.5 rounded-xl transition-colors shadow-sm">
                                                     Inserisci Risultato
                                                 </Link>
                                             ) : (
-                                                <div className="flex-1 text-center bg-slate-100 text-slate-400 text-xs py-2 rounded italic select-none border border-slate-200 flex items-center justify-center">
+                                                <div className="flex-1 text-center bg-slate-100 text-slate-400 text-xs py-2.5 rounded-xl italic select-none border border-slate-200 flex items-center justify-center">
                                                     Sola lettura (non sei in campo)
                                                 </div>
                                             )}
-
-                                            {/* CANCELLAZIONE SICURA TRAMITE IL CLIENT COMPONENT ESTRATTO */}
-                                            {canResolve && (
-                                                <DeleteMatchButton matchId={match.id} />
-                                            )}
+                                            {canResolve && <DeleteMatchButton matchId={match.id} />}
                                         </div>
                                     </div>
                                 </div>
@@ -307,41 +283,62 @@ export default async function Home() {
                     )}
                 </div>
 
-                {/* SEZIONE 2: STORICO RISULTATI RECENTI */}
+                {/* SEZIONE 2: STORICO RISULTATI RECENTI CON SET */}
                 <h2 className="text-2xl font-bold text-slate-800 mb-4">Risultati Recenti</h2>
-                <div className="space-y-4">
+                <div className="space-y-3">
                     {completedMatches && completedMatches.length > 0 ? (
                         completedMatches.map((match) => {
                             const winner = match.winning_team;
 
+                            // Recuperiamo l'array dei set (se vuoto mettiamo un fallback)
+                            const sets = (match.score || []) as Array<{team_a: number, team_b: number}>;
+
                             return (
-                                <div key={match.id} className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
+                                <div key={match.id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-3">
+                                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
 
-                                    {/* Team A */}
-                                    <div className={`flex flex-col items-center sm:items-start p-2 rounded w-full sm:w-5/12 ${winner === 'A' ? 'bg-green-50 border-l-4 border-green-500' : 'opacity-60'}`}>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-bold text-slate-400 uppercase">Coppia A</span>
-                                            {winner === 'A' && <span className="bg-green-200 text-green-800 text-xs font-extrabold px-1.5 py-0.2 rounded">VINCITORI 🎉</span>}
+                                        {/* Team A */}
+                                        <div className={`flex flex-col items-center sm:items-start p-3 rounded-xl w-full sm:w-5/12 ${winner === 'A' ? 'bg-green-50 border-l-4 border-l-green-500 font-semibold' : 'opacity-60'}`}>
+                                            <div className="flex items-center gap-1.5 mb-1">
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Coppia A</span>
+                                                {winner === 'A' && <span className="bg-green-200 text-green-800 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">WIN 🎉</span>}
+                                            </div>
+                                            <div className="text-sm text-slate-800 truncate w-full text-center sm:text-left">{getPlayerName(match.team_a_left_id)}</div>
+                                            <div className="text-sm text-slate-800 truncate w-full text-center sm:text-left">{getPlayerName(match.team_a_right_id)}</div>
                                         </div>
-                                        <div className="text-sm font-bold text-slate-800">{getPlayerName(match.team_a_left_id)}</div>
-                                        <div className="text-sm font-bold text-slate-800">{getPlayerName(match.team_a_right_id)}</div>
-                                    </div>
 
-                                    {/* VS Divider */}
-                                    <div className="text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-full uppercase select-none">
-                                        VS
-                                    </div>
-
-                                    {/* Team B */}
-                                    <div className={`flex flex-col items-center sm:items-end p-2 rounded w-full sm:w-5/12 text-center sm:text-right ${winner === 'B' ? 'bg-green-50 border-r-4 border-green-500' : 'opacity-60'}`}>
-                                        <div className="flex items-center sm:flex-row-reverse gap-2">
-                                            <span className="text-xs font-bold text-slate-400 uppercase">Coppia B</span>
-                                            {winner === 'B' && <span className="bg-green-200 text-green-800 text-xs font-extrabold px-1.5 py-0.2 rounded">VINCITORI 🎉</span>}
+                                        {/* Punteggio dei Set al centro */}
+                                        <div className="flex flex-col items-center justify-center shrink-0">
+                                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 select-none">Punteggio</div>
+                                            <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 font-mono font-black text-sm text-indigo-600 shadow-inner">
+                                                {sets.length > 0 ? (
+                                                    sets.map((set, sIdx) => (
+                                                        <span key={sIdx} className="bg-white px-1.5 py-0.5 rounded border border-slate-200/60 shadow-sm">
+                                                            {set.team_a}-{set.team_b}
+                                                        </span>
+                                                    ))
+                                                ) : (
+                                                    <span className="text-xs font-normal text-slate-400 italic">Dato pre-set</span>
+                                                )}
+                                            </div>
                                         </div>
-                                        <div className="text-sm font-bold text-slate-800">{getPlayerName(match.team_b_left_id)}</div>
-                                        <div className="text-sm font-bold text-slate-800">{getPlayerName(match.team_b_right_id)}</div>
+
+                                        {/* Team B */}
+                                        <div className={`flex flex-col items-center sm:items-end p-3 rounded-xl w-full sm:w-5/12 text-center sm:text-right ${winner === 'B' ? 'bg-green-50 border-r-4 border-r-green-500 font-semibold' : 'opacity-60'}`}>
+                                            <div className="flex items-center sm:flex-row-reverse gap-1.5 mb-1">
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Coppia B</span>
+                                                {winner === 'B' && <span className="bg-green-200 text-green-800 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">WIN 🎉</span>}
+                                            </div>
+                                            <div className="text-sm text-slate-800 truncate w-full text-center sm:text-right">{getPlayerName(match.team_b_left_id)}</div>
+                                            <div className="text-sm text-slate-800 truncate w-full text-center sm:text-right">{getPlayerName(match.team_b_right_id)}</div>
+                                        </div>
+
                                     </div>
 
+                                    {/* Data di chiusura match in piccolo sul fondo della card */}
+                                    <div className="text-[10px] text-slate-400 text-center sm:text-left font-medium border-t border-slate-50 pt-2">
+                                        Disputata il {new Date(match.updated_at).toLocaleDateString('it-IT')} alle {new Date(match.updated_at).toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})}
+                                    </div>
                                 </div>
                             );
                         })
