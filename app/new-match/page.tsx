@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { createMatch } from '@/actions/match-actions'; // Sarà usata al momento del submit reale
+import { createPendingMatch as createMatch } from '@/actions/match-actions'; // 👈 RISOLTO: Import corretto con alias dinamico
 
 interface Player {
     id: number;
@@ -25,6 +25,7 @@ export default function CreateMatchForm() {
     const [levelError, setLevelError] = useState<boolean>(false);
     const [duplicateError, setDuplicateError] = useState<boolean>(false);
     const [loading, setLoading] = useState<boolean>(false);
+    const [submitError, setSubmitError] = useState<string>('');
 
     // Caricamento iniziale dell'anagrafica giocatori da Supabase
     useEffect(() => {
@@ -85,26 +86,37 @@ export default function CreateMatchForm() {
         if (levelError || duplicateError) return;
 
         setLoading(true);
+        setSubmitError('');
 
-        // Esempio di implementazione futura per la Server Action:
-        // try {
-        //     await createMatch({
-        //         team_a_left_id: teamALeft ? parseInt(teamALeft) : null,
-        //         team_a_right_id: teamARight ? parseInt(teamARight) : null,
-        //         team_b_left_id: teamBLeft ? parseInt(teamBLeft) : null,
-        //         team_b_right_id: teamBRight ? parseInt(teamBRight) : null,
-        //         status: 'pending'
-        //     });
-        //     // redirect o reset form...
-        // } catch(err) { console.error(err); }
+        try {
+            // 👈 AGGIORNATO: Ora esegue realmente l'inserimento agganciando l'azione
+            await createMatch({
+                teamALeft: teamALeft ? parseInt(teamALeft) : null,
+                teamARight: teamARight ? parseInt(teamARight) : null,
+                teamBLeft: teamBLeft ? parseInt(teamBLeft) : null,
+                teamBRight: teamBRight ? parseInt(teamBRight) : null,
+                // Il database imposterà automaticamente la data corrente e lo status 'pending'
+            });
 
-        setLoading(false);
+            // Ritorno pulito alla home alla fine dell'operazione
+            window.location.href = '/';
+        } catch (err: any) {
+            console.error(err);
+            setSubmitError(err.message || 'Errore durante la creazione del match.');
+            setLoading(false);
+        }
     };
 
     return (
-        <main className="min-h-screen p-4 sm:p-8 bg-slate-50 flex items-center justify-center">
+        <main className="min-h-screen p-4 sm:p-8 bg-slate-55 flex items-center justify-center">
             <div className="w-full max-w-2xl bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <h1 className="text-xl font-black text-slate-800 mb-6">Nuova Partita</h1>
+
+                {submitError && (
+                    <div className="bg-rose-50 border border-rose-200 text-rose-700 p-3 rounded-xl mb-5 text-xs font-bold">
+                        {submitError}
+                    </div>
+                )}
 
                 <form onSubmit={handleSubmit} className="space-y-6">
 
@@ -199,7 +211,7 @@ export default function CreateMatchForm() {
                         </div>
                     )}
 
-                    {/* BOTTONE DI INVIO (Si spegne se c'è QUALSIASI blocco attivo o se carica) */}
+                    {/* BOTTONE DI INVIO */}
                     <button
                         type="submit"
                         disabled={levelError || duplicateError || loading}
