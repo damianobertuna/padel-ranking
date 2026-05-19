@@ -133,7 +133,22 @@ export default async function Home({ searchParams }: PageProps) {
                 {/* INTESTAZIONE */}
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
                     <h1 className="text-3xl font-black text-slate-800 tracking-tight">RanKING Padel</h1>
+                    <Link
+                        href="/rules"
+                        className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-black rounded-full border border-indigo-200/60 transition-all hover:scale-[1.02] shadow-xs"
+                    >
+                        <span className="font-mono text-sm leading-none">📖</span>
+                        <span>Regolamento Ufficiale</span>
+                    </Link>
                     <div className="flex gap-2 w-full sm:w-auto">
+                        <Link
+                            href="/rules"
+                            className="sm:hidden flex-1 inline-flex items-center justify-center gap-2 bg-slate-200/80 hover:bg-slate-300 text-slate-700 font-bold py-2.5 px-4 rounded-xl transition-all text-sm shadow-xs active:scale-[0.99]"
+                        >
+                            <span>📖</span>
+                            <span>Regolamento</span>
+                        </Link>
+
                         {user && (
                             <Link href="/new-match" className="flex-1 sm:flex-none text-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-xl transition-colors text-sm shadow-sm">
                                 + Nuova Partita
