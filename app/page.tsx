@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import { canUserResolveMatch } from '@/lib/matchRules';
 import DeleteMatchButton from '@/components/DeleteMatchButton';
+import ResolveMatchButton from '@/components/ResolveMatchButton'; // 👈 NUOVO IMPORT
 
 export const revalidate = 0;
 
@@ -14,12 +15,10 @@ interface PageProps {
 export default async function Home({ searchParams }: PageProps) {
     const supabase = await createClient();
 
-    // 1. Recuperiamo i parametri dall'URL
     const resolvedParams = await searchParams;
     const currentPage = parseInt(resolvedParams.page || '1', 10) || 1;
-    const currentSort = resolvedParams.sort || 'ranking'; // 'ranking', 'played', 'winrate'
+    const currentSort = resolvedParams.sort || 'ranking';
 
-    // 2. Autenticazione e Profilo
     const { data: { user } } = await supabase.auth.getUser();
     let currentUserPlayer = null;
     if (user) {
@@ -31,14 +30,10 @@ export default async function Home({ searchParams }: PageProps) {
         currentUserPlayer = playerData;
     }
 
-    // 3. Recuperiamo i dati base per la classifica e TUTTI i match completati
-    // Ci servono tutti i match storici per calcolare al volo partite giocate e win rate di ognuno
     const { data: rawPlayers } = await supabase.from('players').select('*');
     const { data: allCompletedMatches } = await supabase.from('matches').select('*').eq('status', 'completed');
 
-    // 4. ELABORAZIONE STATISTICHE GIOCATORI IN TEMPO REALE
     const playersWithStats = (rawPlayers || []).map(player => {
-        // Contiamo quanti match ha giocato e quanti ne ha vinti
         let played = 0;
         let won = 0;
 
@@ -62,35 +57,38 @@ export default async function Home({ searchParams }: PageProps) {
         };
     });
 
-    // 5. APPLICAZIONE DELL'ORDINAMENTO DINAMICO (SORT)
     const sortedPlayers = [...playersWithStats].sort((a, b) => {
         if (currentSort === 'played') {
-            // Ordina per partite giocate (se pari, spareggio per ranking)
             return b.total_played - a.total_played || b.ranking - a.ranking;
         }
         if (currentSort === 'winrate') {
-            // Ordina per Win Rate (se pari, spareggio per partite giocate)
             return b.win_rate - a.win_rate || b.total_played - a.total_played;
         }
-        // Default: Ordinamento classico per Punti Ranking
         return b.ranking - a.ranking;
     });
 
-    // Identifichiamo i ruoli speciali basandoci sul ranking puro (anche se la classifica cambia ordine)
-    const leftPlayers = sortedPlayers.filter(p => p.preferred_side === 'Left').sort((a,b) => b.ranking - a.ranking);
-    const rightPlayers = sortedPlayers.filter(p => p.preferred_side === 'Right').sort((a,b) => b.ranking - a.ranking);
-    const kingLeftId = leftPlayers.length > 0 ? leftPlayers[0].id : null;
-    const kingRightId = rightPlayers.length > 0 ? rightPlayers[0].id : null;
-    const lastPlaceId = [...sortedPlayers].sort((a,b) => a.ranking - b.ranking).length > 0 ? [...sortedPlayers].sort((a,b) => a.ranking - b.ranking)[0].id : null;
+    // --- CORREZIONE COMPLETA EX-AEQUO (KING E FANALINO COMPARTITI) ---
+    const leftPlayersSorted = [...sortedPlayers].filter(p => p.preferred_side === 'Left' || p.preferred_side === 'Both').sort((a,b) => b.ranking - a.ranking);
+    const rightPlayersSorted = [...sortedPlayers].filter(p => p.preferred_side === 'Right' || p.preferred_side === 'Both').sort((a,b) => b.ranking - a.ranking);
+    const allPlayersAscending = [...sortedPlayers].sort((a,b) => a.ranking - b.ranking);
 
-    // 6. Recuperiamo le partite IN PROGRAMMA (pending)
+    // Troviamo i punteggi massimi e minimi assoluti
+    const maxRankingLeft = leftPlayersSorted.length > 0 ? leftPlayersSorted[0].ranking : -1;
+    const maxRankingRight = rightPlayersSorted.length > 0 ? rightPlayersSorted[0].ranking : -1;
+    const minRankingAbsolute = allPlayersAscending.length > 0 ? allPlayersAscending[0].ranking : -1;
+
+    // Raccogliamo TUTTI gli ID che hanno quel punteggio massimo/minimo (Gestione Parità)
+    const kingLeftIds = leftPlayersSorted.filter(p => p.ranking === maxRankingLeft && maxRankingLeft !== -1).map(p => p.id);
+    const kingRightIds = rightPlayersSorted.filter(p => p.ranking === maxRankingRight && maxRankingRight !== -1).map(p => p.id);
+    const lastPlaceIds = allPlayersAscending.filter(p => p.ranking === minRankingAbsolute && minRankingAbsolute !== -1).map(p => p.id);
+    // -----------------------------------------------------------------
+
     const { data: pendingMatches } = await supabase
         .from('matches')
         .select('*')
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
-    // 7. PAGINAZIONE RISULTATI STORICI RECENTI
     const fromRange = (currentPage - 1) * MATCHES_PER_PAGE;
     const toRange = fromRange + MATCHES_PER_PAGE - 1;
 
@@ -103,7 +101,6 @@ export default async function Home({ searchParams }: PageProps) {
 
     const totalPages = totalCompletedCount ? Math.ceil(totalCompletedCount / MATCHES_PER_PAGE) : 1;
 
-    // Helper per recuperare nome e cognome
     const getPlayerName = (id: number) => {
         const p = rawPlayers?.find(player => player.id === id);
         return p ? `${p.first_name} ${p.last_name}` : 'Sconosciuto';
@@ -111,7 +108,6 @@ export default async function Home({ searchParams }: PageProps) {
 
     const getPlayerObj = (id: number) => rawPlayers?.find(player => player.id === id) || null;
 
-    // FUNZIONE GENERATRICE LINK WHATSAPP
     const generaLinkWhatsApp = (match: any) => {
         const pA1 = getPlayerObj(match.team_a_left_id); const pA2 = getPlayerObj(match.team_a_right_id);
         const pB1 = getPlayerObj(match.team_b_left_id); const pB2 = getPlayerObj(match.team_b_right_id);
@@ -169,19 +165,13 @@ export default async function Home({ searchParams }: PageProps) {
                     </div>
                 </div>
 
-                {/* FILTRI DI ORDINAMENTO DINAMICI (Pulsanti in stile tab) */}
+                {/* FILTRI DI ORDINAMENTO DINAMICI */}
                 <div className="flex justify-between items-center mb-3">
                     <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Classifica Ufficiale</h2>
                     <div className="flex gap-1.5 bg-slate-200/60 p-1 rounded-xl border border-slate-200 text-[11px] font-bold">
-                        <Link href={`/?sort=ranking`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'ranking' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>
-                            Punti
-                        </Link>
-                        <Link href={`/?sort=played`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'played' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>
-                            Giocate
-                        </Link>
-                        <Link href={`/?sort=winrate`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'winrate' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>
-                            Win Rate
-                        </Link>
+                        <Link href={`/?sort=ranking`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'ranking' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>Punti</Link>
+                        <Link href={`/?sort=played`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'played' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>Giocate</Link>
+                        <Link href={`/?sort=winrate`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'winrate' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>Win Rate</Link>
                     </div>
                 </div>
 
@@ -189,9 +179,10 @@ export default async function Home({ searchParams }: PageProps) {
                 <div className="flex flex-col gap-2.5 mb-8">
                     {sortedPlayers.map((player, index) => {
                         const rankIndex = index + 1;
-                        const isKingLeft = player.id === kingLeftId;
-                        const isKingRight = player.id === kingRightId;
-                        const isLastPlace = player.id === lastPlaceId;
+                        // Controllo di appartenenza agli array degli ex-aequo
+                        const isKingLeft = kingLeftIds.includes(player.id);
+                        const isKingRight = kingRightIds.includes(player.id);
+                        const isLastPlace = lastPlaceIds.includes(player.id);
 
                         return (
                             <Link
@@ -205,24 +196,19 @@ export default async function Home({ searchParams }: PageProps) {
                                             rankIndex === 2 ? 'bg-slate-100 text-slate-600 border border-slate-300' :
                                                 rankIndex === 3 ? 'bg-orange-100 text-orange-700 border border-orange-300' :
                                                     'bg-slate-50 text-slate-400'
-                                    }`}>
-                                        {rankIndex}°
-                                    </div>
+                                    }`}>{rankIndex}°</div>
 
                                     <div className="min-w-0">
                                         <div className="flex items-center gap-1.5 flex-wrap">
-                                            <span className="font-bold text-slate-800 text-base truncate">
-                                                {player.first_name} {player.last_name}
-                                            </span>
+                                            <span className="font-bold text-slate-800 text-base truncate">{player.first_name} {player.last_name}</span>
                                             {isKingLeft && <span className="bg-amber-100 text-amber-800 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shrink-0">King SX</span>}
                                             {isKingRight && <span className="bg-yellow-100 text-yellow-800 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shrink-0">King DX</span>}
                                             {isLastPlace && <span className="bg-red-100 text-red-800 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shrink-0">Fanalino</span>}
                                         </div>
 
-                                        {/* Badge e Dati secondari sotto il nome */}
                                         <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-1 font-medium flex-wrap">
-                                            <span className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${player.preferred_side === 'Left' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                                                {player.preferred_side === 'Left' ? 'SX' : 'DX'}
+                                            <span className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${player.preferred_side === 'Left' ? 'bg-blue-50 text-blue-600' : player.preferred_side === 'Right' ? 'bg-emerald-50 text-emerald-600' : 'bg-purple-50 text-purple-600'}`}>
+                                                {player.preferred_side === 'Left' ? 'SX' : player.preferred_side === 'Right' ? 'DX' : 'MIX'}
                                             </span>
                                             <span>Match: <strong className="text-slate-600">{player.total_played}</strong></span>
                                             <span className="text-slate-200">•</span>
@@ -231,18 +217,13 @@ export default async function Home({ searchParams }: PageProps) {
                                     </div>
                                 </div>
 
-                                {/* Valore in risalto a destra dinamico basato sul filtro selezionato */}
                                 <div className="flex items-center gap-3 shrink-0">
                                     <div className="text-right">
                                         <div className="text-lg font-mono font-black text-indigo-600 leading-none">
-                                            {currentSort === 'played' ? player.total_played :
-                                                currentSort === 'winrate' ? `${player.win_rate.toFixed(1)}%` :
-                                                    player.ranking.toFixed(2)}
+                                            {currentSort === 'played' ? player.total_played : currentSort === 'winrate' ? `${player.win_rate.toFixed(1)}%` : player.ranking.toFixed(2)}
                                         </div>
                                         <span className="text-[9px] text-slate-400 uppercase tracking-tight font-bold">
-                                            {currentSort === 'played' ? 'Partite' :
-                                                currentSort === 'winrate' ? 'Rate' :
-                                                    'Punti'}
+                                            {currentSort === 'played' ? 'Partite' : currentSort === 'winrate' ? 'Rate' : 'Punti'}
                                         </span>
                                     </div>
                                 </div>
@@ -259,14 +240,10 @@ export default async function Home({ searchParams }: PageProps) {
                         </div>
                         <div>
                             <h3 className="text-base font-bold tracking-wide text-slate-100">Vuoi scalare il Ranking? Cura la tua nutrizione!</h3>
-                            <p className="text-xs text-slate-300 max-w-xl mt-1 leading-relaxed">
-                                Scopri come un'alimentazione strategica su misura può aumentare la tua resistenza nei match più lunghi e velocizzare il recovery muscolare.
-                            </p>
+                            <p className="text-xs text-slate-300 max-w-xl mt-1 leading-relaxed">Scopri come un'alimentazione strategica su misura può aumentare la tua resistenza nei match più lunghi e velocizzare il recovery muscolare.</p>
                         </div>
                     </div>
-                    <a href="https://www.bionutrimed.it/prenota/prenota-visita-in-studio.html" target="_blank" rel="noopener noreferrer" className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs uppercase tracking-wider py-3 px-5 rounded-lg transition-all shadow-sm text-center w-full md:w-auto shrink-0">
-                        🌐 Prenota una visita
-                    </a>
+                    <a href="https://www.bionutrimed.it/prenota/prenota-visita-in-studio.html" target="_blank" rel="noopener noreferrer" className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs uppercase tracking-wider py-3 px-5 rounded-lg transition-all shadow-sm text-center w-full md:w-auto shrink-0">🌐 Prenota una visita</a>
                 </div>
 
                 {/* SEZIONE 1: PARTITE IN PROGRAMMA */}
@@ -300,9 +277,7 @@ export default async function Home({ searchParams }: PageProps) {
                                         </a>
                                         <div className="flex gap-2 w-full">
                                             {canResolve ? (
-                                                <Link href={`/resolve-match/${match.id}`} className="flex-1 text-center bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold py-2.5 rounded-xl transition-colors shadow-sm">
-                                                    Inserisci Risultato
-                                                </Link>
+                                                <ResolveMatchButton matchId={match.id} /> // 👈 RISOLTO: Ora integra lo spinner client
                                             ) : (
                                                 <div className="flex-1 text-center bg-slate-100 text-slate-400 text-xs py-2.5 rounded-xl italic select-none border border-slate-200 flex items-center justify-center">
                                                     Sola lettura (non sei in campo)

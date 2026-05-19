@@ -119,8 +119,12 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
             <div className="max-w-5xl w-full">
 
                 {/* Torna indietro */}
-                <Link href="/" className="text-sm font-semibold text-indigo-600 hover:underline mb-6 inline-block">
-                    ← Torna alla Classifica
+                <Link
+                    href="/"
+                    className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-500 hover:text-indigo-600 bg-slate-200/50 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-all active:scale-95"
+                >
+                    <span className="text-[10px]">←</span>
+                    <span>Torna alla Classifica</span>
                 </Link>
 
                 {/* Intestazione Profilo */}

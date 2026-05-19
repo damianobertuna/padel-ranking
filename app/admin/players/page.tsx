@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { updatePlayerByAdmin } from '../../../actions/player-actions';
+import { SubmitButton } from './SubmitButton'; // 👈 Importiamo il pulsante intelligente
 
 export const revalidate = 0; // Evita cache aggressiva
 
@@ -39,7 +40,13 @@ export default async function AdminPlayersManagement() {
 
                 <div className="flex justify-between items-center mb-6">
                     <div>
-                        <Link href="/" className="text-sm font-semibold text-indigo-600 hover:underline">← Torna alla Classifica</Link>
+                        <Link
+                            href="/"
+                            className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-500 hover:text-indigo-600 bg-slate-200/50 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-all active:scale-95"
+                        >
+                            <i className="fa-solid fa-chevron-left text-[10px]"></i>
+                            Torna alla Classifica
+                        </Link>
                         <h1 className="text-3xl font-bold text-slate-800 mt-2">Gestione Giocatori (Admin)</h1>
                     </div>
                 </div>
@@ -91,14 +98,9 @@ export default async function AdminPlayersManagement() {
                                     />
                                 </div>
 
-                                {/* Pulsante di salvataggio allineato a destra */}
+                                {/* Pulsante di salvataggio riallineato tramite componente Client */}
                                 <div className="flex justify-end">
-                                    <button
-                                        type="submit"
-                                        className="w-full bg-emerald-600 text-white font-bold py-2 px-4 rounded hover:bg-emerald-700 transition-colors shadow-sm text-sm"
-                                    >
-                                        Salva Modifiche
-                                    </button>
+                                    <SubmitButton /> {/* 👈 RISOLTO: Ora gestisce lo spinner autonomamente sul client */}
                                 </div>
 
                                 {/* Opzioni avanzate: Lato, Mano e Ruolo */}
@@ -108,6 +110,7 @@ export default async function AdminPlayersManagement() {
                                         <select name="preferredSide" defaultValue={player.preferred_side} className="w-full p-1.5 border rounded bg-slate-50 text-slate-800 text-xs font-semibold">
                                             <option value="Left">Sinistra (SX)</option>
                                             <option value="Right">Destra (DX)</option>
+                                            <option value="Both">Entrambi (SX/DX)</option> {/* 👈 RISOLTO: Allineato alla bacheca Trello */}
                                         </select>
                                     </div>
 

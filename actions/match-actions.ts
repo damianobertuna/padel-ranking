@@ -99,10 +99,10 @@ export async function deletePendingMatch(matchId: number) {
  */
 export async function createPendingMatch(data: {
     matchDate: string | null;
-    teamALeft: number;
-    teamARight: number;
-    teamBLeft: number;
-    teamBRight: number;
+    teamALeft: number | null;
+    teamARight: number | null;
+    teamBLeft: number | null;
+    teamBRight: number | null;
 }) {
     const supabase = await createClient();
 
