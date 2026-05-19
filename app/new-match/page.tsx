@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { createPendingMatch as createMatch } from '@/actions/match-actions'; // 👈 RISOLTO: Import corretto con alias dinamico
+import { createPendingMatch as createMatch } from '@/actions/match-actions'; // Import corretto con alias dinamico
 
 interface Player {
     id: number;
@@ -20,6 +20,13 @@ export default function CreateMatchForm() {
     const [teamARight, setTeamARight] = useState<string>('');
     const [teamBLeft, setTeamBLeft] = useState<string>('');
     const [teamBRight, setTeamBRight] = useState<string>('');
+
+    // 👈 RISOLTO: Stato per la gestione di data e ora del match (formato YYYY-MM-DDTHH:mm richiesto da input datetime-local)
+    const [matchDate, setMatchDate] = useState<string>(() => {
+        const now = new Date();
+        const tzOffset = now.getTimezoneOffset() * 60000;
+        return new Date(now.getTime() - tzOffset).toISOString().slice(0, 16);
+    });
 
     // Stati per la gestione della validazione in tempo reale
     const [levelError, setLevelError] = useState<boolean>(false);
@@ -89,13 +96,13 @@ export default function CreateMatchForm() {
         setSubmitError('');
 
         try {
-            // 👈 AGGIORNATO: Ora esegue realmente l'inserimento agganciando l'azione
+            // Esegue l'inserimento passando tutti i parametri richiesti, inclusa la data
             await createMatch({
+                matchDate: matchDate, // 👈 Configurato correttamente
                 teamALeft: teamALeft ? parseInt(teamALeft) : null,
                 teamARight: teamARight ? parseInt(teamARight) : null,
                 teamBLeft: teamBLeft ? parseInt(teamBLeft) : null,
                 teamBRight: teamBRight ? parseInt(teamBRight) : null,
-                // Il database imposterà automaticamente la data corrente e lo status 'pending'
             });
 
             // Ritorno pulito alla home alla fine dell'operazione
@@ -108,7 +115,7 @@ export default function CreateMatchForm() {
     };
 
     return (
-        <main className="min-h-screen p-4 sm:p-8 bg-slate-55 flex items-center justify-center">
+        <main className="min-h-screen p-4 sm:p-8 bg-slate-50 flex items-center justify-center"> {/* Fix: bg-slate-55 -> bg-slate-50 */}
             <div className="w-full max-w-2xl bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <h1 className="text-xl font-black text-slate-800 mb-6">Nuova Partita</h1>
 
@@ -119,6 +126,20 @@ export default function CreateMatchForm() {
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-6">
+
+                    {/* 👈 NUOVO: SELEZIONE DATA E ORA MATCH */}
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                            Data e Ora della Partita
+                        </label>
+                        <input
+                            type="datetime-local"
+                            required
+                            value={matchDate}
+                            onChange={e => setMatchDate(e.target.value)}
+                            className="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-medium text-sm text-slate-800 focus:outline-none focus:border-indigo-500"
+                        />
+                    </div>
 
                     {/* Griglia dei due Team */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -219,7 +240,6 @@ export default function CreateMatchForm() {
                     >
                         {loading ? (
                             <>
-                                {/* Icona Spinner SVG Animata */}
                                 <svg className="animate-spin h-5 w-5 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>

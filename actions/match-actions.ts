@@ -140,7 +140,9 @@ export async function createPendingMatch(data: {
         .select('id, first_name, last_name')
         .in('id', [data.teamALeft, data.teamARight, data.teamBLeft, data.teamBRight]);
 
-    const getName = (id: number) => {
+    const getName = (id: number| null) => {
+        if (id === null) return 'Slot Libero';
+        
         const p = playersInMatch?.find(pl => pl.id === id);
         return p ? `${p.first_name} ${p.last_name}` : 'Sconosciuto';
     };
