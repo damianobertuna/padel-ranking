@@ -2,27 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { useRouter, useParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { calculateRankingUpdates, MatchContext } from '@/lib/matchRules';
 import { resolveMatchWithRanking } from '@/actions/match-actions';
 
-interface Player {
-    id: number;
-    first_name: string;
-    last_name: string;
-    ranking: number;
-    preferred_side: string;
-    role: string;
-}
-
-interface Match {
-    id: string;
-    team_a_left_id: number;
-    team_a_right_id: number;
-    team_b_left_id: number;
-    team_b_right_id: number;
-    status: string;
-}
+interface Player { id: number; first_name: string; last_name: string; ranking: number; preferred_side: string; }
+interface Match { id: string; team_a_left_id: number; team_a_right_id: number; team_b_left_id: number; team_b_right_id: number; status: string; }
 
 export default function ResolveMatch() {
     const supabase = createClient();
@@ -34,7 +19,7 @@ export default function ResolveMatch() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
-    // Stati per i punteggi numerici dei set
+    // Stati per i set (Set 1 e Set 2 tornano obbligatori)
     const [set1A, setSet1A] = useState('');
     const [set1B, setSet1B] = useState('');
     const [set2A, setSet2A] = useState('');
@@ -49,11 +34,8 @@ export default function ResolveMatch() {
                 const { data: playersData } = await supabase.from('players').select('*');
                 if (matchData) setMatch(matchData);
                 if (playersData) setPlayers(playersData);
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
+            } catch (err) { console.error(err); }
+            finally { setLoading(false); }
         }
         if (matchId) fetchData();
     }, [matchId, supabase]);
@@ -64,50 +46,45 @@ export default function ResolveMatch() {
         e.preventDefault();
         if (!match) return;
 
-        const s1A = parseInt(set1A);
-        const s1B = parseInt(set1B);
-        const s2A = parseInt(set2A);
-        const s2B = parseInt(set2B);
+        const s1A = parseInt(set1A); const s1B = parseInt(set1B);
+        const s2A = parseInt(set2A); const s2B = parseInt(set2B);
 
         if (isNaN(s1A) || isNaN(s1B) || isNaN(s2A) || isNaN(s2B)) {
-            setError('I primi 2 set sono obbligatori!');
+            setError('I primi 2 set sono obbligatori per convalidare il referto!');
             return;
         }
 
-        // Costruiamo l'array dei set
         const scoreArray = [
             { team_a: s1A, team_b: s1B },
             { team_a: s2A, team_b: s2B }
         ];
 
-        // Aggiungiamo il terzo set solo se compilato
         if (set3A !== '' && set3B !== '') {
             scoreArray.push({ team_a: parseInt(set3A), team_b: parseInt(set3B) });
         }
 
-        // Calcoliamo chi ha vinto più set per determinare il team vincente
-        let setsWonA = 0;
-        let setsWonB = 0;
+        // Calcolo vincitore dai set
+        let setsWonA = 0; let setsWonB = 0;
         scoreArray.forEach(s => {
             if (s.team_a > s.team_b) setsWonA++;
             else if (s.team_b > s.team_a) setsWonB++;
         });
 
         if (setsWonA === setsWonB) {
-            setError('Pareggio nei set impossibile. Compila il terzo set per decretare il vincitore!');
+            setError('La partita è in pareggio (1-1 nei set). È obbligatorio inserire il punteggio del 3° set per stabilire la coppia vincente!');
             return;
         }
 
-        const winningTeam = setsWonA > setsWonB ? 'A' : 'B';
+        const finalWinningTeam = setsWonA > setsWonB ? 'A' : 'B';
 
         setLoading(true);
         setError('');
 
-        // Generiamo i contesti per le tue regole di ranking esistenti
+        // Generazione contesti per le regole di Ranking
         const teamAIds = [match.team_a_left_id, match.team_a_right_id];
         const teamBIds = [match.team_b_left_id, match.team_b_right_id];
-        const winnerIds = winningTeam === 'A' ? teamAIds : teamBIds;
-        const loserIds = winningTeam === 'A' ? teamBIds : teamAIds;
+        const winnerIds = finalWinningTeam === 'A' ? teamAIds : teamBIds;
+        const loserIds = finalWinningTeam === 'A' ? teamBIds : teamAIds;
 
         const leftPlayers = players.filter(p => p.preferred_side === 'Left').sort((a, b) => b.ranking - a.ranking);
         const rightPlayers = players.filter(p => p.preferred_side === 'Right').sort((a, b) => b.ranking - a.ranking);
@@ -129,7 +106,6 @@ export default function ResolveMatch() {
                 score: scoreArray,
                 rankingUpdates: updates
             });
-
             window.location.href = '/';
         } catch (err: any) {
             setError(err.message || 'Errore durante il salvataggio.');
@@ -144,7 +120,7 @@ export default function ResolveMatch() {
         <main className="min-h-screen p-4 sm:p-8 bg-slate-100 flex flex-col items-center justify-center">
             <div className="max-w-md w-full bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-slate-200">
                 <h1 className="text-xl font-black text-slate-800 text-center tracking-tight">Referto Gara</h1>
-                <p className="text-xs text-slate-400 text-center mb-6 mt-1">Inserisci i punteggi reali dei set disputati.</p>
+                <p className="text-xs text-slate-400 text-center mb-6 mt-1">Inserisci i punteggi reali per convalidare il match.</p>
 
                 {error && <div className="bg-rose-50 border border-rose-200 text-rose-700 p-3 rounded-xl mb-5 text-xs font-bold">{error}</div>}
 
@@ -163,81 +139,29 @@ export default function ResolveMatch() {
                         <div className="truncate">{getPlayer(match.team_b_left_id)?.first_name} / {getPlayer(match.team_b_right_id)?.first_name}</div>
                     </div>
 
-                    {/* SET 1 */}
+                    {/* SET 1 (Required) */}
                     <div className="grid grid-cols-3 gap-4 items-center bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-                        <input
-                            type="number"
-                            required
-                            min="0"
-                            max="7"
-                            value={set1A}
-                            onChange={e => setSet1A(e.target.value)} // 👈 CORRETTO: setSet1A
-                            className="w-full text-center text-lg font-mono font-bold p-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:border-indigo-500 focus:outline-none"
-                            placeholder="0"
-                        />
+                        <input type="number" required min="0" max="7" value={set1A} onChange={e => setSet1A(e.target.value)} className="w-full text-center text-lg font-mono font-bold p-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:border-indigo-500 focus:outline-none" placeholder="0" />
                         <div className="text-center font-bold text-slate-400 text-[10px] uppercase">Set 1</div>
-                        <input
-                            type="number"
-                            required
-                            min="0"
-                            max="7"
-                            value={set1B}
-                            onChange={e => setSet1B(e.target.value)} // 👈 CORRETTO: setSet1B
-                            className="w-full text-center text-lg font-mono font-bold p-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:border-indigo-500 focus:outline-none"
-                            placeholder="0"
-                        />
+                        <input type="number" required min="0" max="7" value={set1B} onChange={e => setSet1B(e.target.value)} className="w-full text-center text-lg font-mono font-bold p-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:border-indigo-500 focus:outline-none" placeholder="0" />
                     </div>
 
-                    {/* SET 2 */}
+                    {/* SET 2 (Required) */}
                     <div className="grid grid-cols-3 gap-4 items-center bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-                        <input
-                            type="number"
-                            required
-                            min="0"
-                            max="7"
-                            value={set2A}
-                            onChange={e => setSet2A(e.target.value)} // 👈 CORRETTO: setSet2A
-                            className="w-full text-center text-lg font-mono font-bold p-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:border-indigo-500 focus:outline-none"
-                            placeholder="0"
-                        />
+                        <input type="number" required min="0" max="7" value={set2A} onChange={e => setSet2A(e.target.value)} className="w-full text-center text-lg font-mono font-bold p-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:border-indigo-500 focus:outline-none" placeholder="0" />
                         <div className="text-center font-bold text-slate-400 text-[10px] uppercase">Set 2</div>
-                        <input
-                            type="number"
-                            required
-                            min="0"
-                            max="7"
-                            value={set2B}
-                            onChange={e => setSet2B(e.target.value)} // 👈 CORRETTO: setSet2B
-                            className="w-full text-center text-lg font-mono font-bold p-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:border-indigo-500 focus:outline-none"
-                            placeholder="0"
-                        />
+                        <input type="number" required min="0" max="7" value={set2B} onChange={e => setSet2B(e.target.value)} className="w-full text-center text-lg font-mono font-bold p-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:border-indigo-500 focus:outline-none" placeholder="0" />
                     </div>
 
-                    {/* SET 3 (Opzionale) */}
+                    {/* SET 3 (Opzionale, diventa necessario solo se sono 1-1) */}
                     <div className="grid grid-cols-3 gap-4 items-center bg-indigo-50/20 p-3 rounded-xl border border-dashed border-indigo-200">
-                        <input
-                            type="number"
-                            min="0"
-                            max="7"
-                            value={set3A}
-                            onChange={e => setSet3A(e.target.value)} // 👈 CORRETTO: setSet3A
-                            className="w-full text-center text-lg font-mono font-bold p-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:border-indigo-500 focus:outline-none"
-                            placeholder="-"
-                        />
-                        <div className="text-center font-bold text-indigo-400 text-[9px] uppercase leading-tight">Set 3<br/><span className="text-[8px] font-normal text-slate-400 lowercase">(opzionale)</span></div>
-                        <input
-                            type="number"
-                            min="0"
-                            max="7"
-                            value={set3B}
-                            onChange={e => setSet3B(e.target.value)} // 👈 CORRETTO: setSet3B
-                            className="w-full text-center text-lg font-mono font-bold p-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:border-indigo-500 focus:outline-none"
-                            placeholder="-"
-                        />
+                        <input type="number" min="0" max="7" value={set3A} onChange={e => set3A(e.target.value)} className="w-full text-center text-lg font-mono font-bold p-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:border-indigo-500 focus:outline-none" placeholder="-" />
+                        <div className="text-center font-bold text-indigo-400 text-[9px] uppercase leading-tight">Set 3<br/><span className="text-[8px] font-normal text-slate-400 lowercase">(se 1-1)</span></div>
+                        <input type="number" min="0" max="7" value={set3B} onChange={e => set3B(e.target.value)} className="w-full text-center text-lg font-mono font-bold p-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:border-indigo-500 focus:outline-none" placeholder="-" />
                     </div>
 
-                    <button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 mt-4 text-sm">
-                        {loading ? 'Salvataggio referto...' : 'Invia e Calcola Classifica'}
+                    <button type="submit" disabled={loading} className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-xl shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 mt-6 text-sm">
+                        {loading ? 'Salvataggio referto...' : 'Conferma e Calcola Classifica'}
                     </button>
                 </form>
             </div>

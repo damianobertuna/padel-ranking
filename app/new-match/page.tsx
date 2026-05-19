@@ -2,184 +2,212 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { useRouter } from 'next/navigation';
-import { createPendingMatch } from '@/actions/match-actions';
+import { createMatch } from '@/actions/match-actions'; // Sarà usata al momento del submit reale
 
 interface Player {
     id: number;
     first_name: string;
     last_name: string;
-    preferred_side: string;
-    ranking: number;
+    ranking: number; // Il livello del giocatore (es. 4.50, 5.05)
 }
 
-export default function NewMatch() {
+export default function CreateMatchForm() {
     const supabase = createClient();
-    const router = useRouter();
+
+    // Stati per i giocatori selezionati nelle tendine
     const [players, setPlayers] = useState<Player[]>([]);
+    const [teamALeft, setTeamALeft] = useState<string>('');
+    const [teamARight, setTeamARight] = useState<string>('');
+    const [teamBLeft, setTeamBLeft] = useState<string>('');
+    const [teamBRight, setTeamBRight] = useState<string>('');
 
-    const [matchDate, setMatchDate] = useState('');
-    const [teamALeft, setTeamALeft] = useState('');
-    const [teamARight, setTeamARight] = useState('');
-    const [teamBLeft, setTeamBLeft] = useState('');
-    const [teamBRight, setTeamBRight] = useState('');
-    const [error, setError] = useState('');
+    // Stati per la gestione della validazione in tempo reale
+    const [levelError, setLevelError] = useState<boolean>(false);
+    const [duplicateError, setDuplicateError] = useState<boolean>(false);
+    const [loading, setLoading] = useState<boolean>(false);
 
+    // Caricamento iniziale dell'anagrafica giocatori da Supabase
     useEffect(() => {
-        async function fetchPlayers() {
-            const { data } = await supabase.from('players').select('*').order('first_name');
+        async function loadPlayers() {
+            const { data } = await supabase
+                .from('players')
+                .select('id, first_name, last_name, ranking')
+                .order('first_name', { ascending: true });
             if (data) setPlayers(data);
         }
-        fetchPlayers();
-    }, []);
+        loadPlayers();
+    }, [supabase]);
 
-    // --- LOGICA DI GUARDIA IN TEMPO REALE ---
+    // EFFETTO DI VALIDAZIONE DINAMICA: Controlla cloni e divario tecnico (< 0.25)
+    useEffect(() => {
+        // 1. Raccogliamo gli ID selezionati filtrando le opzioni vuote
+        const selectedIds = [teamALeft, teamARight, teamBLeft, teamBRight]
+            .map(id => parseInt(id))
+            .filter(id => !isNaN(id));
 
-    // 1. Controlliamo se ci sono doppioni tra i giocatori attualmente selezionati
-    const selectedIds = [teamALeft, teamARight, teamBLeft, teamBRight].filter(id => id !== '');
-    const hasDuplicates = new Set(selectedIds).size !== selectedIds.length;
+        // --- CONTROLLO 1: GIOCATORI DUPLICATI (BANNER ROSSO) ---
+        const hasDuplicates = new Set(selectedIds).size !== selectedIds.length;
+        setDuplicateError(hasDuplicates);
 
-    // 2. Controlliamo se la differenza di ranking supera 0.50
-    let isRankingDiffInvalid = false;
-    const allSelected = selectedIds.length === 4;
-
-    if (allSelected && !hasDuplicates) {
-        const selectedRankings = selectedIds.map(id => {
-            const player = players.find(p => p.id.toString() === id);
-            return player ? player.ranking : 0;
-        });
-
-        const maxRanking = Math.max(...selectedRankings);
-        const minRanking = Math.min(...selectedRankings);
-        if ((maxRanking - minRanking) > 0.50) {
-            isRankingDiffInvalid = true;
+        // Se ci sono cloni in campo, blocchiamo qui i controlli per evitare conflitti visivi
+        if (hasDuplicates) {
+            setLevelError(false);
+            return;
         }
-    }
 
-    // Il form è valido solo se tutti i 4 giocatori sono scelti, zero doppioni e forbice ok
-    const isFormValid = allSelected && !hasDuplicates && !isRankingDiffInvalid;
+        // --- CONTROLLO 2: TOLLERANZA LIVELLO MASSIMO (BANNER ARANCIONE) ---
+        if (selectedIds.length < 2) {
+            setLevelError(false);
+            return;
+        }
+
+        const selectedRankings = selectedIds
+            .map(id => players.find(p => p.id === id)?.ranking)
+            .filter((ranking): ranking is number => ranking !== undefined);
+
+        if (selectedRankings.length >= 2) {
+            const maxLevel = Math.max(...selectedRankings);
+            const minLevel = Math.min(...selectedRankings);
+            const difference = maxLevel - minLevel;
+
+            // Arrotondiamo a 2 decimali per evitare i bachi matematici dei float in JS
+            if (parseFloat(difference.toFixed(2)) > 0.25) {
+                setLevelError(true);
+            } else {
+                setLevelError(false);
+            }
+        }
+    }, [teamALeft, teamARight, teamBLeft, teamBRight, players]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setError('');
+        // Doppia barriera di sicurezza prima di sparare i dati al server
+        if (levelError || duplicateError) return;
 
-        if (!isFormValid) return; // Blocco di sicurezza extra
+        setLoading(true);
 
-        try {
-            // Eseguiamo la Server Action passando i dati puliti convertiti in numeri
-            await createPendingMatch({
-                matchDate: matchDate || null,
-                teamALeft: parseInt(teamALeft),
-                teamARight: parseInt(teamARight),
-                teamBLeft: parseInt(teamBLeft),
-                teamBRight: parseInt(teamBRight)
-            });
+        // Esempio di implementazione futura per la Server Action:
+        // try {
+        //     await createMatch({
+        //         team_a_left_id: teamALeft ? parseInt(teamALeft) : null,
+        //         team_a_right_id: teamARight ? parseInt(teamARight) : null,
+        //         team_b_left_id: teamBLeft ? parseInt(teamBLeft) : null,
+        //         team_b_right_id: teamBRight ? parseInt(teamBRight) : null,
+        //         status: 'pending'
+        //     });
+        //     // redirect o reset form...
+        // } catch(err) { console.error(err); }
 
-            // Se l'azione (e l'audit log) va a buon fine, torniamo alla Home rinfrescata
-            router.push('/');
-            router.refresh();
-        } catch (insertError: any) {
-            setError(insertError.message || 'Errore durante il salvataggio della partita e dell\'audit log.');
-            console.error(insertError);
-        }
+        setLoading(false);
     };
 
     return (
-        <main className="min-h-screen p-8 bg-slate-100 flex flex-col items-center">
-            <div className="max-w-2xl w-full bg-white p-8 rounded-lg shadow-md">
-                <h1 className="text-3xl font-bold text-slate-800 mb-6 text-center">New Match</h1>
-
-                {error && (
-                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                        {error}
-                    </div>
-                )}
+        <main className="min-h-screen p-4 sm:p-8 bg-slate-50 flex items-center justify-center">
+            <div className="w-full max-w-2xl bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h1 className="text-xl font-black text-slate-800 mb-6">Nuova Partita</h1>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Data della partita */}
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Match Date (Optional)</label>
-                        <input
-                            type="datetime-local"
-                            value={matchDate}
-                            onChange={(e) => setMatchDate(e.target.value)}
-                            className="w-full border border-slate-300 rounded p-2"
-                        />
-                    </div>
 
+                    {/* Griglia dei due Team */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Squadra A */}
-                        <div className="bg-blue-50 p-4 rounded border border-blue-100">
-                            <h3 className="font-bold text-blue-800 mb-4">Team A</h3>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-500 mb-1">Left Player</label>
-                                    <select required value={teamALeft} onChange={(e) => setTeamALeft(e.target.value)} className="w-full border p-2 rounded">
-                                        <option value="">Select...</option>
-                                        {players.filter(p => p.preferred_side === 'Left').map(p => (
-                                            <option key={p.id} value={p.id}>{p.first_name} {p.last_name} ({p.ranking.toFixed(2)})</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-500 mb-1">Right Player</label>
-                                    <select required value={teamARight} onChange={(e) => setTeamARight(e.target.value)} className="w-full border p-2 rounded">
-                                        <option value="">Select...</option>
-                                        {players.filter(p => p.preferred_side === 'Right').map(p => (
-                                            <option key={p.id} value={p.id}>{p.first_name} {p.last_name} ({p.ranking.toFixed(2)})</option>
-                                        ))}
-                                    </select>
-                                </div>
+
+                        {/* CARD TEAM A */}
+                        <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-100 flex flex-col space-y-4">
+                            <h2 className="text-blue-800 font-black text-base tracking-tight">Team A</h2>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Left Player</label>
+                                <select
+                                    value={teamALeft}
+                                    onChange={e => setTeamALeft(e.target.value)}
+                                    className="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-medium text-sm focus:outline-none focus:border-blue-500"
+                                >
+                                    <option value="">Seleziona Giocatore (Vuoto)</option>
+                                    {players.map(p => (
+                                        <option key={p.id} value={p.id}>{p.first_name} {p.last_name} ({p.ranking.toFixed(2)})</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Right Player</label>
+                                <select
+                                    value={teamARight}
+                                    onChange={e => setTeamARight(e.target.value)}
+                                    className="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-medium text-sm focus:outline-none focus:border-blue-500"
+                                >
+                                    <option value="">Seleziona Giocatore (Vuoto)</option>
+                                    {players.map(p => (
+                                        <option key={p.id} value={p.id}>{p.first_name} {p.last_name} ({p.ranking.toFixed(2)})</option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
 
-                        {/* Squadra B */}
-                        <div className="bg-red-50 p-4 rounded border border-red-100">
-                            <h3 className="font-bold text-red-800 mb-4">Team B</h3>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-500 mb-1">Left Player</label>
-                                    <select required value={teamBLeft} onChange={(e) => setTeamBLeft(e.target.value)} className="w-full border p-2 rounded">
-                                        <option value="">Select...</option>
-                                        {players.filter(p => p.preferred_side === 'Left').map(p => (
-                                            <option key={p.id} value={p.id}>{p.first_name} {p.last_name} ({p.ranking.toFixed(2)})</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-500 mb-1">Right Player</label>
-                                    <select required value={teamBRight} onChange={(e) => setTeamBRight(e.target.value)} className="w-full border p-2 rounded">
-                                        <option value="">Select...</option>
-                                        {players.filter(p => p.preferred_side === 'Right').map(p => (
-                                            <option key={p.id} value={p.id}>{p.first_name} {p.last_name} ({p.ranking.toFixed(2)})</option>
-                                        ))}
-                                    </select>
-                                </div>
+                        {/* CARD TEAM B */}
+                        <div className="bg-rose-50/40 p-5 rounded-2xl border border-rose-100 flex flex-col space-y-4">
+                            <h2 className="text-rose-800 font-black text-base tracking-tight">Team B</h2>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Left Player</label>
+                                <select
+                                    value={teamBLeft}
+                                    onChange={e => setTeamBLeft(e.target.value)}
+                                    className="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-medium text-sm focus:outline-none focus:border-rose-500"
+                                >
+                                    <option value="">Seleziona Giocatore (Vuoto)</option>
+                                    {players.map(p => (
+                                        <option key={p.id} value={p.id}>{p.first_name} {p.last_name} ({p.ranking.toFixed(2)})</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Right Player</label>
+                                <select
+                                    value={teamBRight}
+                                    onChange={e => setTeamBRight(e.target.value)}
+                                    className="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-medium text-sm focus:outline-none focus:border-rose-500"
+                                >
+                                    <option value="">Seleziona Giocatore (Vuoto)</option>
+                                    {players.map(p => (
+                                        <option key={p.id} value={p.id}>{p.first_name} {p.last_name} ({p.ranking.toFixed(2)})</option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
+
                     </div>
 
-                    {/* MESSAGGI DI ERRORE DINAMICI */}
-                    <div className="min-h-[24px]">
-                        {hasDuplicates && (
-                            <p className="text-red-600 text-sm font-bold text-center animate-pulse">
-                                ⚠️ Errore: Un giocatore non può sdoppiarsi! Rimuovi i duplicati.
+                    {/* BANNER DI ERRORE DUPLICATI (Rosso - Priorità Alta) */}
+                    {duplicateError && (
+                        <div className="flex items-center justify-center space-x-2 p-3 bg-rose-50 border border-rose-200 rounded-xl transition-all">
+                            <span className="text-base">❌</span>
+                            <p className="text-xs font-black text-rose-700 tracking-tight">
+                                Errore: Lo stesso giocatore è stato inserito in più posizioni!
                             </p>
-                        )}
-                        {isRankingDiffInvalid && (
-                            <p className="text-orange-500 text-sm font-bold text-center">
-                                ⚠️ Attenzione: La differenza di livello supera il limite di 0.50!
-                            </p>
-                        )}
-                    </div>
+                        </div>
+                    )}
 
+                    {/* BANNER DI ALERT SCOMPENSO LIVELLO (Arancione) */}
+                    {levelError && (
+                        <div className="flex items-center justify-center space-x-2 p-3 bg-amber-50 border border-amber-200 rounded-xl transition-all animate-pulse">
+                            <span className="text-base">⚠️</span>
+                            <p className="text-xs font-black text-amber-700 tracking-tight">
+                                Attenzione: La differenza di livello supera il limite di 0.25!
+                            </p>
+                        </div>
+                    )}
+
+                    {/* BOTTONE DI INVIO (Si spegne se c'è QUALSIASI blocco attivo o se carica) */}
                     <button
                         type="submit"
-                        disabled={!isFormValid}
-                        className="w-full bg-slate-800 text-white font-bold py-3 rounded hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        disabled={levelError || duplicateError || loading}
+                        className="w-full bg-slate-800 hover:bg-slate-900 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-all shadow-sm active:scale-[0.99] text-sm"
                     >
-                        Create Match
+                        {loading ? 'Creazione in corso...' : 'Crea Partita'}
                     </button>
+
                 </form>
             </div>
         </main>

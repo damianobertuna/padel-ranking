@@ -169,12 +169,11 @@ export async function createPendingMatch(data: {
 }
 
 /**
- * 3. RISOLUZIONE DI UN MATCH CON CALCOLO RANKING, SET FACOLTATIVI E AUDIT LOG (VERSIONE DEFINITIVA)
+ * 3. RISOLUZIONE DI UN MATCH CON CALCOLO RANKING, SET OBBLIGATORI E AUDIT LOG
  */
 export async function resolveMatchWithRanking(data: {
     matchId: string;
-    score: SetScore[];
-    winningTeam?: 'A' | 'B'; // Facoltativo, usato come fallback se lo score è vuoto
+    score: SetScore[]; // <-- L'array dei set ora torna a essere il sovrano assoluto
     rankingUpdates: Record<number, number>;
 }) {
     const supabase = await createClient();
@@ -203,31 +202,25 @@ export async function resolveMatchWithRanking(data: {
         if (!match) throw new Error("Partita non trovata nel database");
         if (match.status !== 'pending') throw new Error("Questa partita è già stata risolta");
 
-        // DETERMINAZIONE DELLA SQUADRA VINCITRICE
-        let finalWinningTeam: 'A' | 'B' | null = null;
-        let stringaPunteggio = "Punteggio non inserito (Risoluzione Rapida)";
-
-        if (data.score && data.score.length > 0) {
-            // Algoritmo di calcolo automatico basato sui game dei Set inseriti
-            let setsWonA = 0;
-            let setsWonB = 0;
-
-            data.score.forEach(set => {
-                if (set.team_a > set.team_b) setsWonA++;
-                else if (set.team_b > set.team_a) setsWonB++;
-            });
-
-            if (setsWonA !== 0 || setsWonB !== 0) {
-                finalWinningTeam = setsWonA > setsWonB ? 'A' : 'B';
-                stringaPunteggio = data.score.map(s => `${s.team_a}-${s.team_b}`).join(" / ");
-            }
+        // VALIDAZIONE E CALCOLO AUTOMATICO DEL VINCITORE IN BASE AI SET
+        if (!data.score || data.score.length < 2) {
+            throw new Error("I dati dei set sono incompleti. Almeno i primi 2 set sono obbligatori.");
         }
 
-        // Fallback: se i set sono vuoti, usiamo la selezione manuale proveniente dal form
-        if (!finalWinningTeam) {
-            if (!data.winningTeam) throw new Error("Devi compilare i parziali dei set o indicare la coppia vincitrice.");
-            finalWinningTeam = data.winningTeam;
+        let setsWonA = 0;
+        let setsWonB = 0;
+
+        data.score.forEach(set => {
+            if (set.team_a > set.team_b) setsWonA++;
+            else if (set.team_b > set.team_a) setsWonB++;
+        });
+
+        if (setsWonA === setsWonB) {
+            throw new Error("Pareggio nei set impossibile. Inserisci il terzo set per decretare il vincitore.");
         }
+
+        const finalWinningTeam = setsWonA > setsWonB ? 'A' : 'B';
+        const stringaPunteggio = data.score.map(s => `${s.team_a}-${s.team_b}`).join(" / ");
 
         // AGGIORNAMENTO DEL RANKING DEI SINGOLI GIOCATORI
         const allInvolvedIds = [
@@ -252,7 +245,7 @@ export async function resolveMatchWithRanking(data: {
             .update({
                 status: 'completed',
                 winning_team: finalWinningTeam,
-                score: data.score || [] // Scrittura sicura dentro il campo JSONB
+                score: data.score // Scrittura sicura dentro il campo JSONB
             })
             .eq('id', data.matchId);
 
@@ -277,10 +270,7 @@ export async function resolveMatchWithRanking(data: {
             : `Vince il Team B (${nomeTeamB}) contro il Team A (${nomeTeamA})`;
 
         const operatore = `${currentUserPlayer.first_name} ${currentUserPlayer.last_name}`;
-
-        const logDetails = currentUserPlayer.role === 'admin'
-            ? `L'admin ${operatore} ha registrato il risultato: ${esitoDescrizione} [${stringaPunteggio}]`
-            : `Il giocatore ${operatore} ha registrato il risultato del proprio match: ${esitoDescrizione} [${stringaPunteggio}]`;
+        const logDetails = `L'operatore ${operatore} ha registrato il risultato: ${esitoDescrizione} [${stringaPunteggio}]`;
 
         const { error: logError } = await supabase.from('audit_logs').insert([
             {

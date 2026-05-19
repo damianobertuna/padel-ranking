@@ -1,4 +1,4 @@
-import { deletePendingMatch, createPendingMatch, resolveMatchWithRanking } from './match-actions'; // 👈 Importiamo la nuova action
+import { deletePendingMatch, createPendingMatch, resolveMatchWithRanking } from './match-actions';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 // 1. Mock delle utility di Next.js in stile Vitest
@@ -17,8 +17,6 @@ const mockIn = vi.fn(() => ({ select: vi.fn(() => Promise.resolve({ data: [] }))
 const mockSelect = vi.fn(() => ({ eq: mockEq, in: mockIn }));
 const mockInsert = vi.fn(() => Promise.resolve({ error: null }));
 const mockDelete = vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: null })) }));
-
-// 👈 NUOVO MOCK PER IL METODO UPDATE (Richiesto dalla risoluzione dei match)
 const mockUpdate = vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: null })) }));
 
 const mockSupabaseClient = {
@@ -110,7 +108,7 @@ describe('createPendingMatch', () => {
     });
 });
 
-// 4. NUOVO BLOCCO DI TEST PER LA RISOLUZIONE DEI MATCH (SIA ANALITICA CHE VELOCE)
+// 4. BLOCCO DI TEST AGGIORNATO PER LA RISOLUZIONE DEI MATCH (CON SET OBBLIGATORI)
 describe('resolveMatchWithRanking', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -128,7 +126,7 @@ describe('resolveMatchWithRanking', () => {
             }
         });
 
-        // Mock per i cicli sequenziali di lettura del ranking corrente dei 4 giocatori
+        // Mock per i cicli sequenziali di lettura del ranking corrente dei giocatori
         mockSingle.mockResolvedValue({ ranking: 2000 });
 
         const mockScore = [
@@ -158,7 +156,8 @@ describe('resolveMatchWithRanking', () => {
         ]));
     });
 
-    it('dovrebbe fare un fallback sulla selezione manuale del vincitore se l’array dei set viene inviato vuoto', async () => {
+    // 👈 TEST SOSTITUITO: Ora verifica la barriera di sicurezza dei set obbligatori
+    it('dovrebbe rifiutare la risoluzione del match se l’array dei set viene inviato vuoto o incompleto', async () => {
         mockSupabaseClient.auth.getUser.mockResolvedValueOnce({ data: { user: { id: 'user_1' } } });
         mockSingle.mockResolvedValueOnce({ data: { id: 1, first_name: 'Luca', last_name: 'Verdi', role: 'player' } });
         mockSingle.mockResolvedValueOnce({
@@ -170,18 +169,15 @@ describe('resolveMatchWithRanking', () => {
         });
         mockSingle.mockResolvedValue({ ranking: 2000 });
 
-        await resolveMatchWithRanking({
+        const datiInvalidi = {
             matchId: "123",
-            score: [], // Nessun set inserito (risoluzione rapida)
-            winningTeam: 'B', // Pulsante manuale del Team B
+            score: [], // ❌ Invio illegale di un array vuoto
             rankingUpdates: { 1: -10, 2: -10, 3: 10, 4: 10 }
-        });
+        };
 
-        // Controlliamo che l'update sul database rifletta la scelta manuale salvando l'array vuoto
-        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
-            status: 'completed',
-            winning_team: 'B', // Ha preso il fallback manuale
-            score: []
-        }));
+        // Ci aspettiamo che la Server Action rimbalzi la richiesta lanciando l'errore esatto
+        await expect(resolveMatchWithRanking(datiInvalidi)).rejects.toThrow(
+            "I dati dei set sono incompleti. Almeno i primi 2 set sono obbligatori."
+        );
     });
 });
