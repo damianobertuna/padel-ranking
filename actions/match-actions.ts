@@ -11,8 +11,9 @@ export interface SetScore {
 
 /**
  * 1. CANCELLAZIONE DI UN MATCH IN PROGRAMMA
+ * 👉 AGGIORNATO: matchId cambiato da number a string per supportare gli UUID
  */
-export async function deletePendingMatch(matchId: number) {
+export async function deletePendingMatch(matchId: string) {
     const supabase = await createClient();
 
     // Controlliamo l'autenticazione
@@ -53,9 +54,11 @@ export async function deletePendingMatch(matchId: number) {
     const { data: playersInMatch } = await supabase
         .from('players')
         .select('id, first_name, last_name')
-        .in('id', [match.team_a_left_id, match.team_a_right_id, match.team_b_left_id, match.team_b_right_id]);
+        .in('id', [match.team_a_left_id, match.team_a_right_id, match.team_b_left_id, match.team_b_right_id].filter(Boolean));
 
-    const getName = (id: number) => {
+    // 👉 AGGIORNATO: Supporto a number | null per evitare crash con slot vuoti nelle partite aperte
+    const getName = (id: number | null) => {
+        if (id === null) return 'Slot Libero';
         const p = playersInMatch?.find(pl => pl.id === id);
         return p ? `${p.first_name} ${p.last_name}` : 'Sconosciuto';
     };
@@ -138,11 +141,11 @@ export async function createPendingMatch(data: {
     const { data: playersInMatch } = await supabase
         .from('players')
         .select('id, first_name, last_name')
-        .in('id', [data.teamALeft, data.teamARight, data.teamBLeft, data.teamBRight]);
+        .in('id', [data.teamALeft, data.teamARight, data.teamBLeft, data.teamBRight].filter(Boolean));
 
-    const getName = (id: number| null) => {
+    const getName = (id: number | null) => {
         if (id === null) return 'Slot Libero';
-        
+
         const p = playersInMatch?.find(pl => pl.id === id);
         return p ? `${p.first_name} ${p.last_name}` : 'Sconosciuto';
     };
@@ -175,7 +178,7 @@ export async function createPendingMatch(data: {
  */
 export async function resolveMatchWithRanking(data: {
     matchId: string;
-    score: SetScore[]; // <-- L'array dei set ora torna a essere il sovrano assoluto
+    score: SetScore[];
     rankingUpdates: Record<number, number>;
 }) {
     const supabase = await createClient();
@@ -247,7 +250,7 @@ export async function resolveMatchWithRanking(data: {
             .update({
                 status: 'completed',
                 winning_team: finalWinningTeam,
-                score: data.score // Scrittura sicura dentro il campo JSONB
+                score: data.score
             })
             .eq('id', data.matchId);
 
@@ -294,4 +297,28 @@ export async function resolveMatchWithRanking(data: {
         console.error("💥 ERRORE SERVER ACTION:", globalError.message);
         throw new Error(globalError.message || "Errore interno del server");
     }
+}
+
+/**
+ * 4. AGGIORNAMENTO COMPONENTI IN LINEA (PARTITE APERTE)
+ * 👉 RISOLTO: Rimosso completamente il parseInt per accettare l'UUID stringa intatto
+ */
+export async function updateMatchPlayers(matchId: string, updatedFields: {
+    team_a_left_id?: number | null;
+    team_a_right_id?: number | null;
+    team_b_left_id?: number | null;
+    team_b_right_id?: number | null;
+}) {
+    const supabase = await createClient();
+
+    const { error } = await supabase
+        .from('matches')
+        .update(updatedFields)
+        .eq('id', matchId); // 👈 Stringa UUID nativa
+
+    if (error) {
+        throw new Error(`Impossibile aggiornare la formazione: ${error.message}`);
+    }
+
+    revalidatePath('/');
 }

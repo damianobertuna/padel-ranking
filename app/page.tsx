@@ -1,8 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
-import { canUserResolveMatch } from '@/lib/matchRules';
-import DeleteMatchButton from '@/components/DeleteMatchButton';
-import ResolveMatchButton from '@/components/ResolveMatchButton'; // 👈 NUOVO IMPORT
+import PendingMatchCard from '@/components/PendingMatchCard';
 
 export const revalidate = 0;
 
@@ -67,22 +65,20 @@ export default async function Home({ searchParams }: PageProps) {
         return b.ranking - a.ranking;
     });
 
-    // --- CORREZIONE COMPLETA EX-AEQUO (KING E FANALINO COMPARTITI) ---
+    // --- LOGICA EX-AEQUO COMPARTITI ---
     const leftPlayersSorted = [...sortedPlayers].filter(p => p.preferred_side === 'Left' || p.preferred_side === 'Both').sort((a,b) => b.ranking - a.ranking);
     const rightPlayersSorted = [...sortedPlayers].filter(p => p.preferred_side === 'Right' || p.preferred_side === 'Both').sort((a,b) => b.ranking - a.ranking);
     const allPlayersAscending = [...sortedPlayers].sort((a,b) => a.ranking - b.ranking);
 
-    // Troviamo i punteggi massimi e minimi assoluti
     const maxRankingLeft = leftPlayersSorted.length > 0 ? leftPlayersSorted[0].ranking : -1;
     const maxRankingRight = rightPlayersSorted.length > 0 ? rightPlayersSorted[0].ranking : -1;
     const minRankingAbsolute = allPlayersAscending.length > 0 ? allPlayersAscending[0].ranking : -1;
 
-    // Raccogliamo TUTTI gli ID che hanno quel punteggio massimo/minimo (Gestione Parità)
     const kingLeftIds = leftPlayersSorted.filter(p => p.ranking === maxRankingLeft && maxRankingLeft !== -1).map(p => p.id);
     const kingRightIds = rightPlayersSorted.filter(p => p.ranking === maxRankingRight && maxRankingRight !== -1).map(p => p.id);
     const lastPlaceIds = allPlayersAscending.filter(p => p.ranking === minRankingAbsolute && minRankingAbsolute !== -1).map(p => p.id);
-    // -----------------------------------------------------------------
 
+    // Recuperiamo le partite IN PROGRAMMA (pending)
     const { data: pendingMatches } = await supabase
         .from('matches')
         .select('*')
@@ -101,19 +97,10 @@ export default async function Home({ searchParams }: PageProps) {
 
     const totalPages = totalCompletedCount ? Math.ceil(totalCompletedCount / MATCHES_PER_PAGE) : 1;
 
-    const getPlayerName = (id: number) => {
+    const getPlayerNameWithRanking = (id: number | null) => {
+        if (id === null) return 'Slot Libero';
         const p = rawPlayers?.find(player => player.id === id);
-        return p ? `${p.first_name} ${p.last_name}` : 'Sconosciuto';
-    };
-
-    const getPlayerObj = (id: number) => rawPlayers?.find(player => player.id === id) || null;
-
-    const generaLinkWhatsApp = (match: any) => {
-        const pA1 = getPlayerObj(match.team_a_left_id); const pA2 = getPlayerObj(match.team_a_right_id);
-        const pB1 = getPlayerObj(match.team_b_left_id); const pB2 = getPlayerObj(match.team_b_right_id);
-        const dataFormattata = new Date(match.created_at).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-        const testo = `🎾 *RanKING Padel - Convocazione Match* 🎾\n\n📅 *Data d'organizzazione:* ${dataFormattata}\n\n👥 *SQUADRA A:*\n• ${pA1 ? `${pA1.first_name} ${pA1.last_name}` : 'Sconosciuto'} (${pA1 ? pA1.ranking.toFixed(2) : '0.00'})\n• ${pA2 ? `${pA2.first_name} ${pA2.last_name}` : 'Sconosciuto'} (${pA2 ? pA2.ranking.toFixed(2) : '0.00'})\n\n👥 *SQUADRA B:*\n• ${pB1 ? `${pB1.first_name} ${pB1.last_name}` : 'Sconosciuto'} (${pB1 ? pB1.ranking.toFixed(2) : '0.00'})\n• ${pB2 ? `${pB2.first_name} ${pB2.last_name}` : 'Sconosciuto'} (${pB2 ? pB2.ranking.toFixed(2) : '0.00'})\n\n👉 Accedi all'app per inserire il risultato a fine partita!`;
-        return `https://wa.me/?text=${encodeURIComponent(testo)}`;
+        return p ? `${p.first_name} ${p.last_name} (${p.ranking.toFixed(2)})` : 'Sconosciuto';
     };
 
     return (
@@ -179,7 +166,6 @@ export default async function Home({ searchParams }: PageProps) {
                 <div className="flex flex-col gap-2.5 mb-8">
                     {sortedPlayers.map((player, index) => {
                         const rankIndex = index + 1;
-                        // Controllo di appartenenza agli array degli ex-aequo
                         const isKingLeft = kingLeftIds.includes(player.id);
                         const isKingRight = kingRightIds.includes(player.id);
                         const isLastPlace = lastPlaceIds.includes(player.id);
@@ -250,45 +236,14 @@ export default async function Home({ searchParams }: PageProps) {
                 <h2 className="text-2xl font-bold text-slate-800 mb-4">Partite in Programma</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
                     {pendingMatches && pendingMatches.length > 0 ? (
-                        pendingMatches.map((match) => {
-                            const authCtx = currentUserPlayer ? { userRole: currentUserPlayer.role as 'admin' | 'user', userPlayerId: currentUserPlayer.id } : null;
-                            const canResolve = canUserResolveMatch(authCtx, match);
-
-                            return (
-                                <div key={match.id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between gap-4">
-                                    <div>
-                                        <div className="grid grid-cols-2 gap-3 text-center">
-                                            <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-100">
-                                                <div className="text-[10px] font-bold text-blue-600 uppercase mb-1">Coppia A</div>
-                                                <div className="text-sm font-bold text-slate-800 truncate">{getPlayerName(match.team_a_left_id)}</div>
-                                                <div className="text-sm font-bold text-slate-800 truncate">{getPlayerName(match.team_a_right_id)}</div>
-                                            </div>
-                                            <div className="bg-emerald-50/50 p-3 rounded-lg border border-emerald-100">
-                                                <div className="text-[10px] font-bold text-emerald-600 uppercase mb-1">Coppia B</div>
-                                                <div className="text-sm font-bold text-slate-800 truncate">{getPlayerName(match.team_b_left_id)}</div>
-                                                <div className="text-sm font-bold text-slate-800 truncate">{getPlayerName(match.team_b_right_id)}</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-col gap-2">
-                                        <a href={generaLinkWhatsApp(match)} target="_blank" rel="noopener noreferrer" className="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl text-sm transition-colors shadow-sm">
-                                            <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397 0 11.948 0c3.173.001 6.154 1.24 8.396 3.486 2.242 2.246 3.479 5.23 3.477 8.406-.003 6.557-5.338 11.907-11.89 11.907-2.013-.001-3.99-.51-5.741-1.48L0 24zm6.59-4.846c1.66.986 3.288 1.447 4.805 1.448 5.41-.001 9.814-4.415 9.816-9.83.001-2.624-1.012-5.09-2.856-6.937C16.569 1.988 14.09 1.05 11.47 1.05c-5.416 0-9.821 4.415-9.824 9.83-.001 2.05.534 3.513 1.41 5.03L2.025 21.93l6.222-1.63z" /></svg>
-                                            Convoca su WhatsApp
-                                        </a>
-                                        <div className="flex gap-2 w-full">
-                                            {canResolve ? (
-                                                <ResolveMatchButton matchId={match.id} /> // 👈 RISOLTO: Ora integra lo spinner client
-                                            ) : (
-                                                <div className="flex-1 text-center bg-slate-100 text-slate-400 text-xs py-2.5 rounded-xl italic select-none border border-slate-200 flex items-center justify-center">
-                                                    Sola lettura (non sei in campo)
-                                                </div>
-                                            )}
-                                            {canResolve && <DeleteMatchButton matchId={match.id} />}
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })
+                        pendingMatches.map((match) => (
+                            <PendingMatchCard
+                                key={match.id}
+                                match={match}
+                                rawPlayers={rawPlayers || []}
+                                currentUserPlayer={currentUserPlayer}
+                            />
+                        ))
                     ) : (
                         <p className="text-slate-500 italic col-span-2">Nessuna partita in programma.</p>
                     )}
@@ -309,10 +264,11 @@ export default async function Home({ searchParams }: PageProps) {
                             return (
                                 <div key={match.id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-3">
                                     <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                                        {/* 👈 AGGIORNATO: Ora include il punteggio ranking nello storico risultati */}
                                         <div className={`flex flex-col items-center sm:items-start p-3 rounded-xl w-full sm:w-5/12 ${winner === 'A' ? 'bg-green-50 border-l-4 border-l-green-500 font-semibold' : 'opacity-60'}`}>
                                             <div className="flex items-center gap-1.5 mb-1"><span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Coppia A</span>{winner === 'A' && <span className="bg-green-200 text-green-800 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">WIN 🎉</span>}</div>
-                                            <div className="text-sm text-slate-800 truncate w-full text-center sm:text-left">{getPlayerName(match.team_a_left_id)}</div>
-                                            <div className="text-sm text-slate-800 truncate w-full text-center sm:text-left">{getPlayerName(match.team_a_right_id)}</div>
+                                            <div className="text-sm text-slate-800 truncate w-full text-center sm:text-left">{getPlayerNameWithRanking(match.team_a_left_id)}</div>
+                                            <div className="text-sm text-slate-800 truncate w-full text-center sm:text-left">{getPlayerNameWithRanking(match.team_a_right_id)}</div>
                                         </div>
                                         <div className="flex flex-col items-center justify-center shrink-0">
                                             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 select-none">Punteggio</div>
@@ -320,10 +276,11 @@ export default async function Home({ searchParams }: PageProps) {
                                                 {sets.length > 0 ? sets.map((set, sIdx) => (<span key={sIdx} className="bg-white px-1.5 py-0.5 rounded border border-slate-200/60 shadow-sm">{set.team_a}-{set.team_b}</span>)) : <span className="text-xs font-normal text-slate-400 italic">Dato pre-set</span>}
                                             </div>
                                         </div>
+                                        {/* 👈 AGGIORNATO: Ora include il punteggio ranking nello storico risultati */}
                                         <div className={`flex flex-col items-center sm:items-end p-3 rounded-xl w-full sm:w-5/12 text-center sm:text-right ${winner === 'B' ? 'bg-green-50 border-r-4 border-r-green-500 font-semibold' : 'opacity-60'}`}>
                                             <div className="flex items-center sm:flex-row-reverse gap-1.5 mb-1"><span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Coppia B</span>{winner === 'B' && <span className="bg-green-200 text-green-800 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">WIN 🎉</span>}</div>
-                                            <div className="text-sm text-slate-800 truncate w-full text-center sm:text-right">{getPlayerName(match.team_b_left_id)}</div>
-                                            <div className="text-sm text-slate-800 truncate w-full text-center sm:text-right">{getPlayerName(match.team_b_right_id)}</div>
+                                            <div className="text-sm text-slate-800 truncate w-full text-center sm:text-right">{getPlayerNameWithRanking(match.team_b_left_id)}</div>
+                                            <div className="text-sm text-slate-800 truncate w-full text-center sm:text-right">{getPlayerNameWithRanking(match.team_b_right_id)}</div>
                                         </div>
                                     </div>
                                     <div className="text-[10px] text-slate-400 text-center sm:text-left font-medium border-t border-slate-50 pt-2">Disputata il {new Date(match.updated_at).toLocaleDateString('it-IT')}</div>
