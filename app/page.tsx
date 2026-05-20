@@ -2,8 +2,6 @@ import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import PendingMatchCard from '@/components/PendingMatchCard';
 
-export const revalidate = 0;
-
 const MATCHES_PER_PAGE = 5;
 
 interface PageProps {
@@ -28,32 +26,7 @@ export default async function Home({ searchParams }: PageProps) {
         currentUserPlayer = playerData;
     }
 
-    const { data: rawPlayers } = await supabase.from('players').select('*');
-    const { data: allCompletedMatches } = await supabase.from('matches').select('*').eq('status', 'completed');
-
-    const playersWithStats = (rawPlayers || []).map(player => {
-        let played = 0;
-        let won = 0;
-
-        (allCompletedMatches || []).forEach(match => {
-            const isTeamA = [match.team_a_left_id, match.team_a_right_id].includes(player.id);
-            const isTeamB = [match.team_b_left_id, match.team_b_right_id].includes(player.id);
-
-            if (isTeamA || isTeamB) {
-                played++;
-                if (isTeamA && match.winning_team === 'A') won++;
-                if (isTeamB && match.winning_team === 'B') won++;
-            }
-        });
-
-        const winRate = played > 0 ? (won / played) * 100 : 0;
-
-        return {
-            ...player,
-            total_played: played,
-            win_rate: winRate
-        };
-    });
+    const { data: playersWithStats } = await supabase.from('view_player_stats').select('*');
 
     const sortedPlayers = [...playersWithStats].sort((a, b) => {
         if (currentSort === 'played') {
@@ -99,7 +72,7 @@ export default async function Home({ searchParams }: PageProps) {
 
     const getPlayerNameWithRanking = (id: number | null) => {
         if (id === null) return 'Slot Libero';
-        const p = rawPlayers?.find(player => player.id === id);
+        const p = playersWithStats?.find(player => player.id === id);
         return p ? `${p.first_name} ${p.last_name} (${p.ranking.toFixed(2)})` : 'Sconosciuto';
     };
 
@@ -255,7 +228,7 @@ export default async function Home({ searchParams }: PageProps) {
                             <PendingMatchCard
                                 key={match.id}
                                 match={match}
-                                rawPlayers={rawPlayers || []}
+                                rawPlayers={playersWithStats || []}
                                 currentUserPlayer={currentUserPlayer}
                             />
                         ))
