@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { createPendingMatch as createMatch } from '@/actions/match-actions';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 interface Player {
@@ -15,6 +16,7 @@ interface Player {
 
 export default function CreateMatchForm() {
     const supabase = createClient();
+    const router = useRouter();
 
     // Stati per i giocatori selezionati nelle tendine (stringhe provenienti dai tag <select>)
     const [players, setPlayers] = useState<Player[]>([]);
@@ -126,7 +128,8 @@ export default function CreateMatchForm() {
                 teamBRight: teamBRight ? Number(teamBRight) : null,
             });
 
-            window.location.href = '/';
+            router.push('/');
+            router.refresh();
         } catch (err: any) {
             console.error(err);
             setSubmitError(err.message || 'Errore durante la creazione del match.');

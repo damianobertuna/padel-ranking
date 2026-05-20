@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { canUserResolveMatch } from '@/lib/matchRules';
 import DeleteMatchButton from '@/components/DeleteMatchButton';
 import ResolveMatchButton from '@/components/ResolveMatchButton';
+import { useRouter } from "next/navigation";
 
 interface Player {
     id: number;
@@ -35,6 +36,7 @@ export default function PendingMatchCard({
                                              currentUserPlayer
                                          }: PendingMatchCardProps) {
     const [isJoining, setIsJoining] = useState(false);
+    const router = useRouter();
 
     const generaLinkWhatsAppLocal = (m: Match) => {
         const getPlayerObj = (id: number | null) => rawPlayers.find(player => player.id === id) || null;
@@ -124,7 +126,7 @@ export default function PendingMatchCard({
                         <button
                             onClick={() => {
                                 setIsJoining(true);
-                                window.location.href = `/match/${match.id}/join`;
+                                router.push(`\/match/${match.id}/join`);
                             }}
                             disabled={isJoining}
                             className="flex-1 text-center bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-sm font-bold py-2.5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
