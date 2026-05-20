@@ -1,22 +1,7 @@
 'use client';
 
 import React from 'react';
-
-// Interfaccia del giocatore per il client
-interface Player {
-    id: number;
-    first_name: string;
-    last_name: string;
-}
-
-interface MatchWithResult {
-    id: string;
-    team_a_left_id: number;
-    team_a_right_id: number;
-    team_b_left_id: number;
-    team_b_right_id: number;
-    userWon: boolean;
-}
+import { Player, MatchWithResult } from '@/types';
 
 interface PartnersAndNemesisWidgetProps {
     playerId: number;

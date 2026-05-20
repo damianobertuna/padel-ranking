@@ -5,22 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { updateMatchPlayers } from '@/actions/match-actions';
 import Link from 'next/link';
-
-interface Player {
-    id: number;
-    first_name: string;
-    last_name: string;
-    ranking: number;
-    preferred_side: string;
-}
-
-interface Match {
-    id: string;
-    team_a_left_id: number | null;
-    team_a_right_id: number | null;
-    team_b_left_id: number | null;
-    team_b_right_id: number | null;
-}
+import { Player, Match } from '@/types';
 
 export default function JoinMatchPage() {
     const supabase = createClient();

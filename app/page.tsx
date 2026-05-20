@@ -26,7 +26,8 @@ export default async function Home({ searchParams }: PageProps) {
         currentUserPlayer = playerData;
     }
 
-    const { data: playersWithStats } = await supabase.from('view_player_stats').select('*');
+    const { data: playersStatsData } = await supabase.from('view_player_stats').select('*');
+    const playersWithStats = playersStatsData || [];
 
     const sortedPlayers = [...playersWithStats].sort((a, b) => {
         if (currentSort === 'played') {

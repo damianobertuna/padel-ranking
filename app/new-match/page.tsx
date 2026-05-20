@@ -5,14 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { createPendingMatch as createMatch } from '@/actions/match-actions';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-
-interface Player {
-    id: number; // 👈 Ripristinato a number come richiesto
-    first_name: string;
-    last_name: string;
-    ranking: number;
-    preferred_side: string;
-}
+import { Player } from '@/types';
 
 export default function CreateMatchForm() {
     const supabase = createClient();

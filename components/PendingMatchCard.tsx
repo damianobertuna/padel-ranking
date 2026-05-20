@@ -6,29 +6,7 @@ import { canUserResolveMatch } from '@/lib/matchRules';
 import DeleteMatchButton from '@/components/DeleteMatchButton';
 import ResolveMatchButton from '@/components/ResolveMatchButton';
 import { useRouter } from "next/navigation";
-
-interface Player {
-    id: number;
-    first_name: string;
-    last_name: string;
-    ranking: number;
-}
-
-interface Match {
-    id: string;
-    team_a_left_id: number | null;
-    team_a_right_id: number | null;
-    team_b_left_id: number | null;
-    team_b_right_id: number | null;
-    status: string;
-    created_at: string;
-}
-
-interface PendingMatchCardProps {
-    match: Match;
-    rawPlayers: Player[];
-    currentUserPlayer: { id: number; role: string } | null;
-}
+import { Match, PendingMatchCardProps } from '@/types';
 
 export default function PendingMatchCard({
                                              match,

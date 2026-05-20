@@ -5,9 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useParams } from 'next/navigation';
 import { calculateRankingUpdates, MatchContext } from '@/lib/matchRules';
 import { resolveMatchWithRanking } from '@/actions/match-actions';
-
-interface Player { id: number; first_name: string; last_name: string; ranking: number; preferred_side: string; }
-interface Match { id: string; team_a_left_id: number; team_a_right_id: number; team_b_left_id: number; team_b_right_id: number; status: string; }
+import { Player, Match } from '@/types';
 
 export default function ResolveMatch() {
     const supabase = createClient();
@@ -51,7 +49,7 @@ export default function ResolveMatch() {
         fetchData();
     }, [matchId, supabase]);
 
-    const getPlayerName = (id: number) => {
+    const getPlayerName = (id: number | null) => {
         const p = players.find((pl) => pl.id === id);
         return p ? `${p.first_name} ${p.last_name}` : 'Caricamento...'; // 👈 Protezione anti-crash
     };
@@ -93,8 +91,10 @@ export default function ResolveMatch() {
         setSubmitting(true); // 👈 Attiva solo lo spinner del pulsante invio
         setError('');
 
-        const teamAIds = [match.team_a_left_id, match.team_a_right_id];
-        const teamBIds = [match.team_b_left_id, match.team_b_right_id];
+        const teamAIds = [match.team_a_left_id, match.team_a_right_id]
+            .filter((id): id is number => id !== null);
+        const teamBIds = [match.team_b_left_id, match.team_b_right_id]
+            .filter((id): id is number => id !== null);
         const winnerIds = finalWinningTeam === 'A' ? teamAIds : teamBIds;
         const loserIds = finalWinningTeam === 'A' ? teamBIds : teamAIds;
 
