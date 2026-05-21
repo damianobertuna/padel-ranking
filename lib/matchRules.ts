@@ -5,48 +5,59 @@
 export interface MatchContext {
     winnerIds: number[];
     loserIds: number[];
-    kingLeftId: number | null;
-    kingRightId: number | null;
-    lastPlaceId: number | null;
+    kingRightIds: number[];
+    kingLeftIds: number[];
+    kingBothIds?: number[];
+    lastPlaceIds: number[];
 }
 
 export function calculateRankingUpdates(ctx: MatchContext): Record<number, number> {
-    const { winnerIds, loserIds, kingLeftId, kingRightId, lastPlaceId } = ctx;
-
-    // L'oggetto che conterrà i risultati: { idGiocatore: variazionePunteggio }
     const updates: Record<number, number> = {};
 
-    let winnerBonus = 0.05; // Base (Regola 3)
+    // Helper per capire se un ID appartiene a un King o a un Fanalino
+    const isKing = (id: number) =>
+        ctx.kingLeftIds.includes(id) ||
+        ctx.kingRightIds.includes(id) ||
+        (ctx.kingBothIds && ctx.kingBothIds.includes(id));
 
-    // Mappa di default per i malus (Regola 3)
-    let loserMalusMap: Record<number, number> = {
-        [loserIds[0]]: -0.05,
-        [loserIds[1]]: -0.05
-    };
+    const isLastPlace = (id: number) => ctx.lastPlaceIds.includes(id);
 
-    const hasLastPlaceWon = winnerIds.includes(lastPlaceId as number);
-    const hasKingLeftLost = loserIds.includes(kingLeftId as number);
-    const hasKingRightLost = loserIds.includes(kingRightId as number);
+    // Variabili di stato per i Bonus/Malus
+    let defeatedKing = false;
+    let kingsLostTogether = false;
+    let lastPlaceWon = false;
 
-    // Regola 7: Se l'ultimo in classifica vince, doppio bonus ai vincitori
-    if (hasLastPlaceWon) {
-        winnerBonus = 0.10;
-    }
-
-    // Regola 6: Se cade un King, doppio bonus ai vincitori
-    if (hasKingLeftLost || hasKingRightLost) {
-        winnerBonus = 0.10; // Capped a 0.10 (non si somma con la regola 7)
-
-        // Regola "Catastrofe": Se entrambi i King perdono giocando INSIEME
-        if (hasKingLeftLost && hasKingRightLost) {
-            loserMalusMap[kingLeftId as number] = -0.10;
-            loserMalusMap[kingRightId as number] = -0.10;
+    // 1. Controlliamo se qualche King ha perso
+    const losingKings = ctx.loserIds.filter(id => isKing(id));
+    if (losingKings.length > 0) {
+        defeatedKing = true;
+        // Se due King perdono giocando nello stesso team
+        if (losingKings.length >= 2) {
+            kingsLostTogether = true;
         }
     }
 
-    // Assegniamo i risultati finali
-    winnerIds.forEach(id => updates[id] = winnerBonus);
-    loserIds.forEach(id => updates[id] = loserMalusMap[id]);
+    // 2. Controlliamo se un Fanalino ha vinto
+    if (ctx.winnerIds.some(id => isLastPlace(id))) {
+        lastPlaceWon = true;
+    }
+
+    // 3. Calcolo Punti Vincitori (Max +0.10 se battono un King o se vince il Fanalino, altrimenti +0.05)
+    const winnerBonus = (defeatedKing || lastPlaceWon) ? 0.10 : 0.05;
+    ctx.winnerIds.forEach(id => {
+        updates[id] = winnerBonus;
+    });
+
+    // 4. Calcolo Punti Sconfitti
+    ctx.loserIds.forEach(id => {
+        // Se due King perdono insieme, subiscono entrambi -0.10 (Regola 6)
+        if (kingsLostTogether && isKing(id)) {
+            updates[id] = -0.10;
+        } else {
+            // Malus standard -0.05 per tutti gli altri
+            updates[id] = -0.05;
+        }
+    });
 
     return updates;
 }
@@ -57,10 +68,8 @@ export function isRankingDifferenceValid(rankings: number[]): boolean {
     const maxRanking = Math.max(...rankings);
     const minRanking = Math.min(...rankings);
 
-    return (maxRanking - minRanking) <= 0.50;
+    return (maxRanking - minRanking) <= 0.25;
 }
-
-// file: lib/matchRules.ts (Aggiungi in fondo)
 
 export interface AuthContext {
     userRole: 'admin' | 'user';

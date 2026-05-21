@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation'; // 👈 Aggiunto useRouter
 import { calculateRankingUpdates, MatchContext } from '@/lib/matchRules';
 import { resolveMatchWithRanking } from '@/actions/match-actions';
 import { Player, Match } from '@/types';
@@ -10,15 +10,15 @@ import { Player, Match } from '@/types';
 export default function ResolveMatch() {
     const supabase = createClient();
     const params = useParams();
+    const router = useRouter(); // 👈 Inizializzato useRouter
     const matchId = params.id as string;
 
     const [match, setMatch] = useState<Match | null>(null);
     const [players, setPlayers] = useState<Player[]>([]);
-    const [pageLoading, setPageLoading] = useState(true); // 👈 Sdoppiato: Caricamento della pagina iniziale
-    const [submitting, setSubmitting] = useState(false); // 👈 Sdoppiato: Caricamento specifico del pulsante Salva
+    const [pageLoading, setPageLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
 
-    // Stati per i set
     const [set1A, setSet1A] = useState('');
     const [set1B, setSet1B] = useState('');
     const [set2A, setSet2A] = useState('');
@@ -31,7 +31,6 @@ export default function ResolveMatch() {
             try {
                 if (!matchId) return;
 
-                // Eseguiamo le chiamate in parallelo per massima velocità
                 const [matchRes, playersRes] = await Promise.all([
                     supabase.from('matches').select('*').eq('id', matchId).maybeSingle(),
                     supabase.from('players').select('*')
@@ -43,7 +42,7 @@ export default function ResolveMatch() {
                 console.error("Errore download dati:", err);
                 setError("Impossibile recuperare i dati dal server.");
             } finally {
-                setPageLoading(false); // 👈 Spegne in sicurezza lo schermo di attesa
+                setPageLoading(false);
             }
         }
         fetchData();
@@ -51,15 +50,15 @@ export default function ResolveMatch() {
 
     const getPlayerName = (id: number | null) => {
         const p = players.find((pl) => pl.id === id);
-        return p ? `${p.first_name} ${p.last_name}` : 'Caricamento...'; // 👈 Protezione anti-crash
+        return p ? `${p.first_name} ${p.last_name}` : 'Caricamento...';
     };
 
     const handleSubmitScore = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!match) return;
 
-        const s1A = parseInt(set1A); const s1B = parseInt(set1B);
-        const s2A = parseInt(set2A); const s2B = parseInt(set2B);
+        const s1A = parseInt(set1A, 10); const s1B = parseInt(set1B, 10);
+        const s2A = parseInt(set2A, 10); const s2B = parseInt(set2B, 10);
 
         if (isNaN(s1A) || isNaN(s1B) || isNaN(s2A) || isNaN(s2B)) {
             setError('I primi 2 set sono obbligatori per convalidare il referto!');
@@ -71,8 +70,13 @@ export default function ResolveMatch() {
             { team_a: s2A, team_b: s2B }
         ];
 
+        // 👈 Protezione anti-NaN per il terzo set
         if (set3A !== '' && set3B !== '') {
-            scoreArray.push({ team_a: parseInt(set3A), team_b: parseInt(set3B) });
+            const s3A = parseInt(set3A, 10);
+            const s3B = parseInt(set3B, 10);
+            if (!isNaN(s3A) && !isNaN(s3B)) {
+                scoreArray.push({ team_a: s3A, team_b: s3B });
+            }
         }
 
         let setsWonA = 0; let setsWonB = 0;
@@ -88,26 +92,30 @@ export default function ResolveMatch() {
 
         const finalWinningTeam = setsWonA > setsWonB ? 'A' : 'B';
 
-        setSubmitting(true); // 👈 Attiva solo lo spinner del pulsante invio
+        setSubmitting(true);
         setError('');
 
         const teamAIds = [match.team_a_left_id, match.team_a_right_id]
             .filter((id): id is number => id !== null);
         const teamBIds = [match.team_b_left_id, match.team_b_right_id]
             .filter((id): id is number => id !== null);
+
         const winnerIds = finalWinningTeam === 'A' ? teamAIds : teamBIds;
         const loserIds = finalWinningTeam === 'A' ? teamBIds : teamAIds;
 
+        // 👈 Aggiunto il filtro per i giocatori "Both"
         const leftPlayers = players.filter(p => p.preferred_side === 'Left').sort((a, b) => b.ranking - a.ranking);
         const rightPlayers = players.filter(p => p.preferred_side === 'Right').sort((a, b) => b.ranking - a.ranking);
+        const bothPlayers = players.filter(p => p.preferred_side === 'Both').sort((a, b) => b.ranking - a.ranking);
         const allPlayersAscending = [...players].sort((a, b) => a.ranking - b.ranking);
 
         const ctx: MatchContext = {
             winnerIds,
             loserIds,
-            kingLeftId: leftPlayers.length > 0 ? leftPlayers[0].id : null,
-            kingRightId: rightPlayers.length > 0 ? rightPlayers[0].id : null,
-            lastPlaceId: allPlayersAscending.length > 0 ? allPlayersAscending[0].id : null,
+            kingLeftIds: leftPlayers.length > 0 ? [leftPlayers[0].id] : [],
+            kingRightIds: rightPlayers.length > 0 ? [rightPlayers[0].id] : [],
+            kingBothIds: bothPlayers.length > 0 ? [bothPlayers[0].id] : [], // 👈 Integrato King Both
+            lastPlaceIds: allPlayersAscending.length > 0 ? [allPlayersAscending[0].id] : [],
         };
 
         const updates = calculateRankingUpdates(ctx);
@@ -118,10 +126,12 @@ export default function ResolveMatch() {
                 score: scoreArray,
                 rankingUpdates: updates
             });
-            window.location.href = '/';
+            // 👈 Navigazione pulita con useRouter
+            router.push('/');
+            router.refresh();
         } catch (err: any) {
             setError(err.message || 'Errore durante il salvataggio del referto.');
-            setSubmitting(false); // 👈 Spegne lo spinner del tasto in caso di errore
+            setSubmitting(false);
         }
     };
 
@@ -175,7 +185,7 @@ export default function ResolveMatch() {
                     {/* PULSANTE DI SALVATAGGIO CON SPINNER */}
                     <button
                         type="submit"
-                        disabled={submitting} // Bloccato solo se sta inviando i dati
+                        disabled={submitting}
                         className="w-full bg-slate-800 hover:bg-slate-900 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl shadow-sm transition-all active:scale-[0.98] mt-6 text-sm flex items-center justify-center gap-2"
                     >
                         {submitting ? (
@@ -184,7 +194,7 @@ export default function ResolveMatch() {
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
-                                <span>Elaborazione punti Ranking...</span>
+                                <span>Elaborazione punti...</span>
                             </>
                         ) : (
                             'Conferma e Calcola Classifica'

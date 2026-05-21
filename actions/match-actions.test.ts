@@ -43,7 +43,7 @@ describe('deletePendingMatch', () => {
     it('dovrebbe lanciare un errore se l’utente non è autenticato', async () => {
         mockSupabaseClient.auth.getUser.mockResolvedValueOnce({ data: { user: null } });
 
-        await expect(deletePendingMatch(123)).rejects.toThrow("Utente non autenticato");
+        await expect(deletePendingMatch('match-uuid-1')).rejects.toThrow("Utente non autenticato");
     });
 
     it('dovrebbe lanciare un errore se il giocatore corrente tenta di cancellare un match in cui non gioca e non è admin', async () => {
@@ -58,7 +58,7 @@ describe('deletePendingMatch', () => {
             }
         });
 
-        await expect(deletePendingMatch(123)).rejects.toThrow("Non hai i permessi per cancellare questa partita");
+        await expect(deletePendingMatch('match-uuid-1')).rejects.toThrow("Non hai i permessi per cancellare questa partita");
     });
 
     it('dovrebbe completare la cancellazione e scrivere il log se l’utente è un admin', async () => {
@@ -72,7 +72,7 @@ describe('deletePendingMatch', () => {
             }
         });
 
-        await deletePendingMatch(123);
+        await deletePendingMatch('match-uuid-1');
 
         expect(mockSupabaseClient.from).toHaveBeenCalledWith('audit_logs');
         expect(mockInsert).toHaveBeenCalledWith(expect.arrayContaining([
@@ -92,6 +92,7 @@ describe('createPendingMatch', () => {
 
         const matchInput = {
             matchDate: '2026-05-20T18:00',
+            matchType: 'male' | 'female' | 'mixed',
             teamALeft: 1,
             teamARight: 2,
             teamBLeft: 3,

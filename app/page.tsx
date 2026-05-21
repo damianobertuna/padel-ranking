@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import PendingMatchCard from '@/components/PendingMatchCard';
 import { Player } from "@/types";
+import { computeKingAndFanalino } from '@/lib/rankingCalc';
 
 const MATCHES_PER_PAGE = 5;
 
@@ -46,47 +47,15 @@ export default async function Home({ searchParams }: PageProps) {
         return b.ranking - a.ranking;
     });
 
-    // --- INIZIO NUOVA LOGICA KING E FANALINO ---
-
-    // 1. Estraiamo i ranking divisi per lato direttamente dai dati grezzi (immune all'ordinamento)
-    const allLeft = playersWithStats.filter(p => p.preferred_side === 'Left').map(p => p.ranking);
-    const allRight = playersWithStats.filter(p => p.preferred_side === 'Right').map(p => p.ranking);
-    const allBoth = playersWithStats.filter(p => p.preferred_side === 'Both').map(p => p.ranking);
-
-    // 2. Calcoliamo il MAX (King) e il MIN (Fanalino) per ogni singola categoria
-    const maxRankingLeft = allLeft.length > 0 ? Math.max(...allLeft) : -1;
-    const minRankingLeft = allLeft.length > 0 ? Math.min(...allLeft) : -1;
-
-    const maxRankingRight = allRight.length > 0 ? Math.max(...allRight) : -1;
-    const minRankingRight = allRight.length > 0 ? Math.min(...allRight) : -1;
-
-    const maxRankingBoth = allBoth.length > 0 ? Math.max(...allBoth) : -1;
-    const minRankingBoth = allBoth.length > 0 ? Math.min(...allBoth) : -1;
-
-    const kingLeftIds: number[] = [];
-    const kingRightIds: number[] = [];
-    const kingBothIds: number[] = [];
-
-    const lastPlaceLeftIds: number[] = [];
-    const lastPlaceRightIds: number[] = [];
-    const lastPlaceBothIds: number[] = [];
-
-    // 3. Assegniamo i titoli confrontando il punteggio esatto di ciascun giocatore
-    for (const p of sortedPlayers) {
-        const { id, ranking, preferred_side } = p;
-
-        // Assegnazione KING (Massimo per lato)
-        if (preferred_side === 'Left' && ranking === maxRankingLeft && maxRankingLeft !== -1) kingLeftIds.push(id);
-        if (preferred_side === 'Right' && ranking === maxRankingRight && maxRankingRight !== -1) kingRightIds.push(id);
-        if (preferred_side === 'Both' && ranking === maxRankingBoth && maxRankingBoth !== -1) kingBothIds.push(id);
-
-        // Assegnazione FANALINO (Minimo per lato)
-        if (preferred_side === 'Left' && ranking === minRankingLeft && minRankingLeft !== -1) lastPlaceLeftIds.push(id);
-        if (preferred_side === 'Right' && ranking === minRankingRight && minRankingRight !== -1) lastPlaceRightIds.push(id);
-        if (preferred_side === 'Both' && ranking === minRankingBoth && minRankingBoth !== -1) lastPlaceBothIds.push(id);
-    }
-
-    // --- FINE NUOVA LOGICA ---
+    // --- NUOVA LOGICA REFACTORIZZATA ---
+    const {
+        kingLeftIds,
+        kingRightIds,
+        kingBothIds,
+        lastPlaceLeftIds,
+        lastPlaceRightIds,
+        lastPlaceBothIds
+    } = computeKingAndFanalino(playersWithStats);
 
     const { data: pendingMatches } = await supabase
         .from('matches')
