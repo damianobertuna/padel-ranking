@@ -19,13 +19,12 @@ export default function JoinMatchPage() {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
 
-    // New selections for empty slots
+    // Selections for empty slots
     const [newALeft, setNewALeft] = useState<number | ''>('');
     const [newARight, setNewARight] = useState<number | ''>('');
     const [newBLeft, setNewBLeft] = useState<number | ''>('');
     const [newBRight, setNewBRight] = useState<number | ''>('');
 
-    // 👈 NUOVO: Stati per la validazione in tempo reale del livello e dei cloni
     const [levelError, setLevelError] = useState(false);
     const [duplicateError, setDuplicateError] = useState(false);
 
@@ -35,7 +34,8 @@ export default function JoinMatchPage() {
                 if (!matchId) return;
                 const [matchRes, playersRes] = await Promise.all([
                     supabase.from('matches').select('*').eq('id', matchId).maybeSingle(),
-                    supabase.from('players').select('*').order('first_name', { ascending: true })
+                    // Scarichiamo anche il genere per poter filtrare correttamente i rimpiazzi
+                    supabase.from('players').select('id, first_name, last_name, ranking, preferred_side, gender').order('first_name', { ascending: true })
                 ]);
                 if (matchRes.data) setMatch(matchRes.data);
                 if (playersRes.data) setPlayers(playersRes.data);
@@ -49,11 +49,9 @@ export default function JoinMatchPage() {
         loadData();
     }, [matchId, supabase]);
 
-    // 👈 NUOVO: Effetto di validazione dinamica specifico per il Join
     useEffect(() => {
         if (!match) return;
 
-        // 1. Uniamo i giocatori già fissati sul DB con quelli appena selezionati nei menu a tendina
         const allCurrentInField = [
             match.team_a_left_id,
             match.team_a_right_id,
@@ -63,11 +61,10 @@ export default function JoinMatchPage() {
 
         const allNewSelections = [newALeft, newARight, newBLeft, newBRight];
 
-        // Mappiamo tutto in un unico array di ID numerici validi presenti sul campo in questo istante
         const totalActiveIds: number[] = [];
 
         allCurrentInField.forEach(id => { if (id) totalActiveIds.push(id); });
-        allNewSelections.forEach(id => { if (id !== '') totalActiveIds.push(id); });
+        allNewSelections.forEach(id => { if (typeof id === 'number') totalActiveIds.push(id); });
 
         if (totalActiveIds.length === 0) {
             setDuplicateError(false);
@@ -85,7 +82,6 @@ export default function JoinMatchPage() {
         }
 
         // --- CONTROLLO LIVELLO MASSIMO (Tolleranza 0.25) ---
-        // Se c'è solo un giocatore in totale (es. partita aperta creata con 1 solo utente), non c'è divario
         if (totalActiveIds.length < 2) {
             setLevelError(false);
             return;
@@ -100,7 +96,6 @@ export default function JoinMatchPage() {
             const minLevel = Math.min(...activeRankings);
             const difference = maxLevel - minLevel;
 
-            // Evitiamo le bizze dei float di JS arrotondando a due decimali
             if (parseFloat(difference.toFixed(2)) > 0.25) {
                 setLevelError(true);
             } else {
@@ -112,7 +107,6 @@ export default function JoinMatchPage() {
     if (loadingPage) return <div className="min-h-screen flex items-center justify-center bg-slate-100 text-sm font-medium text-slate-500">Caricamento dettagli match...</div>;
     if (!match) return <div className="min-h-screen flex items-center justify-center bg-slate-100 text-sm font-bold text-red-500">Partita non trovata.</div>;
 
-    // Collect all occupied IDs to exclude them from the available player lists
     const occupiedPlayerIds = [
         match.team_a_left_id,
         match.team_a_right_id,
@@ -122,9 +116,20 @@ export default function JoinMatchPage() {
 
     const availablePlayers = players.filter(p => !occupiedPlayerIds.includes(p.id));
 
-    // Dynamic filtering based on side preference (including flexible 'Both' players)
-    const availableLeftPlayers = availablePlayers.filter(p => p.preferred_side === 'Left' || p.preferred_side === 'Both');
-    const availableRightPlayers = availablePlayers.filter(p => p.preferred_side === 'Right' || p.preferred_side === 'Both');
+    // 👈 AGGIORNATO: Filtro Dinamico per Lato e per GENERE in base al tipo di match salvato
+    const availableLeftPlayers = availablePlayers.filter(p => {
+        const isCorrectSide = p.preferred_side === 'Left' || p.preferred_side === 'Both';
+        if (match.match_type === 'male') return isCorrectSide && p.gender === 'M';
+        if (match.match_type === 'female') return isCorrectSide && p.gender === 'F';
+        return isCorrectSide; // mixed
+    });
+
+    const availableRightPlayers = availablePlayers.filter(p => {
+        const isCorrectSide = p.preferred_side === 'Right' || p.preferred_side === 'Both';
+        if (match.match_type === 'male') return isCorrectSide && p.gender === 'M';
+        if (match.match_type === 'female') return isCorrectSide && p.gender === 'F';
+        return isCorrectSide; // mixed
+    });
 
     const getPlayerLabel = (id: number | null) => {
         if (!id) return '';
@@ -134,13 +139,14 @@ export default function JoinMatchPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        // Doppia barriera di protezione prima di mandare i dati alle Server Actions
         if (levelError || duplicateError) return;
 
         setSubmitting(true);
         setError('');
 
-        const updatedFields: any = {};
+        // Tipizzazione sicura per eliminare `any`
+        const updatedFields: Partial<Record<'team_a_left_id' | 'team_a_right_id' | 'team_b_left_id' | 'team_b_right_id', number>> = {};
+
         if (newALeft) updatedFields.team_a_left_id = newALeft;
         if (newARight) updatedFields.team_a_right_id = newARight;
         if (newBLeft) updatedFields.team_b_left_id = newBLeft;
@@ -150,13 +156,13 @@ export default function JoinMatchPage() {
             const cleanMatchId = params.id as string;
             await updateMatchPlayers(cleanMatchId, updatedFields);
             router.push('/');
+            router.refresh();
         } catch (err: any) {
             setError(err.message || 'Si è verificato un errore durante il salvataggio della formazione.');
             setSubmitting(false);
         }
     };
 
-    // UI Helper to render slots as fixed text badge or select input field
     const renderSlotForm = (
         currentId: number | null,
         value: number | '',
@@ -175,7 +181,8 @@ export default function JoinMatchPage() {
         return (
             <select
                 value={value}
-                onChange={e => setNewALeft(e.target.value ? parseInt(e.target.value, 10) : '')}
+                // 👈 RISOLTO: Ora usa il parametro dinamico `setValue` invece di settare sempre la sinistra!
+                onChange={e => setValue(e.target.value ? parseInt(e.target.value, 10) : '')}
                 className="w-full p-2.5 border border-amber-200 rounded-xl bg-amber-50/20 font-medium text-sm text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white"
             >
                 <option value="">Seleziona Giocatore per {label}</option>
@@ -186,6 +193,13 @@ export default function JoinMatchPage() {
         );
     };
 
+    // Label visiva per mostrare chiaramente in quale tipo di match si sta entrando
+    const getMatchBadge = () => {
+        if (match?.match_type === 'female') return <span className="bg-pink-100 text-pink-700 border-pink-200 border px-2 py-0.5 rounded text-[10px] font-black uppercase">👩 Femminile</span>;
+        if (match?.match_type === 'mixed') return <span className="bg-purple-100 text-purple-700 border-purple-200 border px-2 py-0.5 rounded text-[10px] font-black uppercase">🌍 Misto</span>;
+        return <span className="bg-blue-100 text-blue-700 border-blue-200 border px-2 py-0.5 rounded text-[10px] font-black uppercase">👨 Maschile</span>;
+    };
+
     return (
         <main className="min-h-screen p-4 sm:p-8 bg-slate-100 flex flex-col items-center justify-center">
             <div className="max-w-2xl w-full bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-slate-200">
@@ -194,8 +208,13 @@ export default function JoinMatchPage() {
                     <Link href="/" className="text-xs font-bold text-indigo-600 hover:underline">← Torna alla Classifica</Link>
                 </div>
 
-                <h1 className="text-xl font-black text-slate-800 tracking-tight">Completa Formazione Match</h1>
-                <p className="text-xs text-slate-400 mt-1 mb-6">Inserisci i giocatori negli slot liberi evidenziati in arancione.</p>
+                <div className="flex justify-between items-start mb-6">
+                    <div>
+                        <h1 className="text-xl font-black text-slate-800 tracking-tight">Completa Formazione Match</h1>
+                        <p className="text-xs text-slate-400 mt-1">Inserisci i giocatori negli slot liberi evidenziati in arancione.</p>
+                    </div>
+                    {getMatchBadge()}
+                </div>
 
                 {error && <div className="bg-rose-50 border border-rose-200 text-rose-700 p-3 rounded-xl mb-5 text-xs font-bold">{error}</div>}
 
@@ -230,7 +249,6 @@ export default function JoinMatchPage() {
 
                     </div>
 
-                    {/* 👈 NUOVO BANNER: Errore Cloni in campo */}
                     {duplicateError && (
                         <div className="flex items-center justify-center space-x-2 p-3 bg-rose-50 border border-rose-200 rounded-xl transition-all">
                             <span className="text-base">❌</span>
@@ -240,7 +258,6 @@ export default function JoinMatchPage() {
                         </div>
                     )}
 
-                    {/* 👈 NUOVO BANNER: Errore Scompenso Livello Ranking */}
                     {levelError && (
                         <div className="flex items-center justify-center space-x-2 p-3 bg-amber-50 border border-amber-200 rounded-xl transition-all animate-pulse">
                             <span className="text-base">⚠️</span>
@@ -252,7 +269,6 @@ export default function JoinMatchPage() {
 
                     <button
                         type="submit"
-                        // 👈 AGGIORNATO: Il bottone si blocca se c'è un errore di cloni o di livello
                         disabled={submitting || levelError || duplicateError || (!newALeft && !newARight && !newBLeft && !newBRight)}
                         className="w-full bg-slate-800 hover:bg-slate-900 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl shadow-sm transition-all text-sm flex items-center justify-center gap-2"
                     >

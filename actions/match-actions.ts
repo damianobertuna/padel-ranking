@@ -102,6 +102,7 @@ export async function deletePendingMatch(matchId: string) {
  */
 export async function createPendingMatch(data: {
     matchDate: string | null;
+    matchType: 'male' | 'female' | 'mixed';
     teamALeft: number | null;
     teamARight: number | null;
     teamBLeft: number | null;
@@ -127,6 +128,7 @@ export async function createPendingMatch(data: {
         .insert([
             {
                 match_date: data.matchDate || null,
+                match_type: data.matchType,
                 team_a_left_id: data.teamALeft,
                 team_a_right_id: data.teamARight,
                 team_b_left_id: data.teamBLeft,

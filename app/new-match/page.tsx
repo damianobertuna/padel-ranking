@@ -17,6 +17,7 @@ export default function CreateMatchForm() {
     const [teamARight, setTeamARight] = useState<number | ''>('');
     const [teamBLeft, setTeamBLeft] = useState<number | ''>('');
     const [teamBRight, setTeamBRight] = useState<number | ''>('');
+    const [matchType, setMatchType] = useState<'male' | 'female' | 'mixed'>('male');
 
     // Stato per la gestione di data e ora del match
     const [matchDate, setMatchDate] = useState<string>(() => {
@@ -37,7 +38,7 @@ export default function CreateMatchForm() {
             try {
                 const { data, error } = await supabase
                     .from('players')
-                    .select('id, first_name, last_name, ranking, preferred_side')
+                    .select('id, first_name, last_name, ranking, preferred_side, gender')
                     .order('first_name', { ascending: true });
 
                 if (error) {
@@ -100,9 +101,18 @@ export default function CreateMatchForm() {
     }, [teamALeft, teamARight, teamBLeft, teamBRight, players]);
 
     // Filtri dinamici per dividere i giocatori in base al lato di campo preferito
-    const leftSidePlayers = players.filter(p => p.preferred_side === 'Left' || p.preferred_side === 'Both');
-    const rightSidePlayers = players.filter(p => p.preferred_side === 'Right' || p.preferred_side === 'Both');
-
+    const leftSidePlayers = players.filter(p => {
+        const isCorrectSide = p.preferred_side === 'Left' || p.preferred_side === 'Both';
+        if (matchType === 'male') return isCorrectSide && p.gender === 'M';
+        if (matchType === 'female') return isCorrectSide && p.gender === 'F';
+        return isCorrectSide;
+    });
+    const rightSidePlayers = players.filter(p => {
+        const isCorrectSide = p.preferred_side === 'Right' || p.preferred_side === 'Both';
+        if (matchType === 'male') return isCorrectSide && p.gender === 'M';
+        if (matchType === 'female') return isCorrectSide && p.gender === 'F';
+        return isCorrectSide;
+    });
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (levelError || duplicateError) return;
@@ -114,6 +124,7 @@ export default function CreateMatchForm() {
             // Inviamo i numeri interi puliti al server action (oppure null se lasciati vuoti)
             await createMatch({
                 matchDate: matchDate,
+                matchType: matchType,
                 teamALeft: teamALeft || null,
                 teamARight: teamARight || null,
                 teamBLeft: teamBLeft || null,
@@ -161,6 +172,36 @@ export default function CreateMatchForm() {
                             onChange={e => setMatchDate(e.target.value)}
                             className="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-medium text-sm text-slate-800 focus:outline-none focus:border-indigo-500"
                         />
+                    </div>
+
+                    {/* 👈 NUOVO: SELETTORE TIPOLOGIA MATCH */}
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+                            Categoria Partita
+                        </label>
+                        <div className="flex gap-2">
+                            {(['male', 'female', 'mixed'] as const).map((type) => {
+                                const labels = { male: '👨 Maschile', female: '👩 Femminile', mixed: '🌍 Misto' };
+                                return (
+                                    <button
+                                        key={type}
+                                        type="button"
+                                        onClick={() => {
+                                            setMatchType(type);
+                                            // Reset preventivo: svuotiamo i campi per non lasciare un uomo intrappolato in un match appena diventato femminile
+                                            setTeamALeft(''); setTeamARight(''); setTeamBLeft(''); setTeamBRight('');
+                                        }}
+                                        className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase transition-all border shadow-sm active:scale-95 ${
+                                            matchType === type
+                                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                                : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'
+                                        }`}
+                                    >
+                                        {labels[type]}
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
 
                     {/* Griglia dei due Team */}

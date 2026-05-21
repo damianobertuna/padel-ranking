@@ -4,6 +4,7 @@ export interface Player {
     last_name: string;
     ranking: number;
     preferred_side: string;
+    gender: 'M' | 'F';
     total_played?: number;
     win_rate?: number;
 }
@@ -15,6 +16,7 @@ export interface Match {
     team_b_left_id: number | null;
     team_b_right_id: number | null;
     status: string;
+    match_type: 'male' | 'female' | 'mixed';
     created_at: string;
 }
 
