@@ -24,7 +24,7 @@ export default async function Home({ searchParams }: PageProps) {
     const currentPage = parseInt(resolvedParams.page || '1', 10) || 1;
     const currentSort = resolvedParams.sort || 'ranking';
     // 👈 NUOVO: Lettura del genere dalla URL con fallback di default su 'M' (Uomini)
-    const currentGender = resolvedParams.gender || 'M';
+    const currentGender = resolvedParams.gender || 'all';
 
     const { data: { user } } = await supabase.auth.getUser();
     let currentUserPlayer = null;

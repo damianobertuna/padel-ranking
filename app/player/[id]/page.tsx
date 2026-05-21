@@ -4,6 +4,7 @@ import WinRateWidget from '@/components/WinRateWidget';
 import StreakWidget from '@/components/StreakWidget';
 import PartnersAndNemesisWidget from '@/components/PartnersAndNemesisWidget';
 import GameAverageWidget from '@/components/GameAverageWidget';
+import AvatarUpload from '@/components/AvatarUpload'; // 👈 NUOVO: Importiamo il componente
 
 export const revalidate = 0;
 
@@ -33,28 +34,33 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
     if (!player) {
         return (
             <main className="min-h-screen p-8 bg-slate-100 flex flex-col items-center justify-center">
-                <p className="text-red-600 font-bold mb-4">Giocatore non trovato.</p>
+                <p className="text-rose-600 font-bold mb-4">Giocatore non trovato.</p>
                 <Link href="/" className="text-indigo-600 underline">Torna alla classifica</Link>
             </main>
         );
     }
 
-    // 2. Recuperiamo tutti i giocatori per la decodifica dei nomi
+    // 2. Controllo Autenticazione: L'utente che guarda la pagina è il proprietario?
+    const { data: { user } } = await supabase.auth.getUser();
+    // Se l'utente è loggato e il suo ID Auth corrisponde allo user_id del giocatore, è lui!
+    const isOwnProfile = Boolean(user && user.id === player.user_id);
+
+    // 3. Recuperiamo tutti i giocatori per la decodifica dei nomi
     const { data: allPlayers } = await supabase.from('players').select('*');
     const getPlayerName = (id: number) => {
         const p = allPlayers?.find(x => x.id === id);
         return p ? `${p.first_name} ${p.last_name}` : 'Sconosciuto';
     };
 
-    // 3. Recuperiamo TUTTI i match completati in cui ha partecipato il giocatore
+    // 4. Recuperiamo TUTTI i match completati in cui ha partecipato il giocatore
     const { data: allMatches } = await supabase
         .from('matches')
         .select('*')
         .eq('status', 'completed')
         .or(`team_a_left_id.eq.${playerId},team_a_right_id.eq.${playerId},team_b_left_id.eq.${playerId},team_b_right_id.eq.${playerId}`)
-        .order('created_at', { ascending: false });
+        .order('updated_at', { ascending: false });
 
-    // 4. ELABORAZIONE DI TUTTE LE STATISTICHE AVANZATE (SET & GAME)
+    // 5. ELABORAZIONE DI TUTTE LE STATISTICHE AVANZATE (SET & GAME)
     let victories = 0;
     let defeats = 0;
 
@@ -107,7 +113,7 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
         winRate: winRate
     };
 
-    // 5. PAGINAZIONE INTERNA SIDE-SERVER
+    // 6. PAGINAZIONE INTERNA SIDE-SERVER
     const totalMatchesCount = enrichedMatches.length;
     const totalPages = totalMatchesCount > 0 ? Math.ceil(totalMatchesCount / MATCHES_PER_PAGE) : 1;
     const fromIndex = (currentPage - 1) * MATCHES_PER_PAGE;
@@ -121,23 +127,50 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
                 {/* Torna indietro */}
                 <Link
                     href="/"
-                    className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-500 hover:text-indigo-600 bg-slate-200/50 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-all active:scale-95"
+                    className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-500 hover:text-indigo-600 bg-slate-200/50 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-all active:scale-95 mb-6"
                 >
                     <span className="text-[10px]">←</span>
                     <span>Torna alla Classifica</span>
                 </Link>
 
-                {/* Intestazione Profilo */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <div>
-                        <h1 className="text-3xl font-black text-slate-800 tracking-tight">{player.first_name} {player.last_name}</h1>
-                        <p className="text-slate-400 text-sm mt-1 font-medium">
-                            Giocatore di lato: <span className="text-slate-700 font-bold">{player.preferred_side === 'Left' ? 'Sinistro (SX)' : 'Destro (DX)'}</span>
-                        </p>
+                {/* 👈 AGGIORNATO: INTESTAZIONE PROFILO CON AVATAR UPLOAD */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-col sm:flex-row justify-between items-center gap-6">
+
+                    <div className="flex flex-col sm:flex-row items-center gap-6 w-full">
+                        {/* Selettore Avatar o Immagine Statica */}
+                        {isOwnProfile ? (
+                            <AvatarUpload playerId={player.id} currentAvatarUrl={player.avatar_url} />
+                        ) : (
+                            <div className="relative w-24 h-24 rounded-full overflow-hidden bg-slate-100 border-2 border-slate-200 flex items-center justify-center shrink-0 shadow-inner">
+                                {player.avatar_url ? (
+                                    <img src={player.avatar_url} alt={`Avatar di ${player.first_name}`} className="w-full h-full object-cover" />
+                                ) : (
+                                    /* Silhouette neutra di default se l'utente non ha impostato nulla */
+                                    <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 font-black text-xl flex items-center justify-center shrink-0 uppercase tracking-tight">
+                                        {player.first_name[0]}{player.last_name[0]}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        <div className="text-center sm:text-left flex-1">
+                            <h1 className="text-3xl font-black text-slate-800 tracking-tight">{player.first_name} {player.last_name}</h1>
+                            <div className="flex flex-col sm:flex-row items-center gap-2 mt-2">
+                                <span className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${
+                                    player.preferred_side === 'Left' ? 'bg-blue-50 text-blue-600 border border-blue-200' :
+                                        player.preferred_side === 'Right' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' :
+                                            'bg-purple-50 text-purple-600 border border-purple-200'
+                                }`}>
+                                    {player.preferred_side === 'Left' ? '🔹 Lato Sinistro (SX)' : player.preferred_side === 'Right' ? '🔸 Lato Destro (DX)' : '🌍 Mix (Both)'}
+                                </span>
+                                {player.gender === 'F' && <span className="text-xs bg-pink-50 text-pink-600 border border-pink-200 px-2 py-1 rounded-lg font-bold uppercase tracking-wider">👩 Femminile</span>}
+                            </div>
+                        </div>
                     </div>
-                    <div className="text-center sm:text-right">
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ranking Attuale</span>
-                        <div className="text-4xl font-mono font-black text-indigo-600 mt-1">{player.ranking.toFixed(2)}</div>
+
+                    <div className="text-center sm:text-right shrink-0 bg-slate-50 p-4 rounded-xl border border-slate-100 w-full sm:w-auto mt-4 sm:mt-0">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ranking Attuale</span>
+                        <div className="text-4xl font-mono font-black text-indigo-600 mt-0.5 leading-none">{player.ranking.toFixed(2)}</div>
                     </div>
                 </div>
 
@@ -180,21 +213,21 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
                                     key={match.id}
                                     className={`bg-white p-4 rounded-xl shadow-sm border flex flex-col gap-3 transition-all ${
                                         match.userWon
-                                            ? 'border-l-4 border-l-green-500 bg-gradient-to-r from-green-50/10 to-transparent'
-                                            : 'border-l-4 border-l-red-500 bg-gradient-to-r from-red-50/10 to-transparent'
+                                            ? 'border-l-4 border-l-emerald-500 bg-gradient-to-r from-emerald-50/10 to-transparent'
+                                            : 'border-l-4 border-l-rose-500 bg-gradient-to-r from-rose-50/10 to-transparent'
                                     }`}
                                 >
                                     <div className="flex justify-between items-start gap-2">
                                         <div className="min-w-0 flex-1">
                                             <div className="text-[10px] text-slate-400 font-mono font-bold uppercase tracking-wider mb-1">
-                                                Partita del {new Date(match.created_at).toLocaleDateString('it-IT')}
+                                                Partita del {new Date(match.updated_at).toLocaleDateString('it-IT')}
                                             </div>
                                             <div className="space-y-0.5">
                                                 <div className="text-sm text-slate-700 truncate font-medium">
-                                                    In coppia con: <span className="font-bold text-slate-800">{getPlayerName(compagnoId)}</span>
+                                                    In coppia con: <span className="font-bold text-slate-800">{getPlayerName(compagnoId as number)}</span>
                                                 </div>
                                                 <div className="text-xs text-slate-400 truncate font-medium">
-                                                    Contro: <span className="text-slate-600 font-semibold">{getPlayerName(avversario1Id)} / {getPlayerName(avversario2Id)}</span>
+                                                    Contro: <span className="text-slate-600 font-semibold">{getPlayerName(avversario1Id as number)} / {getPlayerName(avversario2Id as number)}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -202,17 +235,17 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
                                         {/* BLOCCO NUOVO: STATO ESITO + VARIAZIONE DEL RANKING IN TEMPO REALE */}
                                         <div className="shrink-0 flex flex-col items-end gap-1.5">
                                             {match.userWon ? (
-                                                <span className="bg-green-100 text-green-800 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                                                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
                                                     Vittoria
                                                 </span>
                                             ) : (
-                                                <span className="bg-red-100 text-red-800 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                                                <span className="bg-rose-100 text-rose-800 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
                                                     Sconfitta
                                                 </span>
                                             )}
 
                                             {/* Tag Variazione Punti nello Storico */}
-                                            <div className={`text-xs font-mono font-black ${match.userWon ? 'text-green-600' : 'text-red-600'}`}>
+                                            <div className={`text-xs font-mono font-black ${match.userWon ? 'text-emerald-600' : 'text-rose-600'}`}>
                                                 {match.userWon ? `+${match.pointsDelta.toFixed(2)}` : `${match.pointsDelta.toFixed(2)}`}
                                             </div>
                                         </div>
