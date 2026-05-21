@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import PendingMatchCard from '@/components/PendingMatchCard';
-import { Player} from "@/types";
+import { Player } from "@/types";
 
 const MATCHES_PER_PAGE = 5;
 
@@ -46,32 +46,47 @@ export default async function Home({ searchParams }: PageProps) {
         return b.ranking - a.ranking;
     });
 
-    const totalPlayers = sortedPlayers.length;
-    const minRankingAbsolute = totalPlayers > 0 ? sortedPlayers[totalPlayers - 1].ranking : -1;
-    const maxRankingLeft = sortedPlayers.find(p => p.preferred_side === 'Left')?.ranking ?? -1;
-    const maxRankingRight = sortedPlayers.find(p => p.preferred_side === 'Right')?.ranking ?? -1;
-    const maxRankingBoth = sortedPlayers.find(p => p.preferred_side === 'Both')?.ranking ?? -1;
+    // --- INIZIO NUOVA LOGICA KING E FANALINO ---
+
+    // 1. Estraiamo i ranking divisi per lato direttamente dai dati grezzi (immune all'ordinamento)
+    const allLeft = playersWithStats.filter(p => p.preferred_side === 'Left').map(p => p.ranking);
+    const allRight = playersWithStats.filter(p => p.preferred_side === 'Right').map(p => p.ranking);
+    const allBoth = playersWithStats.filter(p => p.preferred_side === 'Both').map(p => p.ranking);
+
+    // 2. Calcoliamo il MAX (King) e il MIN (Fanalino) per ogni singola categoria
+    const maxRankingLeft = allLeft.length > 0 ? Math.max(...allLeft) : -1;
+    const minRankingLeft = allLeft.length > 0 ? Math.min(...allLeft) : -1;
+
+    const maxRankingRight = allRight.length > 0 ? Math.max(...allRight) : -1;
+    const minRankingRight = allRight.length > 0 ? Math.min(...allRight) : -1;
+
+    const maxRankingBoth = allBoth.length > 0 ? Math.max(...allBoth) : -1;
+    const minRankingBoth = allBoth.length > 0 ? Math.min(...allBoth) : -1;
 
     const kingLeftIds: number[] = [];
     const kingRightIds: number[] = [];
     const kingBothIds: number[] = [];
+
     const lastPlaceLeftIds: number[] = [];
     const lastPlaceRightIds: number[] = [];
     const lastPlaceBothIds: number[] = [];
 
+    // 3. Assegniamo i titoli confrontando il punteggio esatto di ciascun giocatore
     for (const p of sortedPlayers) {
         const { id, ranking, preferred_side } = p;
 
+        // Assegnazione KING (Massimo per lato)
         if (preferred_side === 'Left' && ranking === maxRankingLeft && maxRankingLeft !== -1) kingLeftIds.push(id);
         if (preferred_side === 'Right' && ranking === maxRankingRight && maxRankingRight !== -1) kingRightIds.push(id);
         if (preferred_side === 'Both' && ranking === maxRankingBoth && maxRankingBoth !== -1) kingBothIds.push(id);
 
-        if (ranking === minRankingAbsolute && minRankingAbsolute !== -1) {
-            if (preferred_side === 'Left') lastPlaceLeftIds.push(id);
-            if (preferred_side === 'Right') lastPlaceRightIds.push(id);
-            if (preferred_side === 'Both') lastPlaceBothIds.push(id);
-        }
+        // Assegnazione FANALINO (Minimo per lato)
+        if (preferred_side === 'Left' && ranking === minRankingLeft && minRankingLeft !== -1) lastPlaceLeftIds.push(id);
+        if (preferred_side === 'Right' && ranking === minRankingRight && minRankingRight !== -1) lastPlaceRightIds.push(id);
+        if (preferred_side === 'Both' && ranking === minRankingBoth && minRankingBoth !== -1) lastPlaceBothIds.push(id);
     }
+
+    // --- FINE NUOVA LOGICA ---
 
     const { data: pendingMatches } = await supabase
         .from('matches')
@@ -172,14 +187,14 @@ export default async function Home({ searchParams }: PageProps) {
                         const playerId = player.id;
 
                         const king = kingLeftIds.includes(playerId) ? 'SX'
-                                : kingRightIds.includes(playerId) ? 'DX'
+                            : kingRightIds.includes(playerId) ? 'DX'
                                 : kingBothIds.includes(playerId) ? 'DX/SX'
-                                : null;
+                                    : null;
 
                         const last = lastPlaceLeftIds.includes(playerId) ? 'SX'
-                                : lastPlaceRightIds.includes(playerId) ? 'DX'
+                            : lastPlaceRightIds.includes(playerId) ? 'DX'
                                 : lastPlaceBothIds.includes(playerId) ? 'DX/SX'
-                                : null;
+                                    : null;
 
                         return (
                             <Link
@@ -282,7 +297,6 @@ export default async function Home({ searchParams }: PageProps) {
                             return (
                                 <div key={match.id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-3">
                                     <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                                        {/* 👈 AGGIORNATO: Ora include il punteggio ranking nello storico risultati */}
                                         <div className={`flex flex-col items-center sm:items-start p-3 rounded-xl w-full sm:w-5/12 ${winner === 'A' ? 'bg-green-50 border-l-4 border-l-green-500 font-semibold' : 'opacity-60'}`}>
                                             <div className="flex items-center gap-1.5 mb-1"><span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Coppia A</span>{winner === 'A' && <span className="bg-green-200 text-green-800 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">WIN 🎉</span>}</div>
                                             <div className="text-sm text-slate-800 truncate w-full text-center sm:text-left">{getPlayerNameWithRanking(match.team_a_left_id, playersWithStats)}</div>
@@ -294,7 +308,6 @@ export default async function Home({ searchParams }: PageProps) {
                                                 {sets.length > 0 ? sets.map((set, sIdx) => (<span key={sIdx} className="bg-white px-1.5 py-0.5 rounded border border-slate-200/60 shadow-sm">{set.team_a}-{set.team_b}</span>)) : <span className="text-xs font-normal text-slate-400 italic">Dato pre-set</span>}
                                             </div>
                                         </div>
-                                        {/* 👈 AGGIORNATO: Ora include il punteggio ranking nello storico risultati */}
                                         <div className={`flex flex-col items-center sm:items-end p-3 rounded-xl w-full sm:w-5/12 text-center sm:text-right ${winner === 'B' ? 'bg-green-50 border-r-4 border-r-green-500 font-semibold' : 'opacity-60'}`}>
                                             <div className="flex items-center sm:flex-row-reverse gap-1.5 mb-1"><span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Coppia B</span>{winner === 'B' && <span className="bg-green-200 text-green-800 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">WIN 🎉</span>}</div>
                                             <div className="text-sm text-slate-800 truncate w-full text-center sm:text-right">{getPlayerNameWithRanking(match.team_b_left_id, playersWithStats)}</div>
