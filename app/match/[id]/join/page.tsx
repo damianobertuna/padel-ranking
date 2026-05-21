@@ -159,8 +159,8 @@ export default function JoinMatchPage() {
     // UI Helper to render slots as fixed text badge or select input field
     const renderSlotForm = (
         currentId: number | null,
-        value: string,
-        setValue: (v: string) => void,
+        value: number | '',
+        setValue: (v: number | '') => void,
         label: string,
         sideFilteredPlayers: Player[]
     ) => {
