@@ -20,10 +20,10 @@ export default function JoinMatchPage() {
     const [error, setError] = useState('');
 
     // New selections for empty slots
-    const [newALeft, setNewALeft] = useState('');
-    const [newARight, setNewARight] = useState('');
-    const [newBLeft, setNewBLeft] = useState('');
-    const [newBRight, setNewBRight] = useState('');
+    const [newALeft, setNewALeft] = useState<number | ''>('');
+    const [newARight, setNewARight] = useState<number | ''>('');
+    const [newBLeft, setNewBLeft] = useState<number | ''>('');
+    const [newBRight, setNewBRight] = useState<number | ''>('');
 
     // 👈 NUOVO: Stati per la validazione in tempo reale del livello e dei cloni
     const [levelError, setLevelError] = useState(false);
@@ -67,7 +67,7 @@ export default function JoinMatchPage() {
         const totalActiveIds: number[] = [];
 
         allCurrentInField.forEach(id => { if (id) totalActiveIds.push(id); });
-        allNewSelections.forEach(id => { if (id !== '') totalActiveIds.push(Number(id)); });
+        allNewSelections.forEach(id => { if (id !== '') totalActiveIds.push(id); });
 
         if (totalActiveIds.length === 0) {
             setDuplicateError(false);
@@ -141,10 +141,10 @@ export default function JoinMatchPage() {
         setError('');
 
         const updatedFields: any = {};
-        if (newALeft) updatedFields.team_a_left_id = Number(newALeft);
-        if (newARight) updatedFields.team_a_right_id = Number(newARight);
-        if (newBLeft) updatedFields.team_b_left_id = Number(newBLeft);
-        if (newBRight) updatedFields.team_b_right_id = Number(newBRight);
+        if (newALeft) updatedFields.team_a_left_id = newALeft;
+        if (newARight) updatedFields.team_a_right_id = newARight;
+        if (newBLeft) updatedFields.team_b_left_id = newBLeft;
+        if (newBRight) updatedFields.team_b_right_id = newBRight;
 
         try {
             const cleanMatchId = params.id as string;
@@ -175,7 +175,7 @@ export default function JoinMatchPage() {
         return (
             <select
                 value={value}
-                onChange={e => setValue(e.target.value)}
+                onChange={e => setNewALeft(e.target.value ? parseInt(e.target.value, 10) : '')}
                 className="w-full p-2.5 border border-amber-200 rounded-xl bg-amber-50/20 font-medium text-sm text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white"
             >
                 <option value="">Seleziona Giocatore per {label}</option>

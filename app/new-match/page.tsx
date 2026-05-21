@@ -57,8 +57,7 @@ export default function CreateMatchForm() {
     useEffect(() => {
         // 1. Convertiamo in numero SOLO gli slot effettivamente compilati (evitando NaN)
         const selectedIds = [teamALeft, teamARight, teamBLeft, teamBRight]
-            .filter(val => val !== '')
-            .map(val => Number(val));
+            .filter((val): val is number => typeof val === 'number');
 
         // --- CONTROLLO 1: ALMENO UN GIOCATORE ---
         if (selectedIds.length === 0) {
@@ -115,10 +114,10 @@ export default function CreateMatchForm() {
             // Inviamo i numeri interi puliti al server action (oppure null se lasciati vuoti)
             await createMatch({
                 matchDate: matchDate,
-                teamALeft: teamALeft ? Number(teamALeft) : null,
-                teamARight: teamARight ? Number(teamARight) : null,
-                teamBLeft: teamBLeft ? Number(teamBLeft) : null,
-                teamBRight: teamBRight ? Number(teamBRight) : null,
+                teamALeft: teamALeft || null,
+                teamARight: teamARight || null,
+                teamBLeft: teamBLeft || null,
+                teamBRight: teamBRight || null,
             });
 
             router.push('/');
