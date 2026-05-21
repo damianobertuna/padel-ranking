@@ -4,6 +4,8 @@ export interface Player {
     last_name: string;
     ranking: number;
     preferred_side: string;
+    total_played?: number;
+    win_rate?: number;
 }
 
 export interface Match {

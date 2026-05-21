@@ -8,6 +8,12 @@ interface PageProps {
     searchParams: Promise<{ page?: string; sort?: string }>;
 }
 
+function getPlayerNameWithRanking(id: number | null, playersList: Player[]) {
+    if (id === null) return 'Slot Libero';
+    const p = playersList?.find(player => player.id === id);
+    return p ? `${p.first_name} ${p.last_name} (${p.ranking.toFixed(2)})` : 'Sconosciuto';
+}
+
 export default async function Home({ searchParams }: PageProps) {
     const supabase = await createClient();
 
@@ -50,7 +56,8 @@ export default async function Home({ searchParams }: PageProps) {
 
     const kingLeftIds = leftPlayersSorted.filter(p => p.ranking === maxRankingLeft && maxRankingLeft !== -1).map(p => p.id);
     const kingRightIds = rightPlayersSorted.filter(p => p.ranking === maxRankingRight && maxRankingRight !== -1).map(p => p.id);
-    const lastPlaceIds = allPlayersAscending.filter(p => p.ranking === minRankingAbsolute && minRankingAbsolute !== -1).map(p => p.id);
+    const lastPlaceLeftIds = allPlayersAscending.filter(p => p.ranking === minRankingAbsolute && minRankingAbsolute !== -1).map(p => p.id);
+    const lastPlaceRightIds = allPlayersAscending.filter(p => p.ranking === minRankingAbsolute && minRankingAbsolute !== -1).map(p => p.id);
 
     // Recuperiamo le partite IN PROGRAMMA (pending)
     const { data: pendingMatches } = await supabase
@@ -70,12 +77,6 @@ export default async function Home({ searchParams }: PageProps) {
         .range(fromRange, toRange);
 
     const totalPages = totalCompletedCount ? Math.ceil(totalCompletedCount / MATCHES_PER_PAGE) : 1;
-
-    const getPlayerNameWithRanking = (id: number | null) => {
-        if (id === null) return 'Slot Libero';
-        const p = playersWithStats?.find(player => player.id === id);
-        return p ? `${p.first_name} ${p.last_name} (${p.ranking.toFixed(2)})` : 'Sconosciuto';
-    };
 
     return (
         <main className="min-h-screen p-4 sm:p-8 bg-slate-100 flex flex-col items-center">
@@ -157,7 +158,8 @@ export default async function Home({ searchParams }: PageProps) {
                         const rankIndex = index + 1;
                         const isKingLeft = kingLeftIds.includes(player.id);
                         const isKingRight = kingRightIds.includes(player.id);
-                        const isLastPlace = lastPlaceIds.includes(player.id);
+                        const isLastLeftPlace = lastPlaceLeftIds.includes(player.id);
+                        const isLastRightPlace = lastPlaceRightIds.includes(player.id);
 
                         return (
                             <Link
@@ -178,7 +180,7 @@ export default async function Home({ searchParams }: PageProps) {
                                             <span className="font-bold text-slate-800 text-base truncate">{player.first_name} {player.last_name}</span>
                                             {isKingLeft && <span className="bg-amber-100 text-amber-800 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shrink-0">King SX</span>}
                                             {isKingRight && <span className="bg-yellow-100 text-yellow-800 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shrink-0">King DX</span>}
-                                            {isLastPlace && <span className="bg-red-100 text-red-800 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shrink-0">Fanalino</span>}
+                                            {(isLastLeftPlace || isLastRightPlace) && <span className="bg-red-100 text-red-800 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shrink-0">Fanalino</span>}
                                         </div>
 
                                         <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-1 font-medium flex-wrap">
@@ -256,8 +258,8 @@ export default async function Home({ searchParams }: PageProps) {
                                         {/* 👈 AGGIORNATO: Ora include il punteggio ranking nello storico risultati */}
                                         <div className={`flex flex-col items-center sm:items-start p-3 rounded-xl w-full sm:w-5/12 ${winner === 'A' ? 'bg-green-50 border-l-4 border-l-green-500 font-semibold' : 'opacity-60'}`}>
                                             <div className="flex items-center gap-1.5 mb-1"><span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Coppia A</span>{winner === 'A' && <span className="bg-green-200 text-green-800 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">WIN 🎉</span>}</div>
-                                            <div className="text-sm text-slate-800 truncate w-full text-center sm:text-left">{getPlayerNameWithRanking(match.team_a_left_id)}</div>
-                                            <div className="text-sm text-slate-800 truncate w-full text-center sm:text-left">{getPlayerNameWithRanking(match.team_a_right_id)}</div>
+                                            <div className="text-sm text-slate-800 truncate w-full text-center sm:text-left">{getPlayerNameWithRanking(match.team_a_left_id, playersWithStats)}</div>
+                                            <div className="text-sm text-slate-800 truncate w-full text-center sm:text-left">{getPlayerNameWithRanking(match.team_a_right_id, playersWithStats)}</div>
                                         </div>
                                         <div className="flex flex-col items-center justify-center shrink-0">
                                             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 select-none">Punteggio</div>
@@ -268,8 +270,8 @@ export default async function Home({ searchParams }: PageProps) {
                                         {/* 👈 AGGIORNATO: Ora include il punteggio ranking nello storico risultati */}
                                         <div className={`flex flex-col items-center sm:items-end p-3 rounded-xl w-full sm:w-5/12 text-center sm:text-right ${winner === 'B' ? 'bg-green-50 border-r-4 border-r-green-500 font-semibold' : 'opacity-60'}`}>
                                             <div className="flex items-center sm:flex-row-reverse gap-1.5 mb-1"><span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Coppia B</span>{winner === 'B' && <span className="bg-green-200 text-green-800 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">WIN 🎉</span>}</div>
-                                            <div className="text-sm text-slate-800 truncate w-full text-center sm:text-right">{getPlayerNameWithRanking(match.team_b_left_id)}</div>
-                                            <div className="text-sm text-slate-800 truncate w-full text-center sm:text-right">{getPlayerNameWithRanking(match.team_b_right_id)}</div>
+                                            <div className="text-sm text-slate-800 truncate w-full text-center sm:text-right">{getPlayerNameWithRanking(match.team_b_left_id, playersWithStats)}</div>
+                                            <div className="text-sm text-slate-800 truncate w-full text-center sm:text-right">{getPlayerNameWithRanking(match.team_b_right_id, playersWithStats)}</div>
                                         </div>
                                     </div>
                                     <div className="text-[10px] text-slate-400 text-center sm:text-left font-medium border-t border-slate-50 pt-2">Disputata il {new Date(match.updated_at).toLocaleDateString('it-IT')}</div>
