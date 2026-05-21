@@ -202,6 +202,22 @@ export default async function Home({ searchParams }: PageProps) {
                                                         'bg-slate-50 text-slate-400'
                                         }`}>{rankIndex}°</div>
 
+
+                                        <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
+                                            {player.avatar_url ? (
+                                                <img
+                                                    src={player.avatar_url}
+                                                    alt={`${player.first_name} Avatar`}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            ) : (
+                                                /* Silhouette neutra di default se l'utente non ha impostato nulla */
+                                                <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 font-black text-xs flex items-center justify-center shrink-0 uppercase tracking-tight">
+                                                    {player.first_name[0]}{player.last_name[0]}
+                                                </div>
+                                            )}
+                                        </div>
+
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-1.5 flex-wrap">
                                                 <span className="font-bold text-slate-800 text-base truncate">{player.first_name} {player.last_name}</span>
