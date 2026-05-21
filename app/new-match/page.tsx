@@ -13,10 +13,10 @@ export default function CreateMatchForm() {
 
     // Stati per i giocatori selezionati nelle tendine (stringhe provenienti dai tag <select>)
     const [players, setPlayers] = useState<Player[]>([]);
-    const [teamALeft, setTeamALeft] = useState<string>('');
-    const [teamARight, setTeamARight] = useState<string>('');
-    const [teamBLeft, setTeamBLeft] = useState<string>('');
-    const [teamBRight, setTeamBRight] = useState<string>('');
+    const [teamALeft, setTeamALeft] = useState<number | ''>('');
+    const [teamARight, setTeamARight] = useState<number | ''>('');
+    const [teamBLeft, setTeamBLeft] = useState<number | ''>('');
+    const [teamBRight, setTeamBRight] = useState<number | ''>('');
 
     // Stato per la gestione di data e ora del match
     const [matchDate, setMatchDate] = useState<string>(() => {
@@ -175,7 +175,7 @@ export default function CreateMatchForm() {
                                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Left Player (SX)</label>
                                 <select
                                     value={teamALeft}
-                                    onChange={e => setTeamALeft(e.target.value)}
+                                    onChange={e => setTeamALeft(e.target.value ? parseInt(e.target.value, 10) : '')}
                                     className="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-medium text-sm focus:outline-none focus:border-blue-500"
                                 >
                                     <option value="">Seleziona Giocatore (Vuoto)</option>
@@ -189,7 +189,7 @@ export default function CreateMatchForm() {
                                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Right Player (DX)</label>
                                 <select
                                     value={teamARight}
-                                    onChange={e => setTeamARight(e.target.value)}
+                                    onChange={e => setTeamARight(e.target.value ? parseInt(e.target.value, 10) : '')}
                                     className="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-medium text-sm focus:outline-none focus:border-blue-500"
                                 >
                                     <option value="">Seleziona Giocatore (Vuoto)</option>
@@ -208,7 +208,7 @@ export default function CreateMatchForm() {
                                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Left Player (SX)</label>
                                 <select
                                     value={teamBLeft}
-                                    onChange={e => setTeamBLeft(e.target.value)}
+                                    onChange={e => setTeamBLeft(e.target.value ? parseInt(e.target.value, 10) : '')}
                                     className="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-medium text-sm focus:outline-none focus:border-rose-500"
                                 >
                                     <option value="">Seleziona Giocatore (Vuoto)</option>
@@ -222,7 +222,7 @@ export default function CreateMatchForm() {
                                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Right Player (DX)</label>
                                 <select
                                     value={teamBRight}
-                                    onChange={e => setTeamBRight(e.target.value)}
+                                    onChange={e => setTeamBRight(e.target.value ? parseInt(e.target.value, 10) : '')}
                                     className="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-medium text-sm focus:outline-none focus:border-rose-500"
                                 >
                                     <option value="">Seleziona Giocatore (Vuoto)</option>

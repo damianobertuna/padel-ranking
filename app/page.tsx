@@ -52,12 +52,12 @@ export default async function Home({ searchParams }: PageProps) {
     const maxRankingRight = sortedPlayers.find(p => p.preferred_side === 'Right')?.ranking ?? -1;
     const maxRankingBoth = sortedPlayers.find(p => p.preferred_side === 'Both')?.ranking ?? -1;
 
-    const kingLeftIds: string[] = [];
-    const kingRightIds: string[] = [];
-    const kingBothIds: string[] = [];
-    const lastPlaceLeftIds: string[] = [];
-    const lastPlaceRightIds: string[] = [];
-    const lastPlaceBothIds: string[] = [];
+    const kingLeftIds: number[] = [];
+    const kingRightIds: number[] = [];
+    const kingBothIds: number[] = [];
+    const lastPlaceLeftIds: number[] = [];
+    const lastPlaceRightIds: number[] = [];
+    const lastPlaceBothIds: number[] = [];
 
     for (const p of sortedPlayers) {
         const { id, ranking, preferred_side } = p;

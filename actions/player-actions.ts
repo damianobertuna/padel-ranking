@@ -21,7 +21,9 @@ export async function updatePlayerByAdmin(formData: FormData) {
     }
 
     // 2. Estraiamo i dati dal form
-    const playerId = parseInt(formData.get('playerId') as string);
+    const playerIdStr = formData.get('playerId');
+    if (!playerIdStr) throw new Error("ID mancante");
+    const playerId = parseInt(playerIdStr as string, 10);
     const firstName = formData.get('firstName') as string;
     const lastName = formData.get('lastName') as string;
     const preferredSide = formData.get('preferredSide') as string;
