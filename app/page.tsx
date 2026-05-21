@@ -7,7 +7,8 @@ import { computeKingAndFanalino } from '@/lib/rankingCalc';
 const MATCHES_PER_PAGE = 5;
 
 interface PageProps {
-    searchParams: Promise<{ page?: string; sort?: string }>;
+    // 👈 AGGIORNATO: Aggiunto gender opzionale nei parametri della URL
+    searchParams: Promise<{ page?: string; sort?: string; gender?: string }>;
 }
 
 function getPlayerNameWithRanking(id: number | null, playersList: Player[]) {
@@ -22,6 +23,8 @@ export default async function Home({ searchParams }: PageProps) {
     const resolvedParams = await searchParams;
     const currentPage = parseInt(resolvedParams.page || '1', 10) || 1;
     const currentSort = resolvedParams.sort || 'ranking';
+    // 👈 NUOVO: Lettura del genere dalla URL con fallback di default su 'M' (Uomini)
+    const currentGender = resolvedParams.gender || 'M';
 
     const { data: { user } } = await supabase.auth.getUser();
     let currentUserPlayer = null;
@@ -37,17 +40,7 @@ export default async function Home({ searchParams }: PageProps) {
     const { data: playersStatsData } = await supabase.from('view_player_stats').select('*');
     const playersWithStats = playersStatsData || [];
 
-    const sortedPlayers = [...playersWithStats].sort((a, b) => {
-        if (currentSort === 'played') {
-            return b.total_played - a.total_played || b.ranking - a.ranking;
-        }
-        if (currentSort === 'winrate') {
-            return b.win_rate - a.win_rate || b.total_played - a.total_played;
-        }
-        return b.ranking - a.ranking;
-    });
-
-    // --- NUOVA LOGICA REFACTORIZZATA ---
+    // 👑 Calcolo dei titoli ASSOLUTI (eseguito sull'anagrafica completa prima del filtro visivo)
     const {
         kingLeftIds,
         kingRightIds,
@@ -56,6 +49,23 @@ export default async function Home({ searchParams }: PageProps) {
         lastPlaceRightIds,
         lastPlaceBothIds
     } = computeKingAndFanalino(playersWithStats);
+
+    // 👈 NUOVO: Filtriamo l'array dei giocatori in base al genere selezionato prima di ordinarli
+    const filteredPlayers = playersWithStats.filter(player => {
+        if (currentGender === 'all') return true; // Mostra tutti
+        return player.gender === currentGender;   // 'M' o 'F'
+    });
+
+    // 👈 AGGIORNATO: Ora ordiniamo l'array già filtrato (filteredPlayers)
+    const sortedPlayers = [...filteredPlayers].sort((a, b) => {
+        if (currentSort === 'played') {
+            return b.total_played - a.total_played || b.ranking - a.ranking;
+        }
+        if (currentSort === 'winrate') {
+            return b.win_rate - a.win_rate || b.total_played - a.total_played;
+        }
+        return b.ranking - a.ranking;
+    });
 
     const { data: pendingMatches } = await supabase
         .from('matches')
@@ -139,85 +149,101 @@ export default async function Home({ searchParams }: PageProps) {
                     </div>
                 </div>
 
-                {/* FILTRI DI ORDINAMENTO DINAMICI */}
-                <div className="flex justify-between items-center mb-3">
+                {/* FILTRI DI ORDINAMENTO E DI GENERE DINAMICI */}
+                {/* 👈 AGGIORNATO: Cambiato in flex-col su mobile per contenere ordinamento e generi senza rompersi */}
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3">
                     <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Classifica Ufficiale</h2>
-                    <div className="flex gap-1.5 bg-slate-200/60 p-1 rounded-xl border border-slate-200 text-[11px] font-bold">
-                        <Link href={`/?sort=ranking`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'ranking' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>Punti</Link>
-                        <Link href={`/?sort=played`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'played' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>Giocate</Link>
-                        <Link href={`/?sort=winrate`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'winrate' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>Win Rate</Link>
+
+                    <div className="flex flex-wrap gap-2">
+                        {/* 👈 NUOVO: Barra selettrice del Genere (Mantiene l'ordinamento attivo `currentSort`) */}
+                        <div className="flex gap-1.5 bg-slate-200/60 p-1 rounded-xl border border-slate-200 text-[11px] font-bold">
+                            <Link href={`/?gender=M&sort=${currentSort}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentGender === 'M' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>👨 Maschi</Link>
+                            <Link href={`/?gender=F&sort=${currentSort}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentGender === 'F' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>👩 Femmine</Link>
+                            <Link href={`/?gender=all&sort=${currentSort}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentGender === 'all' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>🌍 Generale</Link>
+                        </div>
+
+                        {/* 👈 AGGIORNATO: Barra ordinamento (Ora mantiene il genere attivo `currentGender`) */}
+                        <div className="flex gap-1.5 bg-slate-200/60 p-1 rounded-xl border border-slate-200 text-[11px] font-bold">
+                            <Link href={`/?gender=${currentGender}&sort=ranking`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'ranking' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>Punti</Link>
+                            <Link href={`/?gender=${currentGender}&sort=played`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'played' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>Giocate</Link>
+                            <Link href={`/?gender=${currentGender}&sort=winrate`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'winrate' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>Win Rate</Link>
+                        </div>
                     </div>
                 </div>
 
                 {/* CLASSIFICA CARD */}
                 <div className="flex flex-col gap-2.5 mb-8">
-                    {sortedPlayers.map((player, index) => {
-                        const rankIndex = index + 1;
-                        const playerId = player.id;
+                    {sortedPlayers.length > 0 ? (
+                        sortedPlayers.map((player, index) => {
+                            const rankIndex = index + 1;
+                            const playerId = player.id;
 
-                        const king = kingLeftIds.includes(playerId) ? 'SX'
-                            : kingRightIds.includes(playerId) ? 'DX'
-                                : kingBothIds.includes(playerId) ? 'DX/SX'
-                                    : null;
+                            const king = kingLeftIds.includes(playerId) ? 'SX'
+                                : kingRightIds.includes(playerId) ? 'DX'
+                                    : kingBothIds.includes(playerId) ? 'DX/SX'
+                                        : null;
 
-                        const last = lastPlaceLeftIds.includes(playerId) ? 'SX'
-                            : lastPlaceRightIds.includes(playerId) ? 'DX'
-                                : lastPlaceBothIds.includes(playerId) ? 'DX/SX'
-                                    : null;
+                            const last = lastPlaceLeftIds.includes(playerId) ? 'SX'
+                                : lastPlaceRightIds.includes(playerId) ? 'DX'
+                                    : lastPlaceBothIds.includes(playerId) ? 'DX/SX'
+                                        : null;
 
-                        return (
-                            <Link
-                                key={player.id}
-                                href={`/player/${player.id}`}
-                                className="w-full bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between transition-all active:bg-slate-50 active:scale-[0.99] touch-manipulation"
-                            >
-                                <div className="flex items-center gap-3 min-w-0">
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black font-mono shrink-0 ${
-                                        rankIndex === 1 ? 'bg-amber-100 text-amber-700 border border-amber-300' :
-                                            rankIndex === 2 ? 'bg-slate-100 text-slate-600 border border-slate-300' :
-                                                rankIndex === 3 ? 'bg-orange-100 text-orange-700 border border-orange-300' :
-                                                    'bg-slate-50 text-slate-400'
-                                    }`}>{rankIndex}°</div>
+                            return (
+                                <Link
+                                    key={player.id}
+                                    href={`/player/${player.id}`}
+                                    className="w-full bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between transition-all active:bg-slate-50 active:scale-[0.99] touch-manipulation"
+                                >
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black font-mono shrink-0 ${
+                                            rankIndex === 1 ? 'bg-amber-100 text-amber-700 border border-amber-300' :
+                                                rankIndex === 2 ? 'bg-slate-100 text-slate-600 border border-slate-300' :
+                                                    rankIndex === 3 ? 'bg-orange-100 text-orange-700 border border-orange-300' :
+                                                        'bg-slate-50 text-slate-400'
+                                        }`}>{rankIndex}°</div>
 
-                                    <div className="min-w-0">
-                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                            <span className="font-bold text-slate-800 text-base truncate">{player.first_name} {player.last_name}</span>
-                                            {king && (
-                                                <span className="bg-yellow-100 text-yellow-800 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shrink-0">
-                                                King {king}
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="font-bold text-slate-800 text-base truncate">{player.first_name} {player.last_name}</span>
+                                                {king && (
+                                                    <span className="bg-yellow-100 text-yellow-800 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shrink-0">
+                                                    King {king}
+                                                    </span>
+                                                )}
+                                                {last && (
+                                                    <span className="bg-red-100 text-red-800 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shrink-0">
+                                                        Fanalino {last}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-1 font-medium flex-wrap">
+                                                <span className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${player.preferred_side === 'Left' ? 'bg-blue-50 text-blue-600' : player.preferred_side === 'Right' ? 'bg-emerald-50 text-emerald-600' : 'bg-purple-50 text-purple-600'}`}>
+                                                    {player.preferred_side === 'Left' ? 'SX' : player.preferred_side === 'Right' ? 'DX' : 'MIX'}
                                                 </span>
-                                            )}
-                                            {last && (
-                                                <span className="bg-red-100 text-red-800 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shrink-0">
-                                                    Fanalino {last}
-                                                </span>
-                                            )}
+                                                <span>Match: <strong className="text-slate-600">{player.total_played}</strong></span>
+                                                <span className="text-slate-200">•</span>
+                                                <span>Win Rate: <strong className="text-slate-600">{player.win_rate.toFixed(1)}%</strong></span>
+                                            </div>
                                         </div>
+                                    </div>
 
-                                        <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-1 font-medium flex-wrap">
-                                            <span className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${player.preferred_side === 'Left' ? 'bg-blue-50 text-blue-600' : player.preferred_side === 'Right' ? 'bg-emerald-50 text-emerald-600' : 'bg-purple-50 text-purple-600'}`}>
-                                                {player.preferred_side === 'Left' ? 'SX' : player.preferred_side === 'Right' ? 'DX' : 'MIX'}
+                                    <div className="flex items-center gap-3 shrink-0">
+                                        <div className="text-right">
+                                            <div className="text-lg font-mono font-black text-indigo-600 leading-none">
+                                                {currentSort === 'played' ? player.total_played : currentSort === 'winrate' ? `${player.win_rate.toFixed(1)}%` : player.ranking.toFixed(2)}
+                                            </div>
+                                            <span className="text-[9px] text-slate-400 uppercase tracking-tight font-bold">
+                                                {currentSort === 'played' ? 'Partite' : currentSort === 'winrate' ? 'Rate' : 'Punti'}
                                             </span>
-                                            <span>Match: <strong className="text-slate-600">{player.total_played}</strong></span>
-                                            <span className="text-slate-200">•</span>
-                                            <span>Win Rate: <strong className="text-slate-600">{player.win_rate.toFixed(1)}%</strong></span>
                                         </div>
                                     </div>
-                                </div>
-
-                                <div className="flex items-center gap-3 shrink-0">
-                                    <div className="text-right">
-                                        <div className="text-lg font-mono font-black text-indigo-600 leading-none">
-                                            {currentSort === 'played' ? player.total_played : currentSort === 'winrate' ? `${player.win_rate.toFixed(1)}%` : player.ranking.toFixed(2)}
-                                        </div>
-                                        <span className="text-[9px] text-slate-400 uppercase tracking-tight font-bold">
-                                            {currentSort === 'played' ? 'Partite' : currentSort === 'winrate' ? 'Rate' : 'Punti'}
-                                        </span>
-                                    </div>
-                                </div>
-                            </Link>
-                        );
-                    })}
+                                </Link>
+                            );
+                        })
+                    ) : (
+                        <p className="text-slate-500 italic text-sm p-4 bg-white rounded-xl border border-slate-200 text-center">Nessun giocatore registrato in questa categoria.</p>
+                    )}
                 </div>
 
                 {/* BANNER PUBBLICITARIO SPONSOR */}
@@ -295,9 +321,10 @@ export default async function Home({ searchParams }: PageProps) {
                 {/* CONTROLLI DI PAGINAZIONE */}
                 {totalPages > 1 && (
                     <div className="flex justify-center items-center gap-4 mt-6">
-                        <Link href={`/?page=${currentPage - 1}&sort=${currentSort}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all active:scale-95 ${currentPage <= 1 ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}>← Precedente</Link>
+                        {/* 👈 AGGIORNATO: I link di paginazione ora portano con sé anche il parametro `gender` attivo */}
+                        <Link href={`/?page=${currentPage - 1}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all active:scale-95 ${currentPage <= 1 ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}>← Precedente</Link>
                         <div className="text-xs font-bold text-slate-500 font-mono">{currentPage} / {totalPages}</div>
-                        <Link href={`/?page=${currentPage + 1}&sort=${currentSort}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all active:scale-95 ${currentPage >= totalPages ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}>Successiva →</Link>
+                        <Link href={`/?page=${currentPage + 1}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all active:scale-95 ${currentPage >= totalPages ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}>Successiva →</Link>
                     </div>
                 )}
 
