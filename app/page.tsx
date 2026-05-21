@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import PendingMatchCard from '@/components/PendingMatchCard';
+import { Player} from "@/types";
 
 const MATCHES_PER_PAGE = 5;
 
@@ -45,21 +46,33 @@ export default async function Home({ searchParams }: PageProps) {
         return b.ranking - a.ranking;
     });
 
-    // --- LOGICA EX-AEQUO COMPARTITI ---
-    const leftPlayersSorted = [...sortedPlayers].filter(p => p.preferred_side === 'Left' || p.preferred_side === 'Both').sort((a,b) => b.ranking - a.ranking);
-    const rightPlayersSorted = [...sortedPlayers].filter(p => p.preferred_side === 'Right' || p.preferred_side === 'Both').sort((a,b) => b.ranking - a.ranking);
-    const allPlayersAscending = [...sortedPlayers].sort((a,b) => a.ranking - b.ranking);
+    const totalPlayers = sortedPlayers.length;
+    const minRankingAbsolute = totalPlayers > 0 ? sortedPlayers[totalPlayers - 1].ranking : -1;
+    const maxRankingLeft = sortedPlayers.find(p => p.preferred_side === 'Left')?.ranking ?? -1;
+    const maxRankingRight = sortedPlayers.find(p => p.preferred_side === 'Right')?.ranking ?? -1;
+    const maxRankingBoth = sortedPlayers.find(p => p.preferred_side === 'Both')?.ranking ?? -1;
 
-    const maxRankingLeft = leftPlayersSorted.length > 0 ? leftPlayersSorted[0].ranking : -1;
-    const maxRankingRight = rightPlayersSorted.length > 0 ? rightPlayersSorted[0].ranking : -1;
-    const minRankingAbsolute = allPlayersAscending.length > 0 ? allPlayersAscending[0].ranking : -1;
+    const kingLeftIds: string[] = [];
+    const kingRightIds: string[] = [];
+    const kingBothIds: string[] = [];
+    const lastPlaceLeftIds: string[] = [];
+    const lastPlaceRightIds: string[] = [];
+    const lastPlaceBothIds: string[] = [];
 
-    const kingLeftIds = leftPlayersSorted.filter(p => p.ranking === maxRankingLeft && maxRankingLeft !== -1).map(p => p.id);
-    const kingRightIds = rightPlayersSorted.filter(p => p.ranking === maxRankingRight && maxRankingRight !== -1).map(p => p.id);
-    const lastPlaceLeftIds = allPlayersAscending.filter(p => p.ranking === minRankingAbsolute && minRankingAbsolute !== -1).map(p => p.id);
-    const lastPlaceRightIds = allPlayersAscending.filter(p => p.ranking === minRankingAbsolute && minRankingAbsolute !== -1).map(p => p.id);
+    for (const p of sortedPlayers) {
+        const { id, ranking, preferred_side } = p;
 
-    // Recuperiamo le partite IN PROGRAMMA (pending)
+        if (preferred_side === 'Left' && ranking === maxRankingLeft && maxRankingLeft !== -1) kingLeftIds.push(id);
+        if (preferred_side === 'Right' && ranking === maxRankingRight && maxRankingRight !== -1) kingRightIds.push(id);
+        if (preferred_side === 'Both' && ranking === maxRankingBoth && maxRankingBoth !== -1) kingBothIds.push(id);
+
+        if (ranking === minRankingAbsolute && minRankingAbsolute !== -1) {
+            if (preferred_side === 'Left') lastPlaceLeftIds.push(id);
+            if (preferred_side === 'Right') lastPlaceRightIds.push(id);
+            if (preferred_side === 'Both') lastPlaceBothIds.push(id);
+        }
+    }
+
     const { data: pendingMatches } = await supabase
         .from('matches')
         .select('*')
@@ -156,10 +169,17 @@ export default async function Home({ searchParams }: PageProps) {
                 <div className="flex flex-col gap-2.5 mb-8">
                     {sortedPlayers.map((player, index) => {
                         const rankIndex = index + 1;
-                        const isKingLeft = kingLeftIds.includes(player.id);
-                        const isKingRight = kingRightIds.includes(player.id);
-                        const isLastLeftPlace = lastPlaceLeftIds.includes(player.id);
-                        const isLastRightPlace = lastPlaceRightIds.includes(player.id);
+                        const playerId = player.id;
+
+                        const king = kingLeftIds.includes(playerId) ? 'SX'
+                                : kingRightIds.includes(playerId) ? 'DX'
+                                : kingBothIds.includes(playerId) ? 'DX/SX'
+                                : null;
+
+                        const last = lastPlaceLeftIds.includes(playerId) ? 'SX'
+                                : lastPlaceRightIds.includes(playerId) ? 'DX'
+                                : lastPlaceBothIds.includes(playerId) ? 'DX/SX'
+                                : null;
 
                         return (
                             <Link
@@ -178,9 +198,16 @@ export default async function Home({ searchParams }: PageProps) {
                                     <div className="min-w-0">
                                         <div className="flex items-center gap-1.5 flex-wrap">
                                             <span className="font-bold text-slate-800 text-base truncate">{player.first_name} {player.last_name}</span>
-                                            {isKingLeft && <span className="bg-amber-100 text-amber-800 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shrink-0">King SX</span>}
-                                            {isKingRight && <span className="bg-yellow-100 text-yellow-800 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shrink-0">King DX</span>}
-                                            {(isLastLeftPlace || isLastRightPlace) && <span className="bg-red-100 text-red-800 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shrink-0">Fanalino</span>}
+                                            {king && (
+                                                <span className="bg-yellow-100 text-yellow-800 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shrink-0">
+                                                King {king}
+                                                </span>
+                                            )}
+                                            {last && (
+                                                <span className="bg-red-100 text-red-800 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shrink-0">
+                                                    Fanalino {last}
+                                                </span>
+                                            )}
                                         </div>
 
                                         <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-1 font-medium flex-wrap">
