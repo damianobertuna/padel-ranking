@@ -18,6 +18,8 @@ export interface Match {
     status: string;
     match_type: 'male' | 'female' | 'mixed';
     created_at: string;
+    match_date?: string | null;
+    club_id?: number | null;
 }
 
 export interface MatchWithResult {
@@ -33,4 +35,13 @@ export interface PendingMatchCardProps {
     match: Match;
     rawPlayers: Player[];
     currentUserPlayer: { id: number; role: string } | null;
+}
+
+export interface Club {
+    id: number;
+    name: string;
+    address?: string | null;
+    city?: string | null;
+    maps_url?: string | null;
+    created_at?: string;
 }

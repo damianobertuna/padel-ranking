@@ -3,7 +3,7 @@ import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/re
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CreateMatchForm from './page';
 import { createPendingMatch } from '@/actions/match-actions';
-import { Player } from '@/types';
+import { Player, Club } from '@/types';
 
 // Mock delle dipendenze di navigazione e server actions
 const mockPush = vi.fn();
@@ -24,13 +24,37 @@ const mockPlayers: Player[] = [
     { id: 4, first_name: 'Elena', last_name: 'DonnaDX', ranking: 4.80, preferred_side: 'Right', gender: 'F' },
 ];
 
-// Mock parziale del client Supabase
-const mockSelect = vi.fn().mockImplementation(() => ({
-    order: vi.fn().mockResolvedValue({ data: mockPlayers, error: null })
-}));
+// Finti Club per il nuovo menu a tendina
+const mockClubs: Club[] = [
+    { id: 1, name: 'Padel Club X', city: 'Catania' }
+];
+
+// Mock intelligente del client Supabase per gestire le due chiamate parallele (Players e Clubs)
+const mockFrom = vi.fn((table: string) => {
+    if (table === 'players') {
+        return {
+            select: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: mockPlayers, error: null })
+            })
+        };
+    }
+    if (table === 'clubs') {
+        return {
+            select: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: mockClubs, error: null })
+            })
+        };
+    }
+    return {
+        select: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null })
+        })
+    };
+});
+
 vi.mock('@/lib/supabase/client', () => ({
     createClient: () => ({
-        from: () => ({ select: mockSelect })
+        from: mockFrom
     })
 }));
 
@@ -49,8 +73,9 @@ describe('CreateMatchForm Component', () => {
         render(<CreateMatchForm />);
 
         // Di default il match è "male" (Maschile). La tendina Left deve mostrare solo Marco.
+        // NOTA: selects[0] ora è il Campo da Gioco, i giocatori partono da selects[1]
         await waitFor(() => {
-            const leftSelect = screen.getAllByRole('combobox')[0];
+            const leftSelect = screen.getAllByRole('combobox')[1];
             expect(leftSelect.innerHTML).toContain('Marco UomoSX');
             expect(leftSelect.innerHTML).not.toContain('Giulia DonnaSX');
         });
@@ -61,7 +86,7 @@ describe('CreateMatchForm Component', () => {
 
         // Ora la tendina Left deve contenere Giulia e non Marco
         await waitFor(() => {
-            const leftSelect = screen.getAllByRole('combobox')[0];
+            const leftSelect = screen.getAllByRole('combobox')[1];
             expect(leftSelect.innerHTML).toContain('Giulia DonnaSX');
             expect(leftSelect.innerHTML).not.toContain('Marco UomoSX');
         });
@@ -70,15 +95,16 @@ describe('CreateMatchForm Component', () => {
     it('dovrebbe mostrare un errore visivo in caso di giocatori cloni', async () => {
         render(<CreateMatchForm />);
 
-        // 👈 FISSAATO: Attendiamo che le tendine siano pronte prima di fare modifiche
+        // Attendiamo che le tendine siano pronte prima di fare modifiche
         await screen.findAllByRole('option');
 
         const selects = screen.getAllByRole('combobox');
-        // Selezioniamo lo stesso giocatore (Marco id: 1) sia in Team A Left che in Team B Left
-        fireEvent.change(selects[0], { target: { value: '1' } });
-        fireEvent.change(selects[2], { target: { value: '1' } });
 
-        // 👈 FISSATO: waitFor garantisce che l'effetto useEffect si sia concluso
+        // Selezioniamo lo stesso giocatore (Marco id: 1) sia in Team A Left [1] che in Team B Left [3]
+        fireEvent.change(selects[1], { target: { value: '1' } });
+        fireEvent.change(selects[3], { target: { value: '1' } });
+
+        // waitFor garantisce che l'effetto useEffect si sia concluso
         await waitFor(() => {
             expect(screen.getByText(/Errore: Lo stesso giocatore è stato inserito in più posizioni/i)).toBeDefined();
             const submitBtn = screen.getByRole('button', { name: /Crea Partita/i });
@@ -96,11 +122,12 @@ describe('CreateMatchForm Component', () => {
         fireEvent.click(screen.getByText('🌍 Misto'));
 
         const selects = screen.getAllByRole('combobox');
-        // Inseriamo Giulia (4.45) ed Elena (4.80) -> Divario = 0.35
-        fireEvent.change(selects[0], { target: { value: '3' } });
-        fireEvent.change(selects[1], { target: { value: '4' } });
 
-        // 👈 FISSATO: Aspettiamo l'aggiornamento dinamico dello sbilanciamento tecnico
+        // Inseriamo Giulia (4.45) in Team A SX [1] ed Elena (4.80) in Team A DX [2] -> Divario = 0.35
+        fireEvent.change(selects[1], { target: { value: '3' } });
+        fireEvent.change(selects[2], { target: { value: '4' } });
+
+        // Aspettiamo l'aggiornamento dinamico dello sbilanciamento tecnico
         await waitFor(() => {
             expect(screen.getByText(/Attenzione: La differenza di livello supera il limite di 0.25/i)).toBeDefined();
             const submitBtn = screen.getByRole('button', { name: /Crea Partita/i });
@@ -115,11 +142,12 @@ describe('CreateMatchForm Component', () => {
         await screen.findAllByRole('option');
 
         const selects = screen.getAllByRole('combobox');
-        // Configurazione valida: Marco (4.50) e Luca (4.55) -> Divario = 0.05
-        fireEvent.change(selects[0], { target: { value: '1' } });
-        fireEvent.change(selects[1], { target: { value: '2' } });
 
-        // 👈 FISSATO: Attendiamo che il bottone di sottomissione si sblocchi stabilmente
+        // Configurazione valida: Marco (4.50) in [1] e Luca (4.55) in [2] -> Divario = 0.05
+        fireEvent.change(selects[1], { target: { value: '1' } });
+        fireEvent.change(selects[2], { target: { value: '2' } });
+
+        // Attendiamo che il bottone di sottomissione si sblocchi stabilmente
         await waitFor(() => {
             const submitBtn = screen.getByRole('button', { name: /Crea Partita/i });
             expect(submitBtn.hasAttribute('disabled')).toBe(false);
@@ -134,7 +162,8 @@ describe('CreateMatchForm Component', () => {
                 teamALeft: 1,
                 teamARight: 2,
                 teamBLeft: null,
-                teamBRight: null
+                teamBRight: null,
+                clubId: null // Non avendo toccato il campo [0], invia null come previsto
             }));
             expect(mockPush).toHaveBeenCalledWith('/');
         });

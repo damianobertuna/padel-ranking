@@ -40,6 +40,9 @@ export default async function Home({ searchParams }: PageProps) {
     const { data: playersStatsData } = await supabase.from('view_player_stats').select('*');
     const playersWithStats = playersStatsData || [];
 
+    const { data: clubsData } = await supabase.from('clubs').select('*');
+    const clubsList = clubsData || [];
+
     // 👑 Calcolo dei titoli ASSOLUTI (eseguito sull'anagrafica completa prima del filtro visivo)
     const {
         kingLeftIds,
@@ -292,6 +295,7 @@ export default async function Home({ searchParams }: PageProps) {
                                 match={match}
                                 rawPlayers={playersWithStats || []}
                                 currentUserPlayer={currentUserPlayer}
+                                clubs={clubsList}
                             />
                         ))
                     ) : (
@@ -310,6 +314,7 @@ export default async function Home({ searchParams }: PageProps) {
                         completedMatches.map((match) => {
                             const winner = match.winning_team;
                             const sets = (match.score || []) as Array<{team_a: number, team_b: number}>;
+                            const matchClub = clubsList.find(c => c.id === match.club_id);
 
                             return (
                                 <div key={match.id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-3">
@@ -331,8 +336,31 @@ export default async function Home({ searchParams }: PageProps) {
                                             <div className="text-sm text-slate-800 truncate w-full text-center sm:text-right">{getPlayerNameWithRanking(match.team_b_right_id, playersWithStats)}</div>
                                         </div>
                                     </div>
-                                    <div className="text-[10px] text-slate-400 text-center sm:text-left font-medium border-t border-slate-50 pt-2">Disputata il {new Date(match.updated_at).toLocaleDateString('it-IT')}</div>
-                                </div>
+                                    {/* FOOTER DELLA CARD: Data e Location */}
+                                    <div className="text-[10px] text-slate-400 text-center sm:text-left font-medium border-t border-slate-50 pt-2 flex flex-col sm:flex-row sm:justify-between items-center gap-2">
+                                        <span>Disputata il {new Date(match.updated_at).toLocaleDateString('it-IT')}</span>
+
+                                        {/* 👈 RENDER DEL CLUB E LINK MAPS */}
+                                        {matchClub && (
+                                            <span className="inline-flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded border border-slate-100 text-slate-500">
+                                                <span>📍</span>
+                                                {matchClub.maps_url ? (
+                                                    <a
+                                                        href={matchClub.maps_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-indigo-600 hover:underline font-bold transition-colors"
+                                                    >
+                                                        {matchClub.name} {matchClub.city ? `(${matchClub.city})` : ''}
+                                                    </a>
+                                                ) : (
+                                                    <span className="font-bold text-slate-600">
+                                                        {matchClub.name} {matchClub.city ? `(${matchClub.city})` : ''}
+                                                    </span>
+                                                )}
+                                            </span>
+                                        )}
+                                    </div>                                </div>
                             );
                         })
                     ) : (

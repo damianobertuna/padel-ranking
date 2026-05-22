@@ -4,20 +4,24 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { createPendingMatch as createMatch } from '@/actions/match-actions';
 import { useRouter } from 'next/navigation';
-import { Player } from '@/types';
+import { Player, Club } from '@/types';
 import BackToHomeButton from "@/components/BackToHomeButton";
 
 export default function CreateMatchForm() {
     const supabase = createClient();
     const router = useRouter();
 
-    // Stati per i giocatori selezionati nelle tendine (stringhe provenienti dai tag <select>)
+    // Stati per i dati scaricati dal DB
     const [players, setPlayers] = useState<Player[]>([]);
+    const [clubs, setClubs] = useState<Club[]>([]);
+
+    // Stati per i form e le selezioni
     const [teamALeft, setTeamALeft] = useState<number | ''>('');
     const [teamARight, setTeamARight] = useState<number | ''>('');
     const [teamBLeft, setTeamBLeft] = useState<number | ''>('');
     const [teamBRight, setTeamBRight] = useState<number | ''>('');
     const [matchType, setMatchType] = useState<'male' | 'female' | 'mixed'>('male');
+    const [clubId, setClubId] = useState<number | ''>('');
 
     // Stato per la gestione di data e ora del match
     const [matchDate, setMatchDate] = useState<string>(() => {
@@ -32,42 +36,42 @@ export default function CreateMatchForm() {
     const [loading, setLoading] = useState<boolean>(false);
     const [submitError, setSubmitError] = useState<string>('');
 
-    // Caricamento iniziale dell'anagrafica giocatori da Supabase
+    // Caricamento iniziale in parallelo di anagrafica giocatori e club
     useEffect(() => {
-        async function loadPlayers() {
+        async function loadData() {
             try {
-                const { data, error } = await supabase
-                    .from('players')
-                    .select('id, first_name, last_name, ranking, preferred_side, gender')
-                    .order('first_name', { ascending: true });
+                const [playersRes, clubsRes] = await Promise.all([
+                    supabase.from('players').select('id, first_name, last_name, ranking, preferred_side, gender').order('first_name', { ascending: true }),
+                    supabase.from('clubs').select('*').order('name', { ascending: true })
+                ]);
 
-                if (error) {
-                    console.error("❌ Errore Supabase:", error.message);
-                    setSubmitError(`Impossibile caricare i giocatori: ${error.message}`);
+                if (playersRes.error) {
+                    console.error("❌ Errore Supabase Giocatori:", playersRes.error.message);
+                    setSubmitError(`Impossibile caricare i giocatori: ${playersRes.error.message}`);
                     return;
                 }
-                if (data) setPlayers(data);
+
+                if (playersRes.data) setPlayers(playersRes.data);
+                if (clubsRes.data) setClubs(clubsRes.data);
+
             } catch (err) {
                 console.error("💥 Errore imprevisto:", err);
             }
         }
-        loadPlayers();
+        loadData();
     }, [supabase]);
 
     // EFFETTO DI VALIDAZIONE DINAMICA: Controlla cloni e divario tecnico (< 0.25)
     useEffect(() => {
-        // 1. Convertiamo in numero SOLO gli slot effettivamente compilati (evitando NaN)
         const selectedIds = [teamALeft, teamARight, teamBLeft, teamBRight]
             .filter((val): val is number => typeof val === 'number');
 
-        // --- CONTROLLO 1: ALMENO UN GIOCATORE ---
         if (selectedIds.length === 0) {
             setLevelError(false);
             setDuplicateError(false);
             return;
         }
 
-        // --- CONTROLLO 2: GIOCATORI DUPLICATI (BANNER ROSSO) ---
         const hasDuplicates = new Set(selectedIds).size !== selectedIds.length;
         setDuplicateError(hasDuplicates);
 
@@ -76,13 +80,11 @@ export default function CreateMatchForm() {
             return;
         }
 
-        // --- CONTROLLO 3: TOLLERANZA LIVELLO MASSIMO (BANNER ARANCIONE) ---
         if (selectedIds.length < 2) {
             setLevelError(false);
             return;
         }
 
-        // Adesso confrontiamo i numeri puri in modo sicuro (number === number)
         const selectedRankings = selectedIds
             .map(id => players.find(p => p.id === id)?.ranking)
             .filter((ranking): ranking is number => ranking !== undefined);
@@ -113,6 +115,7 @@ export default function CreateMatchForm() {
         if (matchType === 'female') return isCorrectSide && p.gender === 'F';
         return isCorrectSide;
     });
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (levelError || duplicateError) return;
@@ -121,7 +124,6 @@ export default function CreateMatchForm() {
         setSubmitError('');
 
         try {
-            // Inviamo i numeri interi puliti al server action (oppure null se lasciati vuoti)
             await createMatch({
                 matchDate: matchDate,
                 matchType: matchType,
@@ -129,6 +131,7 @@ export default function CreateMatchForm() {
                 teamARight: teamARight || null,
                 teamBLeft: teamBLeft || null,
                 teamBRight: teamBRight || null,
+                clubId: clubId || null
             });
 
             router.push('/');
@@ -158,21 +161,41 @@ export default function CreateMatchForm() {
 
                 <form onSubmit={handleSubmit} className="space-y-6">
 
-                    {/* SELEZIONE DATA E ORA MATCH */}
-                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                            Data e Ora della Partita
-                        </label>
-                        <input
-                            type="datetime-local"
-                            required
-                            value={matchDate}
-                            onChange={e => setMatchDate(e.target.value)}
-                            className="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-medium text-sm text-slate-800 focus:outline-none focus:border-indigo-500"
-                        />
+                    {/* SELEZIONE DATA/ORA E CAMPO DA GIOCO */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                                Data e Ora
+                            </label>
+                            <input
+                                type="datetime-local"
+                                required
+                                value={matchDate}
+                                onChange={e => setMatchDate(e.target.value)}
+                                className="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-medium text-sm text-slate-800 focus:outline-none focus:border-indigo-500"
+                            />
+                        </div>
+
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                                Campo da Gioco (Opzionale)
+                            </label>
+                            <select
+                                value={clubId}
+                                onChange={e => setClubId(e.target.value ? parseInt(e.target.value, 10) : '')}
+                                className="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-medium text-sm text-slate-800 focus:outline-none focus:border-indigo-500"
+                            >
+                                <option value="">📍 Non definito</option>
+                                {clubs.map(club => (
+                                    <option key={club.id} value={club.id}>
+                                        {club.name} {club.city ? `(${club.city})` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
 
-                    {/* 👈 NUOVO: SELETTORE TIPOLOGIA MATCH */}
+                    {/* SELETTORE TIPOLOGIA MATCH */}
                     <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                         <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
                             Categoria Partita
@@ -186,7 +209,6 @@ export default function CreateMatchForm() {
                                         type="button"
                                         onClick={() => {
                                             setMatchType(type);
-                                            // Reset preventivo: svuotiamo i campi per non lasciare un uomo intrappolato in un match appena diventato femminile
                                             setTeamALeft(''); setTeamARight(''); setTeamBLeft(''); setTeamBRight('');
                                         }}
                                         className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase transition-all border shadow-sm active:scale-95 ${

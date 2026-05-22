@@ -6,15 +6,20 @@ import { canUserResolveMatch } from '@/lib/matchRules';
 import DeleteMatchButton from '@/components/DeleteMatchButton';
 import ResolveMatchButton from '@/components/ResolveMatchButton';
 import { useRouter } from "next/navigation";
-import { Match, PendingMatchCardProps } from '@/types';
+import { Match, PendingMatchCardProps, Club } from '@/types'; // 👈 Aggiunto il tipo Club
 
 export default function PendingMatchCard({
                                              match,
                                              rawPlayers,
-                                             currentUserPlayer
-                                         }: PendingMatchCardProps) {
+                                             currentUserPlayer,
+                                             clubs // 👈 Riceviamo la lista dei club da page.tsx
+                                         }: PendingMatchCardProps & { clubs?: Club[] }) { // 👈 Estensione del tipo per supportare il nuovo parametro
+
     const [isJoining, setIsJoining] = useState(false);
     const router = useRouter();
+
+    // 👈 Cerchiamo il club corrispondente per questa partita
+    const matchClub = clubs?.find(c => c.id === match.club_id);
 
     const generaLinkWhatsAppLocal = (m: Match) => {
         const getPlayerObj = (id: number | null) => rawPlayers.find(player => player.id === id) || null;
@@ -22,11 +27,16 @@ export default function PendingMatchCard({
         const pA1 = getPlayerObj(m.team_a_left_id); const pA2 = getPlayerObj(m.team_a_right_id);
         const pB1 = getPlayerObj(m.team_b_left_id); const pB2 = getPlayerObj(m.team_b_right_id);
 
-        const dataFormattata = new Date(m.created_at).toLocaleString('it-IT', {
+        // 👈 Usiamo la data prefissata per il match, se manca usiamo quella di creazione
+        const dataFormattata = new Date(m.match_date || m.created_at).toLocaleString('it-IT', {
             day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
         });
 
-        const testo = `🎾 *RanKING Padel - Convocazione Match* 🎾\n\n📅 *Data d'organizzazione:* ${dataFormattata}\n\n👥 *SQUADRA A:*\n• ${pA1 ? `${pA1.first_name} ${pA1.last_name}` : 'Slot Libero'} (${pA1 ? pA1.ranking.toFixed(2) : '0.00'})\n• ${pA2 ? `${pA2.first_name} ${pA2.last_name}` : 'Slot Libero'} (${pA2 ? pA2.ranking.toFixed(2) : '0.00'})\n\n👥 *SQUADRA B:*\n• ${pB1 ? `${pB1.first_name} ${pB1.last_name}` : 'Slot Libero'} (${pB1 ? pB1.ranking.toFixed(2) : '0.00'})\n• ${pB2 ? `${pB2.first_name} ${pB2.last_name}` : 'Slot Libero'} (${pB2 ? pB2.ranking.toFixed(2) : '0.00'})\n\n👉 Accedi all'app per completare la formazione o aggiungere il risultato!`;
+        // 👈 Recuperiamo il nome del campo per il messaggio testuale
+        const clubText = matchClub ? `${matchClub.name}${matchClub.city ? ` (${matchClub.city})` : ''}` : 'Da definire';
+
+        const testo = `🎾 *RanKING Padel - Convocazione Match* 🎾\n\n📅 *Data:* ${dataFormattata}\n📍 *Campo:* ${clubText}\n\n👥 *SQUADRA A:*\n• ${pA1 ? `${pA1.first_name} ${pA1.last_name}` : 'Slot Libero'} (${pA1 ? pA1.ranking.toFixed(2) : '0.00'})\n• ${pA2 ? `${pA2.first_name} ${pA2.last_name}` : 'Slot Libero'} (${pA2 ? pA2.ranking.toFixed(2) : '0.00'})\n\n👥 *SQUADRA B:*\n• ${pB1 ? `${pB1.first_name} ${pB1.last_name}` : 'Slot Libero'} (${pB1 ? pB1.ranking.toFixed(2) : '0.00'})\n• ${pB2 ? `${pB2.first_name} ${pB2.last_name}` : 'Slot Libero'} (${pB2 ? pB2.ranking.toFixed(2) : '0.00'})\n\n👉 Accedi all'app per completare la formazione o aggiungere il risultato!`;
+
         return `https://wa.me/?text=${encodeURIComponent(testo)}`;
     };
 
@@ -41,11 +51,11 @@ export default function PendingMatchCard({
                 </div>
             );
         }
+
         const p = rawPlayers.find(player => player.id === id);
         return (
             <div className="text-sm font-bold text-slate-800 truncate py-0.5 flex items-center justify-center gap-1">
                 <span>{p ? `${p.first_name} ${p.last_name}` : 'Sconosciuto'}</span>
-                {/* 👈 RISOLTO: Aggiunto il badge del ranking visibile a FE */}
                 {p && (
                     <span className="text-[10px] font-mono font-bold text-indigo-600 bg-indigo-50 px-1 rounded">
                         {p.ranking.toFixed(2)}
@@ -68,7 +78,8 @@ export default function PendingMatchCard({
     return (
         <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between gap-4 transition-all hover:border-slate-300">
             <div>
-                <div className="flex justify-between items-center mb-3">
+                {/* Intestazione della Card */}
+                <div className="flex justify-between items-center mb-4">
                     <span className="text-[10px] font-mono text-slate-400">ID: #{match.id.slice(0, 8)}</span>
                     {isMatchComplete ? (
                         <span className="text-[10px] font-black bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full uppercase tracking-wider">Match Pronto</span>
@@ -77,6 +88,35 @@ export default function PendingMatchCard({
                     )}
                 </div>
 
+                {/* 👈 NUOVO BLOCCO INFO: DATA E CAMPO DA GIOCO */}
+                {(match.match_date || matchClub) && (
+                    <div className="flex flex-col gap-1.5 mb-4 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                        {match.match_date && (
+                            <div className="flex items-center gap-2">
+                                <span className="shrink-0 text-sm">📅</span>
+                                <span className="font-semibold text-slate-700 tracking-tight">
+                                    {new Date(match.match_date).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                            </div>
+                        )}
+                        {matchClub && (
+                            <div className="flex items-center gap-2">
+                                <span className="shrink-0 text-sm">📍</span>
+                                {matchClub.maps_url ? (
+                                    <a href={matchClub.maps_url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-700 hover:underline font-semibold truncate transition-colors">
+                                        {matchClub.name} {matchClub.city ? `(${matchClub.city})` : ''}
+                                    </a>
+                                ) : (
+                                    <span className="font-semibold text-slate-700 truncate">
+                                        {matchClub.name} {matchClub.city ? `(${matchClub.city})` : ''}
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Griglia delle Squadre */}
                 <div className="grid grid-cols-2 gap-3 text-center">
                     <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-100 flex flex-col justify-center space-y-1">
                         <div className="text-[9px] font-black text-blue-600 uppercase tracking-wider mb-1">Coppia A</div>
@@ -91,7 +131,7 @@ export default function PendingMatchCard({
                 </div>
             </div>
 
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 mt-2">
                 <a href={generaLinkWhatsAppLocal(match)} target="_blank" rel="noopener noreferrer" className="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl text-sm transition-colors shadow-sm">
                     <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397 0 11.948 0c3.173.001 6.154 1.24 8.396 3.486 2.242 2.246 3.479 5.23 3.477 8.406-.003 6.557-5.338 11.907-11.89 11.907-2.013-.001-3.99-.51-5.741-1.48L0 24zm6.59-4.846c1.66.986 3.288 1.447 4.805 1.448 5.41-.001 9.814-4.415 9.816-9.83.001-2.624-1.012-5.09-2.856-6.937C16.569 1.988 14.09 1.05 11.47 1.05c-5.416 0-9.821 4.415-9.824 9.83-.001 2.05.534 3.513 1.41 5.03L2.025 21.93l6.222-1.63z" /></svg>
                     Convoca su WhatsApp
@@ -104,7 +144,7 @@ export default function PendingMatchCard({
                         <button
                             onClick={() => {
                                 setIsJoining(true);
-                                router.push(`\/match/${match.id}/join`);
+                                router.push(`/match/${match.id}/join`);
                             }}
                             disabled={isJoining}
                             className="flex-1 text-center bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-sm font-bold py-2.5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
@@ -124,7 +164,6 @@ export default function PendingMatchCard({
                     )}
 
                     {(currentUserPlayer?.role === 'admin' || canResolve) && (
-                        /* 👈 RISOLTO: Rimosso parseInt, ora viene inoltrata la stringa UUID pulita */
                         <DeleteMatchButton matchId={match.id} />
                     )}
                 </div>

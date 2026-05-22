@@ -107,6 +107,7 @@ export async function createPendingMatch(data: {
     teamARight: number | null;
     teamBLeft: number | null;
     teamBRight: number | null;
+    clubId?: number | null;
 }) {
     const supabase = await createClient();
 
@@ -133,6 +134,7 @@ export async function createPendingMatch(data: {
                 team_a_right_id: data.teamARight,
                 team_b_left_id: data.teamBLeft,
                 team_b_right_id: data.teamBRight,
+                club_id: data.clubId || null,
                 status: 'pending'
             }
         ]);
