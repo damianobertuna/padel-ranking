@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
+import BackToHomeButton from "@/components/BackToHomeButton";
 
 export const revalidate = 0;
 
@@ -35,9 +36,9 @@ export default async function AdminLogsPage({ searchParams }: PageProps) {
             <div className="max-w-4xl w-full">
 
                 {/* Pulsante Torna Indietro */}
-                <Link href="/" className="text-sm font-semibold text-indigo-600 hover:underline mb-6 inline-block">
-                    ← Torna alla Classifica
-                </Link>
+                <div className="mb-6">
+                    <BackToHomeButton />
+                </div>
 
                 {/* Intestazione Pagina */}
                 <div className="flex justify-between items-baseline mb-6">
