@@ -144,6 +144,7 @@ export default function ResolveMatch() {
             <div className="mb-4">
                 <BackToHomeButton />
             </div>
+
             <div className="max-w-md w-full bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-slate-200">
                 <h1 className="text-xl font-black text-slate-800 text-center tracking-tight">Referto Gara</h1>
                 <p className="text-xs text-slate-400 text-center mb-6 mt-1">Inserisci i punteggi reali per convalidare il match.</p>
