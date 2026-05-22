@@ -4,7 +4,8 @@ import WinRateWidget from '@/components/WinRateWidget';
 import StreakWidget from '@/components/StreakWidget';
 import PartnersAndNemesisWidget from '@/components/PartnersAndNemesisWidget';
 import GameAverageWidget from '@/components/GameAverageWidget';
-import AvatarUpload from '@/components/AvatarUpload'; // 👈 NUOVO: Importiamo il componente
+import AvatarUpload from '@/components/AvatarUpload';
+import BackToHomeButton from "@/components/BackToHomeButton";
 
 export const revalidate = 0;
 
@@ -35,7 +36,7 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
         return (
             <main className="min-h-screen p-8 bg-slate-100 flex flex-col items-center justify-center">
                 <p className="text-rose-600 font-bold mb-4">Giocatore non trovato.</p>
-                <Link href="/" className="text-indigo-600 underline">Torna alla classifica</Link>
+                <BackToHomeButton />
             </main>
         );
     }
@@ -123,17 +124,10 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
     return (
         <main className="min-h-screen p-4 sm:p-8 bg-slate-100 flex flex-col items-center">
             <div className="max-w-5xl w-full">
+                <div className="mb-6">
+                    <BackToHomeButton />
+                </div>
 
-                {/* Torna indietro */}
-                <Link
-                    href="/"
-                    className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-500 hover:text-indigo-600 bg-slate-200/50 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-all active:scale-95 mb-6"
-                >
-                    <span className="text-[10px]">←</span>
-                    <span>Torna alla Classifica</span>
-                </Link>
-
-                {/* 👈 AGGIORNATO: INTESTAZIONE PROFILO CON AVATAR UPLOAD */}
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-col sm:flex-row justify-between items-center gap-6">
 
                     <div className="flex flex-col sm:flex-row items-center gap-6 w-full">

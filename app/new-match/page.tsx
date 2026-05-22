@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { createPendingMatch as createMatch } from '@/actions/match-actions';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { Player } from '@/types';
+import BackToHomeButton from "@/components/BackToHomeButton";
 
 export default function CreateMatchForm() {
     const supabase = createClient();
@@ -145,9 +145,7 @@ export default function CreateMatchForm() {
             <div className="w-full max-w-2xl bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
 
                 <div className="mb-4">
-                    <Link href="/" className="text-xs font-bold text-indigo-600 hover:underline">
-                        ← Torna alla Classifica
-                    </Link>
+                    <BackToHomeButton />
                 </div>
 
                 <h1 className="text-xl font-black text-slate-800 mb-6">Nuova Partita</h1>

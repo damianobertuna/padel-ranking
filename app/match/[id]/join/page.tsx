@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { updateMatchPlayers } from '@/actions/match-actions';
-import Link from 'next/link';
+import BackToHomeButton from "@/components/BackToHomeButton";
 import { Player, Match } from '@/types';
 
 export default function JoinMatchPage() {
@@ -205,7 +205,7 @@ export default function JoinMatchPage() {
             <div className="max-w-2xl w-full bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-slate-200">
 
                 <div className="mb-4">
-                    <Link href="/" className="text-xs font-bold text-indigo-600 hover:underline">← Torna alla Classifica</Link>
+                    <BackToHomeButton />
                 </div>
 
                 <div className="flex justify-between items-start mb-6">

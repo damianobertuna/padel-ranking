@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import BackToHomeButton from "@/components/BackToHomeButton";
 
 export default function RegulationsPage() {
     return (
@@ -9,9 +9,7 @@ export default function RegulationsPage() {
 
                 {/* BACK LINK */}
                 <div className="mb-6">
-                    <Link href="/" className="text-xs font-bold text-indigo-600 hover:underline">
-                        ← Torna alla Classifica
-                    </Link>
+                    <BackToHomeButton />
                 </div>
 
                 {/* HEADER */}

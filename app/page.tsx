@@ -192,7 +192,7 @@ export default async function Home({ searchParams }: PageProps) {
                                 <Link
                                     key={player.id}
                                     href={`/player/${player.id}`}
-                                    className="w-full bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between transition-all active:bg-slate-50 active:scale-[0.99] touch-manipulation"
+                                    className="group w-full bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between transition-all active:bg-slate-50 active:scale-[0.99] touch-manipulation"
                                 >
                                     <div className="flex items-center gap-3 min-w-0">
                                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black font-mono shrink-0 ${
@@ -203,7 +203,7 @@ export default async function Home({ searchParams }: PageProps) {
                                         }`}>{rankIndex}°</div>
 
 
-                                        <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
+                                        <div className="group w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
                                             {player.avatar_url ? (
                                                 <img
                                                     src={player.avatar_url}
@@ -252,6 +252,12 @@ export default async function Home({ searchParams }: PageProps) {
                                             <span className="text-[9px] text-slate-400 uppercase tracking-tight font-bold">
                                                 {currentSort === 'played' ? 'Partite' : currentSort === 'winrate' ? 'Rate' : 'Punti'}
                                             </span>
+                                        </div>
+
+                                        <div className="flex items-center justify-center w-7 h-7 rounded-full bg-slate-100 text-slate-400 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors flex-shrink-0 ml-2">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                            </svg>
                                         </div>
                                     </div>
                                 </Link>

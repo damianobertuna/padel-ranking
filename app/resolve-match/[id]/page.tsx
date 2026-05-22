@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation'; // 👈 Aggiunto useRout
 import { calculateRankingUpdates, MatchContext } from '@/lib/matchRules';
 import { resolveMatchWithRanking } from '@/actions/match-actions';
 import { Player, Match } from '@/types';
+import BackToHomeButton from "@/components/BackToHomeButton";
 
 export default function ResolveMatch() {
     const supabase = createClient();
@@ -140,6 +141,9 @@ export default function ResolveMatch() {
 
     return (
         <main className="min-h-screen p-4 sm:p-8 bg-slate-100 flex flex-col items-center justify-center">
+            <div className="mb-4">
+                <BackToHomeButton />
+            </div>
             <div className="max-w-md w-full bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-slate-200">
                 <h1 className="text-xl font-black text-slate-800 text-center tracking-tight">Referto Gara</h1>
                 <p className="text-xs text-slate-400 text-center mb-6 mt-1">Inserisci i punteggi reali per convalidare il match.</p>

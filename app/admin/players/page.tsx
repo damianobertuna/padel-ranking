@@ -2,7 +2,8 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { updatePlayerByAdmin } from '../../../actions/player-actions';
-import { SubmitButton } from './SubmitButton'; // 👈 Importiamo il pulsante intelligente
+import { SubmitButton } from './SubmitButton';
+import BackToHomeButton from "@/components/BackToHomeButton"; // 👈 Importiamo il pulsante intelligente
 
 export const revalidate = 0; // Evita cache aggressiva
 
@@ -40,13 +41,7 @@ export default async function AdminPlayersManagement() {
 
                 <div className="flex justify-between items-center mb-6">
                     <div>
-                        <Link
-                            href="/"
-                            className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-500 hover:text-indigo-600 bg-slate-200/50 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-all active:scale-95"
-                        >
-                            <i className="fa-solid fa-chevron-left text-[10px]"></i>
-                            Torna alla Classifica
-                        </Link>
+                        <BackToHomeButton />
                         <h1 className="text-3xl font-bold text-slate-800 mt-2">Gestione Giocatori (Admin)</h1>
                     </div>
                 </div>
