@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from "@/lib/supabase/server";
+import { logAction } from "@/lib/audit";
 
 export async function logUserLogin(userId: string) {
     try {
@@ -27,15 +28,15 @@ export async function logUserLogin(userId: string) {
             : `Il giocatore ${operatore} ha effettuato l'accesso alla bacheca.`;
 
         // 2. Scrittura nel registro delle attività
-        await supabase.from('audit_logs').insert([
+        await logAction(
+            'USER_LOGIN',
+            userId, // entity_id
+            `Accesso effettuato: ${operatore}`,
             {
-                admin_id: userId,
-                admin_name: operatore,
-                action_type: 'USER_LOGIN',
-                target_player_id: null,
-                details: logDescription
+                user_id: userId,
+                method: 'email_password'
             }
-        ]);
+        );
 
         console.log(`✅ Log di login registrato per: ${operatore}`);
 

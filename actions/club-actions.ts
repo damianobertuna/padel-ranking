@@ -3,6 +3,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { logAction } from "@/lib/audit";
 
 /**
  * CREAZIONE DI UN NUOVO CLUB/CAMPO
@@ -43,27 +44,27 @@ export async function createClub(formData: FormData) {
     }
 
     // 2. Inserimento nel database
-    const { error: insertError } = await supabase
+    const { data: club, error: insertError } = await supabase
         .from('clubs')
         .insert([{
             name: clubName.trim(),
             address: clubAddress?.trim() || null,
             city: clubCity?.trim() || null,
             maps_url: generatedMapsUrl
-        }]);
+        }])
+        .select('id')
+        .single();
 
     if (insertError) {
         return { error: `Errore durante il salvataggio: ${insertError.message}` };
     }
 
-    // 3. Scrittura nell'Audit Log
-    const operatore = `${adminPlayer.first_name} ${adminPlayer.last_name}`;
-    await supabase.from('audit_logs').insert([{
-        admin_id: user.id,
-        admin_name: operatore,
-        action_type: 'CLUB_CREATED',
-        details: `L'admin ${operatore} ha aggiunto un nuovo circolo: ${clubName.trim()}`
-    }]);
+    await logAction(
+        'CLUB_CREATED',
+        club.id,
+        `Creato circolo: ${clubName}`,
+        { name: clubName, city: clubCity }
+    );
 
     revalidatePath('/admin/clubs');
     revalidatePath('/new-match'); // Invalida la cache del form match per mostrare subito il nuovo club
@@ -101,13 +102,15 @@ export async function deleteClub(clubId: number) {
 
     // 3. Scrittura nell'Audit Log
     if (clubToDel) {
-        const operatore = `${adminPlayer.first_name} ${adminPlayer.last_name}`;
-        await supabase.from('audit_logs').insert([{
-            admin_id: user.id,
-            admin_name: operatore,
-            action_type: 'CLUB_DELETED',
-            details: `L'admin ${operatore} ha rimosso il circolo: ${clubToDel.name}`
-        }]);
+        await logAction(
+            'CLUB_DELETED',
+            clubId,
+            `Circolo eliminato: ${clubToDel.name}`,
+            {
+                club_name: clubToDel.name,
+                action: 'deletion'
+            }
+        );
     }
 
     revalidatePath('/admin/clubs');

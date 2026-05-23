@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { logAction } from "@/lib/audit";
 
 // Interfaccia per la struttura del set
 export interface SetScore {
@@ -70,16 +71,19 @@ export async function deletePendingMatch(matchId: string) {
         ? `L'admin ${operatore} ha annullato la partita in programma: ${dettagliMatch}`
         : `Il giocatore ${operatore} ha annullato la propria partita in programma: ${dettagliMatch}`;
 
-    // Scrittura nel registro delle attività (Audit Log)
-    const { error: logError } = await supabase.from('audit_logs').insert([
+    const { error: logError } = await logAction(
+        'MATCH_DELETED',
+        matchId,
+        logDescription,
         {
-            admin_id: user.id,
-            admin_name: operatore,
-            action_type: 'MATCH_DELETED',
-            target_player_id: null,
-            details: logDescription
+            reason: 'Manuale',
+            match_id: matchId,
+            teams: {
+                teamA: [match.team_a_left_id, match.team_a_right_id],
+                teamB: [match.team_b_left_id, match.team_b_right_id]
+            }
         }
-    ]);
+    );
 
     if (logError) {
         console.error("❌ ERRORE CRITICO SCRITTURA AUDIT LOG CANCELLAZIONE:", logError.message);
@@ -124,7 +128,7 @@ export async function createPendingMatch(data: {
     if (!currentUserPlayer) throw new Error("Profilo giocatore non trovato");
 
     // Inseriamo il match in stato pending
-    const { error: matchError } = await supabase
+    const { data: matchId, error: matchError } = await supabase
         .from('matches')
         .insert([
             {
@@ -137,7 +141,9 @@ export async function createPendingMatch(data: {
                 club_id: data.clubId || null,
                 status: 'pending'
             }
-        ]);
+        ])
+        .select('id')
+        .single();
 
     if (matchError) throw new Error(`Errore database: ${matchError.message}`);
 
@@ -158,19 +164,24 @@ export async function createPendingMatch(data: {
     const operatore = `${currentUserPlayer.first_name} ${currentUserPlayer.last_name}`;
 
     const logDescription = currentUserPlayer.role === 'admin'
-        ? `L'admin ${operatore} ha creato una nuova partita in programma: ${dettagliMatch}`
-        : `Il giocatore ${operatore} ha organizzato una nuova partita in programma: ${dettagliMatch}`;
+        ? `L'admin ${operatore} ha creato una nuova partita in programma: ${dettagliMatch} - ${data.matchType} - ${data.matchDate}`
+        : `Il giocatore ${operatore} ha organizzato una nuova partita in programma: ${dettagliMatch} - ${data.matchType} - ${data.matchDate}`;
 
     // Scrittura Audit Log
-    const { error: logError } = await supabase.from('audit_logs').insert([
+    const { error: logError } = await logAction(
+        'MATCH_CREATED',
+        matchId.id,
+        logDescription,
         {
-            admin_id: user.id,
-            admin_name: operatore,
-            action_type: 'MATCH_CREATED',
-            target_player_id: null,
-            details: logDescription
+            match_type: data.matchType,
+            match_date: data.matchDate,
+            club_id: data.clubId,
+            teams: {
+                teamA: [data.teamALeft, data.teamARight],
+                teamB: [data.teamBLeft, data.teamBRight]
+            }
         }
-    ]);
+    );
 
     if (logError) console.error("❌ ERRORE LOG CREAZIONE MATCH:", logError.message);
 
@@ -281,15 +292,33 @@ export async function resolveMatchWithRanking(data: {
         const operatore = `${currentUserPlayer.first_name} ${currentUserPlayer.last_name}`;
         const logDetails = `L'operatore ${operatore} ha registrato il risultato: ${esitoDescrizione} [${stringaPunteggio}]`;
 
-        const { error: logError } = await supabase.from('audit_logs').insert([
+        const { error: logError } = await logAction(
+            'MATCH_RESOLVED',
+            data.matchId,
+            logDetails,
             {
-                admin_id: user.id,
-                admin_name: operatore,
-                action_type: 'MATCH_RESOLVED',
-                target_player_id: null,
-                details: logDetails
+                winning_team: finalWinningTeam,
+                score: stringaPunteggio,
+                is_completed: true,
+                teams: {
+                    team_a: {
+                        left_player_id: match.team_a_left_id,
+                        right_player_id: match.team_a_right_id
+                    },
+                    team_b: {
+                        left_player_id: match.team_b_left_id,
+                        right_player_id: match.team_b_right_id
+                    }
+                },
+                player_names: {
+                    team_a_left: getName(match.team_a_left_id),
+                    team_a_right: getName(match.team_a_right_id),
+                    team_b_left: getName(match.team_b_left_id),
+                    team_b_right: getName(match.team_b_right_id),
+                },
+                resolved_at: new Date().toISOString()
             }
-        ]);
+        );
 
         if (logError) console.error("❌ ERRORE SCRITTURA LOG RISOLUZIONE MATCH:", logError.message);
 
