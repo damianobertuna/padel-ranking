@@ -341,16 +341,56 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
     team_a_right_id?: number | null;
     team_b_left_id?: number | null;
     team_b_right_id?: number | null;
+    match_type?: 'male' | 'female' | 'mixed';
 }) {
     const supabase = await createClient();
 
+    // 1. Recuperiamo il match attuale (per il confronto nel log)
+    const { data: oldMatch } = await supabase
+        .from('matches')
+        .select('*')
+        .eq('id', matchId)
+        .single();
+
+    if (!oldMatch) throw new Error("Match non trovato");
+
+    // 2. Eseguiamo l'update
     const { error } = await supabase
         .from('matches')
         .update(updatedFields)
-        .eq('id', matchId); // 👈 Stringa UUID nativa
+        .eq('id', matchId);
 
-    if (error) {
-        throw new Error(`Impossibile aggiornare la formazione: ${error.message}`);
+    if (error) throw new Error(error.message);
+
+    // 3. GENERIAMO IL LOG DI AUDIT
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: admin } = await supabase.from('players').select('first_name, last_name').eq('user_id', user?.id).single();
+
+    const modifiche: string[] = [];
+
+    // Confronto dinamico (esempio per match_type)
+    if (updatedFields.match_type && updatedFields.match_type !== oldMatch.match_type) {
+        modifiche.push(`Tipo match: da ${oldMatch.match_type} a ${updatedFields.match_type}`);
+    }
+
+    // Confronto per i giocatori (potresti voler aggiungere una funzione helper per i nomi)
+    const slotKeys = ['team_a_left_id', 'team_a_right_id', 'team_b_left_id', 'team_b_right_id'] as const;
+    slotKeys.forEach(key => {
+        if (updatedFields[key] !== undefined && updatedFields[key] !== oldMatch[key]) {
+            modifiche.push(`Slot ${key} aggiornato`);
+        }
+    });
+
+    if (modifiche.length > 0) {
+        await logAction(
+            'MATCH_UPDATED',
+            matchId,
+            `Admin ${admin?.first_name} ${admin?.last_name} ha modificato il match ${matchId}: ${modifiche.join('; ')}`,
+            {
+                previous_data: oldMatch,
+                new_data: updatedFields
+            }
+        );
     }
 
     revalidatePath('/');

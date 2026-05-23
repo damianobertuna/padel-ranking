@@ -158,6 +158,9 @@ export default async function Home({ searchParams }: PageProps) {
                                 <Link href="/admin/players" className="bg-slate-800 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-slate-900 transition-colors text-sm shadow-sm text-center">
                                     ⚙️ Giocatori
                                 </Link>
+                                <Link href="/admin/clubs" className="bg-slate-800 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-slate-900 transition-colors text-sm shadow-sm text-center">
+                                    📍 Club
+                                </Link>
                                 <Link href="/admin/logs" className="bg-indigo-600 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-indigo-700 transition-colors text-sm shadow-sm text-center">
                                     📋 Log
                                 </Link>

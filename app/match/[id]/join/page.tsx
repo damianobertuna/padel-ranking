@@ -19,11 +19,12 @@ export default function JoinMatchPage() {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
 
-    // Selections for empty slots
-    const [newALeft, setNewALeft] = useState<number | ''>('');
-    const [newARight, setNewARight] = useState<number | ''>('');
-    const [newBLeft, setNewBLeft] = useState<number | ''>('');
-    const [newBRight, setNewBRight] = useState<number | ''>('');
+    // Stati della formazione (inizializzati a vuoto, poi riempiti dal DB)
+    const [teamALeft, setTeamALeft] = useState<number | ''>('');
+    const [teamARight, setTeamARight] = useState<number | ''>('');
+    const [teamBLeft, setTeamBLeft] = useState<number | ''>('');
+    const [teamBRight, setTeamBRight] = useState<number | ''>('');
+    const [matchType, setMatchType] = useState<'male' | 'female' | 'mixed'>('male');
 
     const [levelError, setLevelError] = useState(false);
     const [duplicateError, setDuplicateError] = useState(false);
@@ -39,7 +40,16 @@ export default function JoinMatchPage() {
                         .order('ranking', { ascending: false })
                         .order('last_name', { ascending: true })
                 ]);
-                if (matchRes.data) setMatch(matchRes.data);
+
+                if (matchRes.data) {
+                    setMatch(matchRes.data);
+                    // Pre-compiliamo gli slot con i dati attuali del match
+                    setTeamALeft(matchRes.data.team_a_left_id || '');
+                    setTeamARight(matchRes.data.team_a_right_id || '');
+                    setTeamBLeft(matchRes.data.team_b_left_id || '');
+                    setTeamBRight(matchRes.data.team_b_right_id || '');
+                    setMatchType(matchRes.data.match_type);
+                }
                 if (playersRes.data) setPlayers(playersRes.data);
             } catch (err) {
                 console.error(err);
@@ -52,30 +62,15 @@ export default function JoinMatchPage() {
     }, [matchId, supabase]);
 
     useEffect(() => {
-        if (!match) return;
+        const selectedIds = [teamALeft, teamARight, teamBLeft, teamBRight].filter((val): val is number => typeof val === 'number');
 
-        const allCurrentInField = [
-            match.team_a_left_id,
-            match.team_a_right_id,
-            match.team_b_left_id,
-            match.team_b_right_id
-        ];
-
-        const allNewSelections = [newALeft, newARight, newBLeft, newBRight];
-
-        const totalActiveIds: number[] = [];
-
-        allCurrentInField.forEach(id => { if (id) totalActiveIds.push(id); });
-        allNewSelections.forEach(id => { if (typeof id === 'number') totalActiveIds.push(id); });
-
-        if (totalActiveIds.length === 0) {
+        if (selectedIds.length === 0) {
             setDuplicateError(false);
             setLevelError(false);
             return;
         }
 
-        // --- CONTROLLO DUPLICATI ---
-        const hasDuplicates = new Set(totalActiveIds).size !== totalActiveIds.length;
+        const hasDuplicates = new Set(selectedIds).size !== selectedIds.length;
         setDuplicateError(hasDuplicates);
 
         if (hasDuplicates) {
@@ -83,60 +78,49 @@ export default function JoinMatchPage() {
             return;
         }
 
-        // --- CONTROLLO LIVELLO MASSIMO (Tolleranza 0.25) ---
-        if (totalActiveIds.length < 2) {
+        if (selectedIds.length < 2) {
             setLevelError(false);
             return;
         }
 
-        const activeRankings = totalActiveIds
+        const selectedRankings = selectedIds
             .map(id => players.find(p => p.id === id)?.ranking)
             .filter((ranking): ranking is number => ranking !== undefined);
 
-        if (activeRankings.length >= 2) {
-            const maxLevel = Math.max(...activeRankings);
-            const minLevel = Math.min(...activeRankings);
+        if (selectedRankings.length >= 2) {
+            const maxLevel = Math.max(...selectedRankings);
+            const minLevel = Math.min(...selectedRankings);
             const difference = maxLevel - minLevel;
 
-            if (parseFloat(difference.toFixed(2)) > 0.25) {
-                setLevelError(true);
-            } else {
-                setLevelError(false);
-            }
+            setLevelError(parseFloat(difference.toFixed(2)) > 0.25);
         }
-    }, [newALeft, newARight, newBLeft, newBRight, match, players]);
+    }, [teamALeft, teamARight, teamBLeft, teamBRight, players]);
 
     if (loadingPage) return <div className="min-h-screen flex items-center justify-center bg-slate-100 text-sm font-medium text-slate-500">Caricamento dettagli match...</div>;
     if (!match) return <div className="min-h-screen flex items-center justify-center bg-slate-100 text-sm font-bold text-red-500">Partita non trovata.</div>;
 
-    const occupiedPlayerIds = [
-        match.team_a_left_id,
-        match.team_a_right_id,
-        match.team_b_left_id,
-        match.team_b_right_id
-    ].filter((id): id is number => id !== null);
-
-    const availablePlayers = players.filter(p => !occupiedPlayerIds.includes(p.id));
-
-    // 👈 AGGIORNATO: Filtro Dinamico per Lato e per GENERE in base al tipo di match salvato
-    const availableLeftPlayers = availablePlayers.filter(p => {
+    // Filtri Dinamici per Lato e Genere (che reagiscono ai cambi di matchType in tempo reale)
+    const availableLeftPlayers = players.filter(p => {
         const isCorrectSide = p.preferred_side === 'Left' || p.preferred_side === 'Both';
-        if (match.match_type === 'male') return isCorrectSide && p.gender === 'M';
-        if (match.match_type === 'female') return isCorrectSide && p.gender === 'F';
-        return isCorrectSide; // mixed
+        if (matchType === 'male') return isCorrectSide && p.gender === 'M';
+        if (matchType === 'female') return isCorrectSide && p.gender === 'F';
+        return isCorrectSide;
     });
 
-    const availableRightPlayers = availablePlayers.filter(p => {
+    const availableRightPlayers = players.filter(p => {
         const isCorrectSide = p.preferred_side === 'Right' || p.preferred_side === 'Both';
-        if (match.match_type === 'male') return isCorrectSide && p.gender === 'M';
-        if (match.match_type === 'female') return isCorrectSide && p.gender === 'F';
-        return isCorrectSide; // mixed
+        if (matchType === 'male') return isCorrectSide && p.gender === 'M';
+        if (matchType === 'female') return isCorrectSide && p.gender === 'F';
+        return isCorrectSide;
     });
 
-    const getPlayerLabel = (id: number | null) => {
-        if (!id) return '';
-        const p = players.find(pl => pl.id === id);
-        return p ? `${p.first_name} ${p.last_name} (${p.ranking.toFixed(2)})` : 'Giocatore Sconosciuto';
+    // Funzione per rimuovere dalle tendine chi è GIA' selezionato negli altri 3 slot
+    const getOptionsForSlot = (currentVal: number | '', sideFiltered: Player[]) => {
+        return sideFiltered.filter(p => {
+            const occupiedElsewhere = [teamALeft, teamARight, teamBLeft, teamBRight]
+                .filter(id => id !== '' && id !== currentVal);
+            return !occupiedElsewhere.includes(p.id);
+        });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -146,17 +130,15 @@ export default function JoinMatchPage() {
         setSubmitting(true);
         setError('');
 
-        // Tipizzazione sicura per eliminare `any`
-        const updatedFields: Partial<Record<'team_a_left_id' | 'team_a_right_id' | 'team_b_left_id' | 'team_b_right_id', number>> = {};
-
-        if (newALeft) updatedFields.team_a_left_id = newALeft;
-        if (newARight) updatedFields.team_a_right_id = newARight;
-        if (newBLeft) updatedFields.team_b_left_id = newBLeft;
-        if (newBRight) updatedFields.team_b_right_id = newBRight;
-
         try {
-            const cleanMatchId = params.id as string;
-            await updateMatchPlayers(cleanMatchId, updatedFields);
+            // Inviamo esplicitamente null se lo slot è stato svuotato ('') dall'utente
+            await updateMatchPlayers(matchId, {
+                match_type: matchType,
+                team_a_left_id: teamALeft || null,
+                team_a_right_id: teamARight || null,
+                team_b_left_id: teamBLeft || null,
+                team_b_right_id: teamBRight || null,
+            });
             router.push('/');
             router.refresh();
         } catch (err: any) {
@@ -166,40 +148,25 @@ export default function JoinMatchPage() {
     };
 
     const renderSlotForm = (
-        currentId: number | null,
         value: number | '',
         setValue: (v: number | '') => void,
         label: string,
         sideFilteredPlayers: Player[]
     ) => {
-        if (currentId) {
-            return (
-                <div className="p-3 bg-slate-100 rounded-xl border border-slate-200 text-slate-700 text-sm font-bold">
-                    🛡️ {getPlayerLabel(currentId)}
-                </div>
-            );
-        }
-
         return (
             <select
                 value={value}
-                // 👈 RISOLTO: Ora usa il parametro dinamico `setValue` invece di settare sempre la sinistra!
                 onChange={e => setValue(e.target.value ? parseInt(e.target.value, 10) : '')}
-                className="w-full p-2.5 border border-amber-200 rounded-xl bg-amber-50/20 font-medium text-sm text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white"
+                className={`w-full p-2.5 border rounded-xl font-medium text-sm focus:outline-none focus:border-indigo-500 transition-colors ${
+                    value !== '' ? 'bg-indigo-50 border-indigo-200 text-indigo-900' : 'bg-amber-50/30 border-amber-200 text-slate-800'
+                }`}
             >
-                <option value="">Seleziona Giocatore per {label}</option>
-                {sideFilteredPlayers.map(p => (
+                <option value="">Nessuno (Slot Libero)</option>
+                {getOptionsForSlot(value, sideFilteredPlayers).map(p => (
                     <option key={p.id} value={p.id}>{p.first_name} {p.last_name} ({p.ranking.toFixed(2)})</option>
                 ))}
             </select>
         );
-    };
-
-    // Label visiva per mostrare chiaramente in quale tipo di match si sta entrando
-    const getMatchBadge = () => {
-        if (match?.match_type === 'female') return <span className="bg-pink-100 text-pink-700 border-pink-200 border px-2 py-0.5 rounded text-[10px] font-black uppercase">👩 Femminile</span>;
-        if (match?.match_type === 'mixed') return <span className="bg-purple-100 text-purple-700 border-purple-200 border px-2 py-0.5 rounded text-[10px] font-black uppercase">🌍 Misto</span>;
-        return <span className="bg-blue-100 text-blue-700 border-blue-200 border px-2 py-0.5 rounded text-[10px] font-black uppercase">👨 Maschile</span>;
     };
 
     return (
@@ -212,15 +179,45 @@ export default function JoinMatchPage() {
 
                 <div className="flex justify-between items-start mb-6">
                     <div>
-                        <h1 className="text-xl font-black text-slate-800 tracking-tight">Completa Formazione Match</h1>
-                        <p className="text-xs text-slate-400 mt-1">Inserisci i giocatori negli slot liberi evidenziati in arancione.</p>
+                        <h1 className="text-xl font-black text-slate-800 tracking-tight">Gestisci Partita</h1>
+                        <p className="text-xs text-slate-400 mt-1">Puoi ritirarti, scambiare giocatori o cambiare tipologia.</p>
                     </div>
-                    {getMatchBadge()}
                 </div>
 
                 {error && <div className="bg-rose-50 border border-rose-200 text-rose-700 p-3 rounded-xl mb-5 text-xs font-bold">{error}</div>}
 
                 <form onSubmit={handleSubmit} className="space-y-6">
+
+                    {/* SELETTORE TIPOLOGIA MATCH */}
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-3">
+                            Cambia Categoria Partita
+                        </label>
+                        <div className="flex gap-2">
+                            {(['male', 'female', 'mixed'] as const).map((type) => {
+                                const labels = { male: '👨 Maschile', female: '👩 Femminile', mixed: '🌍 Misto' };
+                                return (
+                                    <button
+                                        key={type}
+                                        type="button"
+                                        onClick={() => {
+                                            setMatchType(type);
+                                            // Opzionale: potresti voler svuotare i team qui se cambi genere,
+                                            // ma lasciarli permette all'utente di correggere manualmente gli slot errati.
+                                        }}
+                                        className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase transition-all border shadow-sm active:scale-95 ${
+                                            matchType === type
+                                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                                : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'
+                                        }`}
+                                    >
+                                        {labels[type]}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
                         {/* TEAM A CARD */}
@@ -228,11 +225,11 @@ export default function JoinMatchPage() {
                             <h2 className="text-blue-800 font-black text-sm uppercase tracking-wide">Team A (Blu)</h2>
                             <div>
                                 <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Giocatore Sinistra (SX)</label>
-                                {renderSlotForm(match.team_a_left_id, newALeft, setNewALeft, 'Team A Sinistra', availableLeftPlayers)}
+                                {renderSlotForm(teamALeft, setTeamALeft, 'Team A SX', availableLeftPlayers)}
                             </div>
                             <div>
                                 <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Giocatore Destra (DX)</label>
-                                {renderSlotForm(match.team_a_right_id, newARight, setNewARight, 'Team A Destra', availableRightPlayers)}
+                                {renderSlotForm(teamARight, setTeamARight, 'Team A DX', availableRightPlayers)}
                             </div>
                         </div>
 
@@ -241,11 +238,11 @@ export default function JoinMatchPage() {
                             <h2 className="text-rose-800 font-black text-sm uppercase tracking-wide">Team B (Rosso)</h2>
                             <div>
                                 <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Giocatore Sinistra (SX)</label>
-                                {renderSlotForm(match.team_b_left_id, newBLeft, setNewBLeft, 'Team B Sinistra', availableLeftPlayers)}
+                                {renderSlotForm(teamBLeft, setTeamBLeft, 'Team B SX', availableLeftPlayers)}
                             </div>
                             <div>
                                 <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Giocatore Destra (DX)</label>
-                                {renderSlotForm(match.team_b_right_id, newBRight, setNewBRight, 'Team B Destra', availableRightPlayers)}
+                                {renderSlotForm(teamBRight, setTeamBRight, 'Team B DX', availableRightPlayers)}
                             </div>
                         </div>
 
@@ -255,7 +252,7 @@ export default function JoinMatchPage() {
                         <div className="flex items-center justify-center space-x-2 p-3 bg-rose-50 border border-rose-200 rounded-xl transition-all">
                             <span className="text-base">❌</span>
                             <p className="text-xs font-black text-rose-700 tracking-tight">
-                                Errore: Lo stesso giocatore è inserito in più posizioni contemporaneamente!
+                                Errore: Lo stesso giocatore è inserito in più posizioni!
                             </p>
                         </div>
                     )}
@@ -264,27 +261,17 @@ export default function JoinMatchPage() {
                         <div className="flex items-center justify-center space-x-2 p-3 bg-amber-50 border border-amber-200 rounded-xl transition-all animate-pulse">
                             <span className="text-base">⚠️</span>
                             <p className="text-xs font-black text-amber-700 tracking-tight">
-                                Attenzione: Con questa configurazione la differenza di livello nel match supera il limite di 0.25!
+                                Attenzione: La differenza di livello supera il limite di 0.25!
                             </p>
                         </div>
                     )}
 
                     <button
                         type="submit"
-                        disabled={submitting || levelError || duplicateError || (!newALeft && !newARight && !newBLeft && !newBRight)}
+                        disabled={submitting || levelError || duplicateError || (!teamALeft && !teamARight && !teamBLeft && !teamBRight)}
                         className="w-full bg-slate-800 hover:bg-slate-900 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl shadow-sm transition-all text-sm flex items-center justify-center gap-2"
                     >
-                        {submitting ? (
-                            <>
-                                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                <span>Salvataggio e aggiornamento convocazioni...</span>
-                            </>
-                        ) : (
-                            'Salva ed Occupa Slot'
-                        )}
+                        {submitting ? 'Salvataggio...' : 'Salva Modifiche Match'}
                     </button>
                 </form>
             </div>
