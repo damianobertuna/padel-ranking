@@ -5,10 +5,15 @@ import { Player } from "@/types";
 import { computeKingAndFanalino } from '@/lib/rankingCalc';
 
 const MATCHES_PER_PAGE = 5;
+const PLAYERS_PER_PAGE = 10;
 
 interface PageProps {
-    // 👈 AGGIORNATO: Aggiunto gender opzionale nei parametri della URL
-    searchParams: Promise<{ page?: string; sort?: string; gender?: string }>;
+    searchParams: Promise<{
+        page?: string;
+        playerPage?: string;
+        sort?: string;
+        gender?: string
+    }>;
 }
 
 function getPlayerNameWithRanking(id: number | null, playersList: Player[]) {
@@ -22,8 +27,8 @@ export default async function Home({ searchParams }: PageProps) {
 
     const resolvedParams = await searchParams;
     const currentPage = parseInt(resolvedParams.page || '1', 10) || 1;
+    const playerPage = parseInt(resolvedParams.playerPage || '1', 10) || 1;
     const currentSort = resolvedParams.sort || 'ranking';
-    // 👈 NUOVO: Lettura del genere dalla URL con fallback di default su 'M' (Uomini)
     const currentGender = resolvedParams.gender || 'all';
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -53,13 +58,11 @@ export default async function Home({ searchParams }: PageProps) {
         lastPlaceBothIds
     } = computeKingAndFanalino(playersWithStats);
 
-    // 👈 NUOVO: Filtriamo l'array dei giocatori in base al genere selezionato prima di ordinarli
     const filteredPlayers = playersWithStats.filter(player => {
         if (currentGender === 'all') return true; // Mostra tutti
         return player.gender === currentGender;   // 'M' o 'F'
     });
 
-    // 👈 AGGIORNATO: Ora ordiniamo l'array già filtrato (filteredPlayers)
     const sortedPlayers = [...filteredPlayers].sort((a, b) => {
         if (currentSort === 'played') {
             return b.total_played - a.total_played || b.ranking - a.ranking;
@@ -70,12 +73,18 @@ export default async function Home({ searchParams }: PageProps) {
         return b.ranking - a.ranking;
     });
 
+    // Paginazione Giocatori
+    const totalPlayerPages = Math.ceil(sortedPlayers.length / PLAYERS_PER_PAGE) || 1;
+    const startIndex = (playerPage - 1) * PLAYERS_PER_PAGE;
+    const paginatedPlayers = sortedPlayers.slice(startIndex, startIndex + PLAYERS_PER_PAGE);
+
     const { data: pendingMatches } = await supabase
         .from('matches')
         .select('*')
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
+    // Paginazione Match
     const fromRange = (currentPage - 1) * MATCHES_PER_PAGE;
     const toRange = fromRange + MATCHES_PER_PAGE - 1;
 
@@ -153,32 +162,32 @@ export default async function Home({ searchParams }: PageProps) {
                 </div>
 
                 {/* FILTRI DI ORDINAMENTO E DI GENERE DINAMICI */}
-                {/* 👈 AGGIORNATO: Cambiato in flex-col su mobile per contenere ordinamento e generi senza rompersi */}
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3">
                     <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Classifica Ufficiale</h2>
 
                     <div className="flex flex-wrap gap-2">
-                        {/* 👈 NUOVO: Barra selettrice del Genere (Mantiene l'ordinamento attivo `currentSort`) */}
+                        {/* Filtri Genere (Mantengono paginazione match, ma resettano paginazione giocatori a 1) */}
                         <div className="flex gap-1.5 bg-slate-200/60 p-1 rounded-xl border border-slate-200 text-[11px] font-bold">
-                            <Link href={`/?gender=M&sort=${currentSort}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentGender === 'M' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>👨 Maschi</Link>
-                            <Link href={`/?gender=F&sort=${currentSort}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentGender === 'F' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>👩 Femmine</Link>
-                            <Link href={`/?gender=all&sort=${currentSort}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentGender === 'all' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>🌍 Generale</Link>
+                            <Link href={`/?gender=M&sort=${currentSort}&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentGender === 'M' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>👨 Maschi</Link>
+                            <Link href={`/?gender=F&sort=${currentSort}&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentGender === 'F' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>👩 Femmine</Link>
+                            <Link href={`/?gender=all&sort=${currentSort}&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentGender === 'all' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>🌍 Generale</Link>
                         </div>
 
-                        {/* 👈 AGGIORNATO: Barra ordinamento (Ora mantiene il genere attivo `currentGender`) */}
+                        {/* Filtri Ordinamento (Mantengono paginazione match, ma resettano paginazione giocatori a 1) */}
                         <div className="flex gap-1.5 bg-slate-200/60 p-1 rounded-xl border border-slate-200 text-[11px] font-bold">
-                            <Link href={`/?gender=${currentGender}&sort=ranking`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'ranking' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>Punti</Link>
-                            <Link href={`/?gender=${currentGender}&sort=played`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'played' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>Giocate</Link>
-                            <Link href={`/?gender=${currentGender}&sort=winrate`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'winrate' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>Win Rate</Link>
+                            <Link href={`/?gender=${currentGender}&sort=ranking&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'ranking' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>Punti</Link>
+                            <Link href={`/?gender=${currentGender}&sort=played&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'played' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>Giocate</Link>
+                            <Link href={`/?gender=${currentGender}&sort=winrate&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'winrate' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>Win Rate</Link>
                         </div>
                     </div>
                 </div>
 
                 {/* CLASSIFICA CARD */}
-                <div className="flex flex-col gap-2.5 mb-8">
-                    {sortedPlayers.length > 0 ? (
-                        sortedPlayers.map((player, index) => {
-                            const rankIndex = index + 1;
+                <div className="flex flex-col gap-2.5 mb-6">
+                    {paginatedPlayers.length > 0 ? (
+                        paginatedPlayers.map((player, index) => {
+                            // Indice globale assoluto per mantenere i gradi (es. pagina 2 inizia da 11°)
+                            const rankIndex = startIndex + index + 1;
                             const playerId = player.id;
 
                             const king = kingLeftIds.includes(playerId) ? 'SX'
@@ -214,7 +223,6 @@ export default async function Home({ searchParams }: PageProps) {
                                                     className="w-full h-full object-cover"
                                                 />
                                             ) : (
-                                                /* Silhouette neutra di default se l'utente non ha impostato nulla */
                                                 <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 font-black text-xs flex items-center justify-center shrink-0 uppercase tracking-tight">
                                                     {player.first_name[0]}{player.last_name[0]}
                                                 </div>
@@ -270,6 +278,31 @@ export default async function Home({ searchParams }: PageProps) {
                         <p className="text-slate-500 italic text-sm p-4 bg-white rounded-xl border border-slate-200 text-center">Nessun giocatore registrato in questa categoria.</p>
                     )}
                 </div>
+
+                {/* CONTROLLI PAGINAZIONE GIOCATORI */}
+                {totalPlayerPages > 1 && (
+                    <div className="flex justify-center items-center gap-4 mb-10">
+                        <Link
+                            href={`/?playerPage=${playerPage - 1}&page=${currentPage}&sort=${currentSort}&gender=${currentGender}`}
+                            scroll={false}
+                            className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all active:scale-95 ${playerPage <= 1 ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}
+                        >
+                            ← Precedente
+                        </Link>
+
+                        <div className="text-xs font-bold text-slate-500 font-mono">
+                            Pag. {playerPage} / {totalPlayerPages}
+                        </div>
+
+                        <Link
+                            href={`/?playerPage=${playerPage + 1}&page=${currentPage}&sort=${currentSort}&gender=${currentGender}`}
+                            scroll={false}
+                            className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all active:scale-95 ${playerPage >= totalPlayerPages ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}
+                        >
+                            Successiva →
+                        </Link>
+                    </div>
+                )}
 
                 {/* BANNER PUBBLICITARIO SPONSOR */}
                 <div className="w-full bg-gradient-to-r from-indigo-950 to-slate-900 text-white p-5 rounded-xl shadow-sm mb-12 flex flex-col md:flex-row items-center justify-between gap-6 border border-slate-700">
@@ -340,7 +373,6 @@ export default async function Home({ searchParams }: PageProps) {
                                     <div className="text-[10px] text-slate-400 text-center sm:text-left font-medium border-t border-slate-50 pt-2 flex flex-col sm:flex-row sm:justify-between items-center gap-2">
                                         <span>Disputata il {new Date(match.updated_at).toLocaleDateString('it-IT')}</span>
 
-                                        {/* 👈 RENDER DEL CLUB E LINK MAPS */}
                                         {matchClub && (
                                             <span className="inline-flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded border border-slate-100 text-slate-500">
                                                 <span>📍</span>
@@ -368,13 +400,12 @@ export default async function Home({ searchParams }: PageProps) {
                     )}
                 </div>
 
-                {/* CONTROLLI DI PAGINAZIONE */}
+                {/* CONTROLLI PAGINAZIONE MATCH */}
                 {totalPages > 1 && (
                     <div className="flex justify-center items-center gap-4 mt-6">
-                        {/* 👈 AGGIORNATO: I link di paginazione ora portano con sé anche il parametro `gender` attivo */}
-                        <Link href={`/?page=${currentPage - 1}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all active:scale-95 ${currentPage <= 1 ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}>← Precedente</Link>
+                        <Link href={`/?page=${currentPage - 1}&playerPage=${playerPage}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all active:scale-95 ${currentPage <= 1 ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}>← Precedente</Link>
                         <div className="text-xs font-bold text-slate-500 font-mono">{currentPage} / {totalPages}</div>
-                        <Link href={`/?page=${currentPage + 1}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all active:scale-95 ${currentPage >= totalPages ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}>Successiva →</Link>
+                        <Link href={`/?page=${currentPage + 1}&playerPage=${playerPage}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all active:scale-95 ${currentPage >= totalPages ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}>Successiva →</Link>
                     </div>
                 )}
 
