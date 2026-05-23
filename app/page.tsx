@@ -13,7 +13,7 @@ interface PageProps {
         playerPage?: string;
         sort?: string;
         gender?: string;
-        tab?: string; // 👈 NUOVO PARAMETRO PER I TAB
+        tab?: string;
     }>;
 }
 
@@ -31,7 +31,7 @@ export default async function Home({ searchParams }: PageProps) {
     const playerPage = parseInt(resolvedParams.playerPage || '1', 10) || 1;
     const currentSort = resolvedParams.sort || 'ranking';
     const currentGender = resolvedParams.gender || 'all';
-    const currentTab = resolvedParams.tab || 'ranking'; // 'ranking' | 'pending' | 'completed'
+    const currentTab = resolvedParams.tab || 'ranking';
 
     const { data: { user } } = await supabase.auth.getUser();
     let currentUserPlayer = null;
@@ -50,7 +50,6 @@ export default async function Home({ searchParams }: PageProps) {
     const { data: clubsData } = await supabase.from('clubs').select('*');
     const clubsList = clubsData || [];
 
-    // 👑 Calcolo dei titoli ASSOLUTI
     const {
         kingLeftIds,
         kingRightIds,
@@ -75,7 +74,6 @@ export default async function Home({ searchParams }: PageProps) {
         return b.ranking - a.ranking;
     });
 
-    // Paginazione Giocatori
     const totalPlayerPages = Math.ceil(sortedPlayers.length / PLAYERS_PER_PAGE) || 1;
     const startIndex = (playerPage - 1) * PLAYERS_PER_PAGE;
     const paginatedPlayers = sortedPlayers.slice(startIndex, startIndex + PLAYERS_PER_PAGE);
@@ -86,7 +84,6 @@ export default async function Home({ searchParams }: PageProps) {
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
-    // Paginazione Match
     const fromRange = (currentPage - 1) * MATCHES_PER_PAGE;
     const toRange = fromRange + MATCHES_PER_PAGE - 1;
 
@@ -99,7 +96,6 @@ export default async function Home({ searchParams }: PageProps) {
 
     const totalPages = totalCompletedCount ? Math.ceil(totalCompletedCount / MATCHES_PER_PAGE) : 1;
 
-    // Helper per mantenere lo stato URL
     const urlState = `gender=${currentGender}&sort=${currentSort}&playerPage=${playerPage}&page=${currentPage}`;
 
     return (
@@ -121,10 +117,10 @@ export default async function Home({ searchParams }: PageProps) {
                     <div className="shrink-0 pl-2">
                         {user ? (
                             <form action="/auth/signout" method="post">
-                                <button type="submit" className="text-sm font-semibold text-red-600 hover:underline">Esci</button>
+                                <button type="submit" className="text-sm font-semibold text-red-600 hover:underline [-webkit-tap-highlight-color:transparent] active:opacity-50 transition-opacity">Esci</button>
                             </form>
                         ) : (
-                            <Link href="/login" className="text-sm font-bold text-indigo-600 hover:underline">Accedi</Link>
+                            <Link href="/login" className="text-sm font-bold text-indigo-600 hover:underline [-webkit-tap-highlight-color:transparent] active:opacity-50 transition-opacity">Accedi</Link>
                         )}
                     </div>
                 </div>
@@ -134,7 +130,7 @@ export default async function Home({ searchParams }: PageProps) {
                     <h1 className="text-3xl font-black text-slate-800 tracking-tight">RanKING Padel</h1>
                     <Link
                         href="/rules"
-                        className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-black rounded-full border border-indigo-200/60 transition-all hover:scale-[1.02] shadow-xs"
+                        className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-black rounded-full border border-indigo-200/60 transition-all duration-150 hover:scale-[1.02] active:scale-95 shadow-xs [-webkit-tap-highlight-color:transparent]"
                     >
                         <span className="font-mono text-sm leading-none">📖</span>
                         <span>Regolamento Ufficiale</span>
@@ -142,26 +138,26 @@ export default async function Home({ searchParams }: PageProps) {
                     <div className="flex gap-2 w-full sm:w-auto">
                         <Link
                             href="/rules"
-                            className="sm:hidden flex-1 inline-flex items-center justify-center gap-2 bg-slate-200/80 hover:bg-slate-300 text-slate-700 font-bold py-2.5 px-4 rounded-xl transition-all text-sm shadow-xs active:scale-[0.99]"
+                            className="sm:hidden flex-1 inline-flex items-center justify-center gap-2 bg-slate-200/80 hover:bg-slate-300 text-slate-700 font-bold py-2.5 px-4 rounded-xl transition-all duration-150 ease-out active:scale-[0.96] active:bg-slate-300 text-sm shadow-xs [-webkit-tap-highlight-color:transparent]"
                         >
                             <span>📖</span>
                             <span>Regolamento</span>
                         </Link>
 
                         {user && (
-                            <Link href="/new-match" className="flex-1 sm:flex-none text-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-xl transition-colors text-sm shadow-sm">
+                            <Link href="/new-match" className="flex-1 sm:flex-none text-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-xl transition-all duration-150 ease-out active:scale-[0.96] active:bg-indigo-800 text-sm shadow-sm [-webkit-tap-highlight-color:transparent]">
                                 + Nuova Partita
                             </Link>
                         )}
                         {currentUserPlayer?.role === 'admin' && (
                             <>
-                                <Link href="/admin/players" className="bg-slate-800 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-slate-900 transition-colors text-sm shadow-sm text-center">
+                                <Link href="/admin/players" className="bg-slate-800 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-slate-900 transition-all duration-150 ease-out active:scale-[0.96] active:bg-slate-950 text-sm shadow-sm text-center [-webkit-tap-highlight-color:transparent]">
                                     ⚙️ Giocatori
                                 </Link>
-                                <Link href="/admin/clubs" className="bg-slate-800 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-slate-900 transition-colors text-sm shadow-sm text-center">
+                                <Link href="/admin/clubs" className="bg-slate-800 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-slate-900 transition-all duration-150 ease-out active:scale-[0.96] active:bg-slate-950 text-sm shadow-sm text-center [-webkit-tap-highlight-color:transparent]">
                                     📍 Club
                                 </Link>
-                                <Link href="/admin/logs" className="bg-indigo-600 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-indigo-700 transition-colors text-sm shadow-sm text-center">
+                                <Link href="/admin/logs" className="bg-indigo-600 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-indigo-700 transition-all duration-150 ease-out active:scale-[0.96] active:bg-indigo-800 text-sm shadow-sm text-center [-webkit-tap-highlight-color:transparent]">
                                     📋 Log
                                 </Link>
                             </>
@@ -169,26 +165,26 @@ export default async function Home({ searchParams }: PageProps) {
                     </div>
                 </div>
 
-                {/* NAVEGAZIONE A TAB */}
+                {/* NAVIGAZIONE A TAB (Migliorata per Mobile) */}
                 <div className="flex bg-slate-200/50 p-1 rounded-xl mb-6 shadow-inner w-full sm:w-auto overflow-x-auto scrollbar-hide">
                     <Link
                         href={`/?tab=ranking&${urlState}`}
                         scroll={false}
-                        className={`flex-1 text-center py-2.5 px-4 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${currentTab === 'ranking' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`flex-1 text-center py-2.5 px-4 rounded-lg text-sm font-bold transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.96] whitespace-nowrap ${currentTab === 'ranking' ? 'bg-white text-indigo-600 shadow-sm active:bg-slate-50' : 'text-slate-500 hover:text-slate-700 active:bg-slate-300/50'}`}
                     >
                         🏆 Classifica
                     </Link>
                     <Link
                         href={`/?tab=pending&${urlState}`}
                         scroll={false}
-                        className={`flex-1 text-center py-2.5 px-4 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${currentTab === 'pending' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`flex-1 text-center py-2.5 px-4 rounded-lg text-sm font-bold transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.96] whitespace-nowrap ${currentTab === 'pending' ? 'bg-white text-indigo-600 shadow-sm active:bg-slate-50' : 'text-slate-500 hover:text-slate-700 active:bg-slate-300/50'}`}
                     >
                         🗓️ In Programma {pendingMatches && pendingMatches.length > 0 ? <span className="ml-1 bg-indigo-100 text-indigo-700 py-0.5 px-1.5 rounded-full text-xs">{pendingMatches.length}</span> : ''}
                     </Link>
                     <Link
                         href={`/?tab=completed&${urlState}`}
                         scroll={false}
-                        className={`flex-1 text-center py-2.5 px-4 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${currentTab === 'completed' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`flex-1 text-center py-2.5 px-4 rounded-lg text-sm font-bold transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.96] whitespace-nowrap ${currentTab === 'completed' ? 'bg-white text-indigo-600 shadow-sm active:bg-slate-50' : 'text-slate-500 hover:text-slate-700 active:bg-slate-300/50'}`}
                     >
                         ✅ Risultati
                     </Link>
@@ -199,19 +195,19 @@ export default async function Home({ searchParams }: PageProps) {
                 ========================================= */}
                 {currentTab === 'ranking' && (
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        {/* FILTRI DI ORDINAMENTO E DI GENERE */}
+                        {/* FILTRI DI ORDINAMENTO E DI GENERE (Migliorati per Mobile) */}
                         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3">
                             <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Classifica Ufficiale</h2>
                             <div className="flex flex-wrap gap-2">
                                 <div className="flex gap-1.5 bg-slate-200/60 p-1 rounded-xl border border-slate-200 text-[11px] font-bold">
-                                    <Link href={`/?tab=ranking&gender=M&sort=${currentSort}&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentGender === 'M' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>👨 Maschi</Link>
-                                    <Link href={`/?tab=ranking&gender=F&sort=${currentSort}&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentGender === 'F' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>👩 Femmine</Link>
-                                    <Link href={`/?tab=ranking&gender=all&sort=${currentSort}&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentGender === 'all' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>🌍 Generale</Link>
+                                    <Link href={`/?tab=ranking&gender=M&sort=${currentSort}&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.94] ${currentGender === 'M' ? 'bg-white text-indigo-600 shadow-xs active:bg-slate-50' : 'text-slate-500 hover:text-slate-800 active:bg-slate-300/50'}`}>👨 Maschi</Link>
+                                    <Link href={`/?tab=ranking&gender=F&sort=${currentSort}&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.94] ${currentGender === 'F' ? 'bg-white text-indigo-600 shadow-xs active:bg-slate-50' : 'text-slate-500 hover:text-slate-800 active:bg-slate-300/50'}`}>👩 Femmine</Link>
+                                    <Link href={`/?tab=ranking&gender=all&sort=${currentSort}&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.94] ${currentGender === 'all' ? 'bg-white text-indigo-600 shadow-xs active:bg-slate-50' : 'text-slate-500 hover:text-slate-800 active:bg-slate-300/50'}`}>🌍 Generale</Link>
                                 </div>
                                 <div className="flex gap-1.5 bg-slate-200/60 p-1 rounded-xl border border-slate-200 text-[11px] font-bold">
-                                    <Link href={`/?tab=ranking&gender=${currentGender}&sort=ranking&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'ranking' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>Punti Rank</Link>
-                                    <Link href={`/?tab=ranking&gender=${currentGender}&sort=played&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'played' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>Giocate</Link>
-                                    <Link href={`/?tab=ranking&gender=${currentGender}&sort=winrate&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'winrate' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>Win Rate</Link>
+                                    <Link href={`/?tab=ranking&gender=${currentGender}&sort=ranking&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.94] ${currentSort === 'ranking' ? 'bg-white text-indigo-600 shadow-xs active:bg-slate-50' : 'text-slate-500 hover:text-slate-800 active:bg-slate-300/50'}`}>Punti Rank</Link>
+                                    <Link href={`/?tab=ranking&gender=${currentGender}&sort=played&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.94] ${currentSort === 'played' ? 'bg-white text-indigo-600 shadow-xs active:bg-slate-50' : 'text-slate-500 hover:text-slate-800 active:bg-slate-300/50'}`}>Giocate</Link>
+                                    <Link href={`/?tab=ranking&gender=${currentGender}&sort=winrate&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.94] ${currentSort === 'winrate' ? 'bg-white text-indigo-600 shadow-xs active:bg-slate-50' : 'text-slate-500 hover:text-slate-800 active:bg-slate-300/50'}`}>Win Rate</Link>
                                 </div>
                             </div>
                         </div>
@@ -226,7 +222,7 @@ export default async function Home({ searchParams }: PageProps) {
                                     const last = lastPlaceLeftIds.includes(playerId) ? 'SX' : lastPlaceRightIds.includes(playerId) ? 'DX' : lastPlaceBothIds.includes(playerId) ? 'DX/SX' : null;
 
                                     return (
-                                        <Link key={player.id} href={`/player/${player.id}`} className="group w-full bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between transition-all active:bg-slate-50 active:scale-[0.99] touch-manipulation">
+                                        <Link key={player.id} href={`/player/${player.id}`} className="group w-full bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between transition-all duration-150 ease-out active:bg-slate-100 active:scale-[0.98] active:border-slate-300 touch-manipulation [-webkit-tap-highlight-color:transparent]">
                                             <div className="flex items-center gap-3 min-w-0">
                                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black font-mono shrink-0 ${rankIndex === 1 ? 'bg-amber-100 text-amber-700 border border-amber-300' : rankIndex === 2 ? 'bg-slate-100 text-slate-600 border border-slate-300' : rankIndex === 3 ? 'bg-orange-100 text-orange-700 border border-orange-300' : 'bg-slate-50 text-slate-400'}`}>{rankIndex}°</div>
                                                 <div className="group w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
@@ -269,9 +265,9 @@ export default async function Home({ searchParams }: PageProps) {
                         {/* CONTROLLI PAGINAZIONE GIOCATORI */}
                         {totalPlayerPages > 1 && (
                             <div className="flex justify-center items-center gap-4 mb-10">
-                                <Link href={`/?tab=ranking&playerPage=${playerPage - 1}&page=${currentPage}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all active:scale-95 ${playerPage <= 1 ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}>← Precedente</Link>
+                                <Link href={`/?tab=ranking&playerPage=${playerPage - 1}&page=${currentPage}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.96] active:bg-slate-100 ${playerPage <= 1 ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}>← Precedente</Link>
                                 <div className="text-xs font-bold text-slate-500 font-mono">Pag. {playerPage} / {totalPlayerPages}</div>
-                                <Link href={`/?tab=ranking&playerPage=${playerPage + 1}&page=${currentPage}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all active:scale-95 ${playerPage >= totalPlayerPages ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}>Successiva →</Link>
+                                <Link href={`/?tab=ranking&playerPage=${playerPage + 1}&page=${currentPage}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.96] active:bg-slate-100 ${playerPage >= totalPlayerPages ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}>Successiva →</Link>
                             </div>
                         )}
 
@@ -286,7 +282,7 @@ export default async function Home({ searchParams }: PageProps) {
                                     <p className="text-xs text-slate-300 max-w-xl mt-1 leading-relaxed">Scopri come un'alimentazione strategica su misura può aumentare la tua resistenza nei match più lunghi e velocizzare il recovery muscolare.</p>
                                 </div>
                             </div>
-                            <a href="https://www.bionutrimed.it/prenota/prenota-visita-in-studio.html" target="_blank" rel="noopener noreferrer" className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs uppercase tracking-wider py-3 px-5 rounded-lg transition-all shadow-sm text-center w-full md:w-auto shrink-0">🌐 Prenota una visita</a>
+                            <a href="https://www.bionutrimed.it/prenota/prenota-visita-in-studio.html" target="_blank" rel="noopener noreferrer" className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs uppercase tracking-wider py-3 px-5 rounded-lg transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.96] active:bg-emerald-700 shadow-sm text-center w-full md:w-auto shrink-0">🌐 Prenota una visita</a>
                         </div>
                     </div>
                 )}
@@ -357,7 +353,7 @@ export default async function Home({ searchParams }: PageProps) {
                                                     <span className="inline-flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded border border-slate-100 text-slate-500">
                                                         <span>📍</span>
                                                         {matchClub.maps_url ? (
-                                                            <a href={matchClub.maps_url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline font-bold transition-colors">{matchClub.name} {matchClub.city ? `(${matchClub.city})` : ''}</a>
+                                                            <a href={matchClub.maps_url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline font-bold transition-colors [-webkit-tap-highlight-color:transparent] active:text-indigo-800">{matchClub.name} {matchClub.city ? `(${matchClub.city})` : ''}</a>
                                                         ) : (
                                                             <span className="font-bold text-slate-600">{matchClub.name} {matchClub.city ? `(${matchClub.city})` : ''}</span>
                                                         )}
@@ -375,9 +371,9 @@ export default async function Home({ searchParams }: PageProps) {
                         {/* CONTROLLI PAGINAZIONE MATCH */}
                         {totalPages > 1 && (
                             <div className="flex justify-center items-center gap-4 mt-6">
-                                <Link href={`/?tab=completed&page=${currentPage - 1}&playerPage=${playerPage}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all active:scale-95 ${currentPage <= 1 ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}>← Precedente</Link>
+                                <Link href={`/?tab=completed&page=${currentPage - 1}&playerPage=${playerPage}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.96] active:bg-slate-100 ${currentPage <= 1 ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}>← Precedente</Link>
                                 <div className="text-xs font-bold text-slate-500 font-mono">{currentPage} / {totalPages}</div>
-                                <Link href={`/?tab=completed&page=${currentPage + 1}&playerPage=${playerPage}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all active:scale-95 ${currentPage >= totalPages ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}>Successiva →</Link>
+                                <Link href={`/?tab=completed&page=${currentPage + 1}&playerPage=${playerPage}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.96] active:bg-slate-100 ${currentPage >= totalPages ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}>Successiva →</Link>
                             </div>
                         )}
                     </div>

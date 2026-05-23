@@ -1,10 +1,10 @@
 // app/admin/clubs/page.tsx
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
 import NewClubForm from './NewClubForm';
 import DeleteClubButton from './DeleteClubButton'; // Lo creiamo subito sotto
-import { Club } from '@/types'; // Assicurati di aver esportato l'interfaccia nel file types/index.ts
+import { Club } from '@/types';
+import BackToHomeButton from "@/components/BackToHomeButton"; // Assicurati di aver esportato l'interfaccia nel file types/index.ts
 
 export default async function AdminClubsPage() {
     const supabase = await createClient();
@@ -38,9 +38,7 @@ export default async function AdminClubsPage() {
                         <h1 className="text-2xl font-black text-slate-800 tracking-tight">Gestione Campi</h1>
                         <p className="text-sm text-slate-500">I campi inseriti qui saranno selezionabili in fase di creazione match.</p>
                     </div>
-                    <Link href="/admin/players" className="text-sm font-bold text-indigo-600 hover:underline">
-                        ← Torna ad Admin
-                    </Link>
+                    <BackToHomeButton />
                 </div>
 
                 {/* Componente Client per l'inserimento */}
