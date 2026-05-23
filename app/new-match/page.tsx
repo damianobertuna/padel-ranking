@@ -41,7 +41,10 @@ export default function CreateMatchForm() {
         async function loadData() {
             try {
                 const [playersRes, clubsRes] = await Promise.all([
-                    supabase.from('players').select('id, first_name, last_name, ranking, preferred_side, gender').order('first_name', { ascending: true }),
+                    supabase.from('players')
+                        .select('id, first_name, last_name, ranking, preferred_side, gender')
+                        .order('ranking', { ascending: false })
+                        .order('last_name', { ascending: true }),
                     supabase.from('clubs').select('*').order('name', { ascending: true })
                 ]);
 

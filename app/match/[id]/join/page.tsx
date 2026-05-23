@@ -34,8 +34,10 @@ export default function JoinMatchPage() {
                 if (!matchId) return;
                 const [matchRes, playersRes] = await Promise.all([
                     supabase.from('matches').select('*').eq('id', matchId).maybeSingle(),
-                    // Scarichiamo anche il genere per poter filtrare correttamente i rimpiazzi
-                    supabase.from('players').select('id, first_name, last_name, ranking, preferred_side, gender').order('first_name', { ascending: true })
+                    supabase.from('players')
+                        .select('id, first_name, last_name, ranking, preferred_side, gender')
+                        .order('ranking', { ascending: false })
+                        .order('last_name', { ascending: true })
                 ]);
                 if (matchRes.data) setMatch(matchRes.data);
                 if (playersRes.data) setPlayers(playersRes.data);
