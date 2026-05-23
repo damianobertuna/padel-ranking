@@ -175,7 +175,7 @@ export default async function Home({ searchParams }: PageProps) {
 
                         {/* Filtri Ordinamento (Mantengono paginazione match, ma resettano paginazione giocatori a 1) */}
                         <div className="flex gap-1.5 bg-slate-200/60 p-1 rounded-xl border border-slate-200 text-[11px] font-bold">
-                            <Link href={`/?gender=${currentGender}&sort=ranking&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'ranking' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>Punti</Link>
+                            <Link href={`/?gender=${currentGender}&sort=ranking&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'ranking' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>Punti Rank</Link>
                             <Link href={`/?gender=${currentGender}&sort=played&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'played' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>Giocate</Link>
                             <Link href={`/?gender=${currentGender}&sort=winrate&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all ${currentSort === 'winrate' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>Win Rate</Link>
                         </div>
@@ -261,7 +261,7 @@ export default async function Home({ searchParams }: PageProps) {
                                                 {currentSort === 'played' ? player.total_played : currentSort === 'winrate' ? `${player.win_rate.toFixed(1)}%` : player.ranking.toFixed(2)}
                                             </div>
                                             <span className="text-[9px] text-slate-400 uppercase tracking-tight font-bold">
-                                                {currentSort === 'played' ? 'Partite' : currentSort === 'winrate' ? 'Rate' : 'Punti'}
+                                                {currentSort === 'played' ? 'Partite' : currentSort === 'winrate' ? 'Rate' : 'Punti Rank'}
                                             </span>
                                         </div>
 

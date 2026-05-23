@@ -185,7 +185,7 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
 
                 {/* Elenco Partite */}
                 <div className="flex justify-between items-baseline mb-4">
-                    <h2 className="text-xl font-bold text-slate-800">Storico Partite e Variazione Punti</h2>
+                    <h2 className="text-xl font-bold text-slate-800">Storico Partite e Variazione Punti Rank</h2>
                     <span className="text-xs font-semibold text-slate-400 font-mono">Pagina {currentPage} di {totalPages}</span>
                 </div>
 

@@ -90,7 +90,7 @@ export default function RegulationsPage() {
                     <section className="space-y-2">
                         <div className="flex items-center gap-2">
                             <span className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs font-mono shrink-0">5</span>
-                            <h2 className="text-base font-black text-slate-800 tracking-tight">Assegnazione Punti Base</h2>
+                            <h2 className="text-base font-black text-slate-800 tracking-tight">Assegnazione Punti Rank Base</h2>
                         </div>
                         <p className="text-sm text-slate-600 leading-relaxed pl-8">
                             Il sistema aggiungerà alla coppia che vince <strong>+0.05</strong> mentre sottrarrà <strong>-0.05</strong> agli sconfitti, aggiornando in tempo reale la classifica RanKING e tutte le statistiche dei giocatori interessati.
@@ -115,7 +115,7 @@ export default function RegulationsPage() {
                             <h2 className="text-base font-black text-slate-800 tracking-tight">Sconfiggere il KING (Moltiplicatore Bonus)</h2>
                         </div>
                         <p className="text-sm text-slate-600 leading-relaxed pl-8">
-                            Nel caso in cui venga battuto il KING (SX, DX o MIX), verrà assegnato il doppio dei punti (ossia <strong>+0.10</strong>) alla coppia vincitrice, mentre sottrarrò sempre <strong>-0.05</strong> agli sconfitti. Solo nel caso in cui venga sconfitta una qualsiasi coppia di KING che ha giocato insieme nella stessa squadra, allora sottrarrò un malus di <strong>-0.10</strong> ad entrambi come penalità.
+                            Nel caso in cui venga battuto il KING (SX, DX o MIX), verrà assegnato il doppio dei punti rank (ossia <strong>+0.10</strong>) alla coppia vincitrice, mentre sottrarrò sempre <strong>-0.05</strong> agli sconfitti. Solo nel caso in cui venga sconfitta una qualsiasi coppia di KING che ha giocato insieme nella stessa squadra, allora sottrarrò un malus di <strong>-0.10</strong> ad entrambi come penalità.
                         </p>
                     </section>
 
@@ -126,7 +126,7 @@ export default function RegulationsPage() {
                             <h2 className="text-base font-black text-slate-800 tracking-tight">Il Riscatto del Fanalino</h2>
                         </div>
                         <p className="text-sm text-slate-600 leading-relaxed pl-8">
-                            Nel caso in cui un FANALINO (SX, DX o MIX) dovesse vincere qualsiasi partita, verrà assegnato il doppio dei punti (ossia <strong>+0.10</strong>) alla coppia vincitrice chiunque sia il suo compagno, mentre verranno sottratti regolarmente <strong>-0.05</strong> agli sconfitti.
+                            Nel caso in cui un FANALINO (SX, DX o MIX) dovesse vincere qualsiasi partita, verrà assegnato il doppio dei punti rank (ossia <strong>+0.10</strong>) alla coppia vincitrice chiunque sia il suo compagno, mentre verranno sottratti regolarmente <strong>-0.05</strong> agli sconfitti.
                         </p>
                     </section>
 
@@ -134,7 +134,7 @@ export default function RegulationsPage() {
                     <section className="space-y-2">
                         <div className="flex items-center gap-2">
                             <span className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs font-mono shrink-0">9</span>
-                            <h2 className="text-base font-black text-slate-800 tracking-tight">Partite Consecutive e Tetto Punti</h2>
+                            <h2 className="text-base font-black text-slate-800 tracking-tight">Partite Consecutive e Tetto Punti Rank</h2>
                         </div>
                         <p className="text-sm text-slate-600 leading-relaxed pl-8">
                             È possibile svolgere più di una partita RanKING consecutiva all’interno della stessa giornata (con le stesse coppie o diverse). I vari Bonus/Malus non sono cumulabili fra loro: <strong>±0.10</strong> sarà sempre il massimo assegnato per partita. Se fate più partite consecutive, dovete registrarle separatamente.
