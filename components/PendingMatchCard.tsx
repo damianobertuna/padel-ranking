@@ -90,6 +90,7 @@ export default function PendingMatchCard({
                 </div>
             </div>
 
+            {currentUserPlayer && (
             <div className="flex flex-col gap-2">
                 <a href={generaLinkWhatsAppLocal(match)} target="_blank" rel="noopener noreferrer" className="w-full inline-flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 px-4 rounded-xl text-[11px] transition-colors">
                     💬 Condividi su WhatsApp
@@ -112,6 +113,7 @@ export default function PendingMatchCard({
                     {(currentUserPlayer?.role === 'admin' || canResolve) && <DeleteMatchButton matchId={match.id} />}
                 </div>
             </div>
+            )}
         </div>
     );
 }

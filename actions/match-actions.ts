@@ -337,6 +337,7 @@ export async function resolveMatchWithRanking(data: {
  * 👉 RISOLTO: Rimosso completamente il parseInt per accettare l'UUID stringa intatto
  */
 export async function updateMatchPlayers(matchId: string, updatedFields: {
+    club_id?: number | null;
     team_a_left_id?: number | null;
     team_a_right_id?: number | null;
     team_b_left_id?: number | null;
@@ -344,6 +345,12 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
     match_type?: 'male' | 'female' | 'mixed';
 }) {
     const supabase = await createClient();
+
+    // 0. CONTROLLO DI SICUREZZA (IL VERO MURO)
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+        throw new Error("Accesso negato: devi effettuare il login per modificare una partita.");
+    }
 
     // 1. Recuperiamo il match attuale (per il confronto nel log)
     const { data: oldMatch } = await supabase
@@ -363,17 +370,20 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
     if (error) throw new Error(error.message);
 
     // 3. GENERIAMO IL LOG DI AUDIT
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data: admin } = await supabase.from('players').select('first_name, last_name').eq('user_id', user?.id).single();
+    const { data: admin } = await supabase.from('players').select('first_name, last_name').eq('user_id', user.id).single();
 
     const modifiche: string[] = [];
 
-    // Confronto dinamico (esempio per match_type)
-    if (updatedFields.match_type && updatedFields.match_type !== oldMatch.match_type) {
+    if (updatedFields.match_type !== undefined && updatedFields.match_type !== oldMatch.match_type) {
         modifiche.push(`Tipo match: da ${oldMatch.match_type} a ${updatedFields.match_type}`);
     }
 
-    // Confronto per i giocatori (potresti voler aggiungere una funzione helper per i nomi)
+    if (updatedFields.club_id !== undefined && updatedFields.club_id !== oldMatch.club_id) {
+        const oldClubText = oldMatch.club_id ? `Club #${oldMatch.club_id}` : 'Nessuno';
+        const newClubText = updatedFields.club_id ? `Club #${updatedFields.club_id}` : 'Nessuno';
+        modifiche.push(`Campo: da ${oldClubText} a ${newClubText}`);
+    }
+
     const slotKeys = ['team_a_left_id', 'team_a_right_id', 'team_b_left_id', 'team_b_right_id'] as const;
     slotKeys.forEach(key => {
         if (updatedFields[key] !== undefined && updatedFields[key] !== oldMatch[key]) {
@@ -385,7 +395,7 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
         await logAction(
             'MATCH_UPDATED',
             matchId,
-            `Admin ${admin?.first_name} ${admin?.last_name} ha modificato il match ${matchId}: ${modifiche.join('; ')}`,
+            `Admin ${admin?.first_name || 'Sconosciuto'} ${admin?.last_name || ''} ha modificato il match ${matchId.slice(0, 8)}: ${modifiche.join('; ')}`,
             {
                 previous_data: oldMatch,
                 new_data: updatedFields

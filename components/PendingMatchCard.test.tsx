@@ -53,6 +53,10 @@ const completeMatch = {
     team_b_right_id: 4
 } as Match;
 
+// UTENTI MOCK PER I TEST SUI PERMESSI
+const baseUser = { id: 10, user_id: 'user-123', role: 'user' } as Player;
+const adminUser = { id: 99, user_id: 'admin-123', role: 'admin' } as Player;
+
 describe('PendingMatchCard Component', () => {
 
     // Pulizia fondamentale per evitare i cloni nel DOM
@@ -85,8 +89,17 @@ describe('PendingMatchCard Component', () => {
         expect(screen.getByText(/📅/i)).toBeDefined();
     });
 
-    it('dovrebbe navigare verso la pagina di join quando si clicca su Unisciti/Gestisci', () => {
+    it('non dovrebbe mostrare i bottoni di azione se l\'utente NON è loggato', () => {
         render(<PendingMatchCard match={openMatch} rawPlayers={mockPlayers} currentUserPlayer={null} />);
+
+        // Verifichiamo che i bottoni siano effettivamente nascosti per gli ospiti
+        expect(screen.queryByText(/Condividi su WhatsApp/i)).toBeNull();
+        expect(screen.queryByRole('button', { name: /Unisciti \/ Invita/i })).toBeNull();
+    });
+
+    it('dovrebbe navigare verso la pagina di join quando si clicca su Unisciti/Gestisci', () => {
+        // Passiamo un utente base per far comparire la pulsantiera
+        render(<PendingMatchCard match={openMatch} rawPlayers={mockPlayers} currentUserPlayer={baseUser} />);
         const actionBtn = screen.getByRole('button', { name: /Unisciti \/ Invita/i });
         fireEvent.click(actionBtn);
 
@@ -96,7 +109,8 @@ describe('PendingMatchCard Component', () => {
 
     it('dovrebbe mostrare "Gestisci / Modifica" per un match completo se non ci sono permessi di risoluzione', () => {
         vi.spyOn(matchRules, 'canUserResolveMatch').mockReturnValue(false);
-        render(<PendingMatchCard match={completeMatch} rawPlayers={mockPlayers} currentUserPlayer={null} />);
+        // Passiamo un utente base per far comparire la pulsantiera
+        render(<PendingMatchCard match={completeMatch} rawPlayers={mockPlayers} currentUserPlayer={baseUser} />);
 
         expect(screen.getByText('Gestisci / Modifica')).toBeDefined();
         expect(screen.queryByTestId('resolve-btn')).toBeNull();
@@ -104,24 +118,23 @@ describe('PendingMatchCard Component', () => {
 
     it('dovrebbe mostrare i bottoni "Risolvi" e "Elimina" se il match è completo e l\'utente ha i permessi', () => {
         vi.spyOn(matchRules, 'canUserResolveMatch').mockReturnValue(true);
-        const adminUser = { id: 1, user_id: 'abc', role: 'admin' };
 
-        render(<PendingMatchCard match={completeMatch} rawPlayers={mockPlayers} currentUserPlayer={adminUser as any} />);
+        render(<PendingMatchCard match={completeMatch} rawPlayers={mockPlayers} currentUserPlayer={adminUser} />);
 
         expect(screen.getByTestId('resolve-btn')).toBeDefined();
         expect(screen.getByTestId('delete-btn')).toBeDefined();
     });
 
     it('dovrebbe mostrare il bottone Elimina all\'Admin anche per i match aperti', () => {
-        const adminUser = { id: 99, user_id: 'admin', role: 'admin' };
-        render(<PendingMatchCard match={openMatch} rawPlayers={mockPlayers} currentUserPlayer={adminUser as any} />);
+        render(<PendingMatchCard match={openMatch} rawPlayers={mockPlayers} currentUserPlayer={adminUser} />);
 
         expect(screen.getByTestId('delete-btn')).toBeDefined();
         expect(screen.queryByTestId('resolve-btn')).toBeNull();
     });
 
     it('dovrebbe generare correttamente il link di WhatsApp con il testo aggiornato', () => {
-        render(<PendingMatchCard match={openMatch} rawPlayers={mockPlayers} currentUserPlayer={null} />);
+        // Passiamo un utente base per far comparire la pulsantiera
+        render(<PendingMatchCard match={openMatch} rawPlayers={mockPlayers} currentUserPlayer={baseUser} />);
 
         const waLink = screen.getByText(/Condividi su WhatsApp/i).closest('a');
         expect(waLink).toBeDefined();
