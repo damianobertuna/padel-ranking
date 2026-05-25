@@ -166,29 +166,29 @@ export default async function Home({ searchParams }: PageProps) {
                 </div>
 
                 {/* NAVIGAZIONE A TAB (Migliorata per Mobile) */}
-                <div className="flex bg-slate-200/50 p-1 rounded-xl mb-6 shadow-inner w-full sm:w-auto overflow-x-auto scrollbar-hide">
+                <div className="grid grid-cols-3 bg-slate-200/50 p-1 rounded-xl mb-6 shadow-inner w-full">
                     <Link
                         href={`/?tab=ranking&${urlState}`}
                         scroll={false}
-                        className={`flex-1 text-center py-2.5 px-4 rounded-lg text-sm font-bold transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.96] whitespace-nowrap ${currentTab === 'ranking' ? 'bg-white text-indigo-600 shadow-sm active:bg-slate-50' : 'text-slate-500 hover:text-slate-700 active:bg-slate-300/50'}`}
+                        className={`flex items-center justify-center py-2 rounded-lg text-[11px] font-black transition-all ${currentTab === 'ranking' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}
                     >
                         🏆 Classifica
                     </Link>
                     <Link
                         href={`/?tab=pending&${urlState}`}
                         scroll={false}
-                        className={`flex-1 text-center py-2.5 px-4 rounded-lg text-sm font-bold transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.96] whitespace-nowrap ${currentTab === 'pending' ? 'bg-white text-indigo-600 shadow-sm active:bg-slate-50' : 'text-slate-500 hover:text-slate-700 active:bg-slate-300/50'}`}
+                        className={`flex items-center justify-center py-2 rounded-lg text-[11px] font-black transition-all ${currentTab === 'pending' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}
                     >
-                        🗓️ In Programma {pendingMatches && pendingMatches.length > 0 ? <span className="ml-1 bg-indigo-100 text-indigo-700 py-0.5 px-1.5 rounded-full text-xs">{pendingMatches.length}</span> : ''}
+                        🗓️ Match
                     </Link>
                     <Link
                         href={`/?tab=completed&${urlState}`}
                         scroll={false}
-                        className={`flex-1 text-center py-2.5 px-4 rounded-lg text-sm font-bold transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.96] whitespace-nowrap ${currentTab === 'completed' ? 'bg-white text-indigo-600 shadow-sm active:bg-slate-50' : 'text-slate-500 hover:text-slate-700 active:bg-slate-300/50'}`}
+                        className={`flex items-center justify-center py-2 rounded-lg text-[11px] font-black transition-all ${currentTab === 'completed' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}
                     >
                         ✅ Risultati
                     </Link>
-                </div>
+                </div>git
 
                 {/* =========================================
                     TAB 1: CLASSIFICA
