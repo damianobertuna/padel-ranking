@@ -166,20 +166,7 @@ export default async function Home({ searchParams }: PageProps) {
                 </div>
 
                 {/* NAVIGAZIONE A TAB (Migliorata per Mobile) */}
-                {/* NAVIGAZIONE A TAB (Migliorata per Mobile) */}
-                <div
-                    className="flex bg-slate-200/50 p-1 rounded-xl mb-6 shadow-inner w-full sm:w-auto overflow-x-auto"
-                    style={{
-                        scrollbarWidth: 'none',     // Firefox
-                        msOverflowStyle: 'none',    // IE/Edge
-                    }}
-                >
-                    <style jsx>{`
-                        div::-webkit-scrollbar {
-                          display: none;            // Chrome, Safari, Opera
-                        }
-                      `}</style>
-
+                <div className="flex bg-slate-200/50 p-1 rounded-xl mb-6 shadow-inner w-full sm:w-auto overflow-x-auto scrollbar-hide">
                     <Link
                         href={`/?tab=ranking&${urlState}`}
                         scroll={false}
