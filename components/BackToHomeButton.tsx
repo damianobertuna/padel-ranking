@@ -4,26 +4,40 @@
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
-export default function BackToHomeButton() {
+interface BackToHomeButtonProps {
+    tab?: 'ranking' | 'pending' | 'completed';
+    label?: string; // Permette di sovrascrivere il testo manualmente, se serve
+}
+
+export default function BackToHomeButton({ tab = 'ranking', label }: BackToHomeButtonProps) {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
 
     const handleNavigation = () => {
-        // startTransition dice a React: "Questa è una transizione asincrona, tieni traccia dello stato pending"
         startTransition(() => {
-            router.push('/');
+            // Se il tab è 'ranking' (quello di default), navighiamo direttamente alla root
+            const url = tab && tab !== 'ranking' ? `/?tab=${tab}` : '/';
+            router.push(url);
         });
     };
+
+    // Determiniamo un testo intelligente di default in base al tab di destinazione
+    const defaultLabel =
+        tab === 'pending' ? 'Torna ai Match' :
+            tab === 'completed' ? 'Torna ai Risultati' :
+                'Torna alla Classifica';
+
+    const displayLabel = label || defaultLabel;
 
     return (
         <button
             onClick={handleNavigation}
             disabled={isPending}
             className={`
-                inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition-all
+                inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent]
                 ${isPending
                 ? 'bg-slate-200 text-slate-500 cursor-wait'
-                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-95 shadow-sm'
+                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-95 active:bg-slate-100 shadow-sm'
             }
             `}
         >
@@ -39,7 +53,7 @@ export default function BackToHomeButton() {
             ) : (
                 <>
                     <span>←</span>
-                    <span>Torna alla classifica</span>
+                    <span>{displayLabel}</span>
                 </>
             )}
         </button>

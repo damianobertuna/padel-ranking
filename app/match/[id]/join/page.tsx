@@ -139,7 +139,7 @@ export default function JoinMatchPage() {
                 team_b_left_id: teamBLeft || null,
                 team_b_right_id: teamBRight || null,
             });
-            router.push('/');
+            router.push('/?tab=pending');
             router.refresh();
         } catch (err: any) {
             setError(err.message || 'Si è verificato un errore durante il salvataggio della formazione.');
@@ -174,7 +174,7 @@ export default function JoinMatchPage() {
             <div className="max-w-2xl w-full bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-slate-200">
 
                 <div className="mb-4">
-                    <BackToHomeButton />
+                    <BackToHomeButton tab="pending"/>
                 </div>
 
                 <div className="flex justify-between items-start mb-6">
