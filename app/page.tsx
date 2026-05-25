@@ -184,7 +184,7 @@ export default async function Home({ searchParams }: PageProps) {
                     >
                         ✅ Risultati
                     </Link>
-                </div>git
+                </div>
 
                 {/* =========================================
                     TAB 1: CLASSIFICA
