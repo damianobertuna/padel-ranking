@@ -126,38 +126,34 @@ export default async function Home({ searchParams }: PageProps) {
                 </div>
 
                 {/* INTESTAZIONE */}
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-                    <h1 className="text-3xl font-black text-slate-800 tracking-tight">RanKING Padel</h1>
-                    <Link
-                        href="/rules"
-                        className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-black rounded-full border border-indigo-200/60 transition-all duration-150 hover:scale-[1.02] active:scale-95 shadow-xs [-webkit-tap-highlight-color:transparent]"
-                    >
-                        <span className="font-mono text-sm leading-none">📖</span>
-                        <span>Regolamento Ufficiale</span>
-                    </Link>
-                    <div className="flex gap-2 w-full sm:w-auto">
+                <div className="flex flex-col gap-4 mb-6">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                        <h1 className="text-3xl font-black text-slate-800 tracking-tight">RanKING Padel</h1>
                         <Link
                             href="/rules"
-                            className="sm:hidden flex-1 inline-flex items-center justify-center gap-2 bg-slate-200/80 hover:bg-slate-300 text-slate-700 font-bold py-2.5 px-4 rounded-xl transition-all duration-150 ease-out active:scale-[0.96] active:bg-slate-300 text-sm shadow-xs [-webkit-tap-highlight-color:transparent]"
+                            className="inline-flex items-center justify-center gap-1.5 px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-black rounded-full border border-indigo-200/60 transition-all shadow-xs"
                         >
                             <span>📖</span>
                             <span>Regolamento</span>
                         </Link>
+                    </div>
 
+                    {/* Contenitore pulsanti che va a capo su mobile */}
+                    <div className="flex flex-wrap gap-2 w-full justify-center sm:justify-start">
                         {user && (
-                            <Link href="/new-match" className="flex-1 sm:flex-none text-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-xl transition-all duration-150 ease-out active:scale-[0.96] active:bg-indigo-800 text-sm shadow-sm [-webkit-tap-highlight-color:transparent]">
+                            <Link href="/new-match" className="flex-[1_1_100%] sm:flex-none text-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-xl text-sm shadow-sm">
                                 + Nuova Partita
                             </Link>
                         )}
                         {currentUserPlayer?.role === 'admin' && (
                             <>
-                                <Link href="/admin/players" className="bg-slate-800 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-slate-900 transition-all duration-150 ease-out active:scale-[0.96] active:bg-slate-950 text-sm shadow-sm text-center [-webkit-tap-highlight-color:transparent]">
+                                <Link href="/admin/players" className="flex-[1_1_45%] sm:flex-none bg-slate-800 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-slate-900 text-sm shadow-sm text-center">
                                     ⚙️ Giocatori
                                 </Link>
-                                <Link href="/admin/clubs" className="bg-slate-800 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-slate-900 transition-all duration-150 ease-out active:scale-[0.96] active:bg-slate-950 text-sm shadow-sm text-center [-webkit-tap-highlight-color:transparent]">
+                                <Link href="/admin/clubs" className="flex-[1_1_45%] sm:flex-none bg-slate-800 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-slate-900 text-sm shadow-sm text-center">
                                     📍 Club
                                 </Link>
-                                <Link href="/admin/logs" className="bg-indigo-600 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-indigo-700 transition-all duration-150 ease-out active:scale-[0.96] active:bg-indigo-800 text-sm shadow-sm text-center [-webkit-tap-highlight-color:transparent]">
+                                <Link href="/admin/logs" className="flex-[1_1_45%] sm:flex-none bg-indigo-600 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-indigo-700 text-sm shadow-sm text-center">
                                     📋 Log
                                 </Link>
                             </>
