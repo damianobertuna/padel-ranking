@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { canUserResolveMatch } from '@/lib/matchRules';
 import DeleteMatchButton from '@/components/DeleteMatchButton';
 import ResolveMatchButton from '@/components/ResolveMatchButton';
@@ -19,6 +20,26 @@ export default function PendingMatchCard({
 
     const matchClub = clubs?.find(c => c.id === match.club_id);
 
+    // --- NUOVA LOGICA: Calcolo del range di livello ---
+    const activePlayerIds = [
+        match.team_a_left_id, match.team_a_right_id,
+        match.team_b_left_id, match.team_b_right_id
+    ].filter(Boolean) as number[];
+
+    const activeRankings = activePlayerIds
+        .map(id => rawPlayers.find(p => p.id === id)?.ranking)
+        .filter((r): r is number => r !== undefined);
+
+    let levelText = 'Da definire (Nessun giocatore)';
+    if (activeRankings.length > 0) {
+        const minLvl = Math.min(...activeRankings);
+        const maxLvl = Math.max(...activeRankings);
+        levelText = minLvl === maxLvl
+            ? `${minLvl.toFixed(2)}`
+            : `${minLvl.toFixed(2)} - ${maxLvl.toFixed(2)}`;
+    }
+    // ----------------------------------------------------
+
     const generaLinkWhatsAppLocal = (m: Match) => {
         const getPlayerObj = (id: number | null) => rawPlayers.find(player => player.id === id) || null;
         const pA1 = getPlayerObj(m.team_a_left_id); const pA2 = getPlayerObj(m.team_a_right_id);
@@ -29,7 +50,10 @@ export default function PendingMatchCard({
         });
         const clubText = matchClub ? `${matchClub.name}${matchClub.city ? ` (${matchClub.city})` : ''}` : 'Da definire';
 
-        const testo = `🎾 *RanKING Padel - Convocazione Match* 🎾\n\n📅 *Data:* ${dataFormattata}\n📍 *Campo:* ${clubText}\n\n👥 *SQUADRA A:*\n• ${pA1 ? `${pA1.first_name} ${pA1.last_name}` : 'Slot Libero'} (${pA1 ? pA1.ranking.toFixed(2) : '0.00'})\n• ${pA2 ? `${pA2.first_name} ${pA2.last_name}` : 'Slot Libero'} (${pA2 ? pA2.ranking.toFixed(2) : '0.00'})\n\n👥 *SQUADRA B:*\n• ${pB1 ? `${pB1.first_name} ${pB1.last_name}` : 'Slot Libero'} (${pB1 ? pB1.ranking.toFixed(2) : '0.00'})\n• ${pB2 ? `${pB2.first_name} ${pB2.last_name}` : 'Slot Libero'} (${pB2 ? pB2.ranking.toFixed(2) : '0.00'})\n\n👉 Accedi all'app per completare la formazione o aggiungere il risultato!`;
+        const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+        const matchLink = `${baseUrl}/match/${m.id}/join`;
+
+        const testo = `🎾 *RanKING Padel - Convocazione Match* 🎾\n\n📅 *Data:* ${dataFormattata}\n📍 *Campo:* ${clubText}\n📊 *Livello Attuale:* ${levelText}\n\n👥 *SQUADRA A:*\n• ${pA1 ? `${pA1.first_name} ${pA1.last_name}` : 'Slot Libero'} (${pA1 ? pA1.ranking.toFixed(2) : '0.00'})\n• ${pA2 ? `${pA2.first_name} ${pA2.last_name}` : 'Slot Libero'} (${pA2 ? pA2.ranking.toFixed(2) : '0.00'})\n\n👥 *SQUADRA B:*\n• ${pB1 ? `${pB1.first_name} ${pB1.last_name}` : 'Slot Libero'} (${pB1 ? pB1.ranking.toFixed(2) : '0.00'})\n• ${pB2 ? `${pB2.first_name} ${pB2.last_name}` : 'Slot Libero'} (${pB2 ? pB2.ranking.toFixed(2) : '0.00'})\n\n👉 *Tutte le info e gestione match qui:*\n🔗 ${matchLink}`;
 
         return `https://wa.me/?text=${encodeURIComponent(testo)}`;
     };
@@ -45,7 +69,7 @@ export default function PendingMatchCard({
         return (
             <div className="text-xs font-bold text-slate-800 truncate py-0.5 flex items-center justify-center gap-1">
                 <span>{p ? `${p.first_name} ${p.last_name}` : 'Sconosciuto'}</span>
-                {p && <span className="text-[9px] font-mono font-bold text-indigo-600 bg-indigo-50 px-1 rounded">{p.ranking.toFixed(1)}</span>}
+                {p && <span className="text-[9px] font-mono font-bold text-indigo-600 bg-indigo-50 px-1 rounded">{p.ranking.toFixed(2)}</span>}
             </div>
         );
     };
@@ -64,23 +88,42 @@ export default function PendingMatchCard({
                     </span>
                 </div>
 
-                {(match.match_date || matchClub) && (
-                    <div className="flex flex-col gap-1.5 mb-4 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                        {match.match_date && (
-                            <div className="flex items-center gap-2 font-semibold">📅 {new Date(match.match_date).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
+                {/* VISUALIZZAZIONE FISSA DI DATA, CAMPO E LIVELLO */}
+                <div className="flex flex-col gap-1.5 mb-4 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                    {match.match_date && (
+                        <div className="flex items-center gap-2 font-semibold">
+                            📅 {new Date(match.match_date).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                    )}
+
+                    <div className="flex items-center gap-2 truncate">
+                        <span>📍</span>
+                        {matchClub?.maps_url ? (
+                            <a
+                                href={matchClub.maps_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-semibold text-indigo-600 hover:text-indigo-800 hover:underline transition-colors [-webkit-tap-highlight-color:transparent]"
+                            >
+                                {matchClub.name} {matchClub.city && <span className="font-normal text-slate-500">({matchClub.city})</span>}
+                            </a>
+                        ) : matchClub ? (
+                            <span className="font-semibold text-slate-700">
+                                {matchClub.name} {matchClub.city && <span className="font-normal text-slate-500">({matchClub.city})</span>}
+                            </span>
+                        ) : (
+                            <span className="italic text-slate-400 font-medium">Campo da definire</span>
                         )}
-                        <a
-                            href={matchClub?.maps_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-semibold text-indigo-600 hover:text-indigo-800 hover:underline transition-colors [-webkit-tap-highlight-color:transparent]"
-                        >
-                            {matchClub && (
-                                <div className="flex items-center gap-2 truncate">📍 {matchClub.name}</div>
-                            )}
-                        </a>
                     </div>
-                )}
+
+                    {/* NUOVA RIGA: Range di Livello */}
+                    <div className="flex items-center gap-2">
+                        <span>📊</span>
+                        <span className="font-semibold text-slate-700">
+                            Livello: <span className="text-indigo-700">{levelText}</span>
+                        </span>
+                    </div>
+                </div>
 
                 <div className="grid grid-cols-2 gap-3 text-center">
                     <div className="bg-blue-50/50 p-2 rounded-lg border border-blue-100 space-y-1">
@@ -97,28 +140,27 @@ export default function PendingMatchCard({
             </div>
 
             {currentUserPlayer && (
-            <div className="flex flex-col gap-2">
-                <a href={generaLinkWhatsAppLocal(match)} target="_blank" rel="noopener noreferrer" className="w-full inline-flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 px-4 rounded-xl text-[11px] transition-colors">
-                    💬 Condividi su WhatsApp
-                </a>
+                <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 mt-1">
+                    <a href={generaLinkWhatsAppLocal(match)} target="_blank" rel="noopener noreferrer" className="w-full inline-flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 px-4 rounded-xl text-[11px] transition-colors [-webkit-tap-highlight-color:transparent] active:scale-[0.98]">
+                        💬 Condividi su WhatsApp
+                    </a>
 
-                <div className="flex gap-2 w-full">
-                    {/* Bottoni di gestione - Sempre accessibili per modificare o risolvere */}
-                    <button
-                        onClick={() => {
-                            setIsManaging(true);
-                            router.push(`/match/${match.id}/join`);
-                        }}
-                        disabled={isManaging}
-                        className="flex-[2] text-center bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2.5 rounded-xl transition-all flex items-center justify-center gap-2"
-                    >
-                        {isManaging ? 'Caricamento...' : (isMatchComplete ? 'Gestisci / Modifica' : 'Unisciti / Invita')}
-                    </button>
+                    <div className="flex gap-2 w-full">
+                        <button
+                            onClick={() => {
+                                setIsManaging(true);
+                                router.push(`/match/${match.id}/join`);
+                            }}
+                            disabled={isManaging}
+                            className="flex-[2] text-center bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2.5 rounded-xl transition-all duration-150 ease-out active:scale-[0.96] flex items-center justify-center gap-2 [-webkit-tap-highlight-color:transparent]"
+                        >
+                            {isManaging ? 'Caricamento...' : (isMatchComplete ? 'Gestisci / Modifica' : 'Unisciti / Invita')}
+                        </button>
 
-                    {canResolve && <ResolveMatchButton matchId={match.id} />}
-                    {(currentUserPlayer?.role === 'admin' || canResolve) && <DeleteMatchButton matchId={match.id} />}
+                        {canResolve && <ResolveMatchButton matchId={match.id} />}
+                        {(currentUserPlayer?.role === 'admin' || canResolve) && <DeleteMatchButton matchId={match.id} />}
+                    </div>
                 </div>
-            </div>
             )}
         </div>
     );
