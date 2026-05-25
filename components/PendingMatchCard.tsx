@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { canUserResolveMatch } from '@/lib/matchRules';
 import DeleteMatchButton from '@/components/DeleteMatchButton';
 import ResolveMatchButton from '@/components/ResolveMatchButton';
@@ -70,9 +69,16 @@ export default function PendingMatchCard({
                         {match.match_date && (
                             <div className="flex items-center gap-2 font-semibold">📅 {new Date(match.match_date).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
                         )}
-                        {matchClub && (
-                            <div className="flex items-center gap-2 truncate">📍 {matchClub.name}</div>
-                        )}
+                        <a
+                            href={matchClub?.maps_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-semibold text-indigo-600 hover:text-indigo-800 hover:underline transition-colors [-webkit-tap-highlight-color:transparent]"
+                        >
+                            {matchClub && (
+                                <div className="flex items-center gap-2 truncate">📍 {matchClub.name}</div>
+                            )}
+                        </a>
                     </div>
                 )}
 
