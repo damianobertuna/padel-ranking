@@ -125,7 +125,6 @@ export default function ResolveMatch() {
             await resolveMatchWithRanking({
                 matchId: match.id,
                 score: scoreArray,
-                rankingUpdates: updates
             });
             // 👈 Navigazione pulita con useRouter
             router.push('/');

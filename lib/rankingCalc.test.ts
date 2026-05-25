@@ -57,14 +57,15 @@ describe('Engine Calcolo King e Fanalino', () => {
         expect(res.lastPlaceLeftIds.length).toBe(2);
     });
 
-    it('should assign BOTH titles to a single player if they are alone in that side', () => {
+    it('should NOT assign titles to a single player if they are alone (flat ranking)', () => {
         const players = [
-            createMockPlayer(1, 'Left', 4.50), // Da solo: è sia il migliore che il peggiore!
+            createMockPlayer(1, 'Left', 4.50), // Da solo: max e min coincidono (classifica piatta)
         ];
 
         const res = computeKingAndFanalino(players);
 
-        expect(res.kingLeftIds).toEqual([1]);
-        expect(res.lastPlaceLeftIds).toEqual([1]);
+        // Ci aspettiamo array vuoti grazie al controllo di validità interno
+        expect(res.kingLeftIds).toEqual([]);
+        expect(res.lastPlaceLeftIds).toEqual([]);
     });
 });

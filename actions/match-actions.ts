@@ -12,7 +12,6 @@ export interface SetScore {
 
 /**
  * 1. CANCELLAZIONE DI UN MATCH IN PROGRAMMA
- * 👉 AGGIORNATO: matchId cambiato da number a string per supportare gli UUID
  */
 export async function deletePendingMatch(matchId: string) {
     const supabase = await createClient();
@@ -57,7 +56,6 @@ export async function deletePendingMatch(matchId: string) {
         .select('id, first_name, last_name')
         .in('id', [match.team_a_left_id, match.team_a_right_id, match.team_b_left_id, match.team_b_right_id].filter(Boolean));
 
-    // 👉 AGGIORNATO: Supporto a number | null per evitare crash con slot vuoti nelle partite aperte
     const getName = (id: number | null) => {
         if (id === null) return 'Slot Libero';
         const p = playersInMatch?.find(pl => pl.id === id);
@@ -155,7 +153,6 @@ export async function createPendingMatch(data: {
 
     const getName = (id: number | null) => {
         if (id === null) return 'Slot Libero';
-
         const p = playersInMatch?.find(pl => pl.id === id);
         return p ? `${p.first_name} ${p.last_name}` : 'Sconosciuto';
     };
@@ -194,7 +191,6 @@ export async function createPendingMatch(data: {
 export async function resolveMatchWithRanking(data: {
     matchId: string;
     score: SetScore[];
-    rankingUpdates: Record<number, number>;
 }) {
     const supabase = await createClient();
 
@@ -222,7 +218,7 @@ export async function resolveMatchWithRanking(data: {
         if (!match) throw new Error("Partita non trovata nel database");
         if (match.status !== 'pending') throw new Error("Questa partita è già stata risolta");
 
-        // VALIDAZIONE E CALCOLO AUTOMATICO DEL VINCITORE IN BASE AI SET
+        // VALIDAZIONE SET E VINCITORE
         if (!data.score || data.score.length < 2) {
             throw new Error("I dati dei set sono incompleti. Almeno i primi 2 set sono obbligatori.");
         }
@@ -242,41 +238,95 @@ export async function resolveMatchWithRanking(data: {
         const finalWinningTeam = setsWonA > setsWonB ? 'A' : 'B';
         const stringaPunteggio = data.score.map(s => `${s.team_a}-${s.team_b}`).join(" / ");
 
-        // AGGIORNAMENTO DEL RANKING DEI SINGOLI GIOCATORI
-        const allInvolvedIds = [
-            match.team_a_left_id, match.team_a_right_id,
-            match.team_b_left_id, match.team_b_right_id
-        ];
+        // ========================================================
+        // NUOVO ALGORITMO UFFICIALE: CALCOLO DEL RANKING SUL SERVER
+        // ========================================================
+        const playerIds = [match.team_a_left_id, match.team_a_right_id, match.team_b_left_id, match.team_b_right_id];
+        const { data: playersInMatch } = await supabase.from('players').select('*').in('id', playerIds);
 
-        for (const id of allInvolvedIds) {
-            const updateValue = data.rankingUpdates[id];
-            if (updateValue !== undefined) {
-                const { data: p } = await supabase.from('players').select('ranking').eq('id', id).single();
-                if (p) {
-                    const newRanking = p.ranking + updateValue;
-                    await supabase.from('players').update({ ranking: newRanking }).eq('id', id);
-                }
-            }
+        if (!playersInMatch || playersInMatch.length !== 4) {
+            throw new Error("Impossibile risolvere: la partita non ha 4 giocatori validi.");
         }
 
-        // AGGIORNAMENTO RECORD DEL MATCH (Salvataggio in stato 'completed')
+        // Troviamo i massimi (King) e minimi (Fanalino) globali
+        const { data: allPlayers } = await supabase.from('players').select('preferred_side, ranking');
+        const thresholds = {
+            Left: { max: -Infinity, min: Infinity },
+            Right: { max: -Infinity, min: Infinity },
+            Both: { max: -Infinity, min: Infinity }
+        };
+
+        allPlayers?.forEach(p => {
+            const side = p.preferred_side as 'Left' | 'Right' | 'Both';
+            if (p.ranking > thresholds[side].max) thresholds[side].max = p.ranking;
+            if (p.ranking < thresholds[side].min) thresholds[side].min = p.ranking;
+        });
+
+        const isKing = (p: any) => {
+            const sideKey = p.preferred_side as 'Left' | 'Right' | 'Both';
+            const side = thresholds[sideKey];
+            if (!side) return false;
+            return side.max !== side.min && p.ranking === side.max;
+        };
+
+        const isFanalino = (p: any) => {
+            const sideKey = p.preferred_side as 'Left' | 'Right' | 'Both';
+            const side = thresholds[sideKey];
+            if (!side) return false;
+            return side.max !== side.min && p.ranking === side.min;
+        };
+
+        // Dividiamo le squadre
+        const teamA = playersInMatch.filter(p => p.id === match.team_a_left_id || p.id === match.team_a_right_id);
+        const teamB = playersInMatch.filter(p => p.id === match.team_b_left_id || p.id === match.team_b_right_id);
+
+        const winners = finalWinningTeam === 'A' ? teamA : teamB;
+        const losers = finalWinningTeam === 'A' ? teamB : teamA;
+
+        // Calcoliamo i Delta in base alle Regole Ufficiali
+        let winnerDelta = 0.05;
+        let loserDelta = -0.05;
+
+        if (winners.some(isFanalino) || losers.some(isKing)) {
+            winnerDelta = 0.10; // Bonus sconfiggere King o Fanalino vince
+        }
+
+        if (losers.every(isKing)) {
+            loserDelta = -0.10; // Malus se vengono sconfitti due King in coppia
+        }
+
+        const teamADelta = finalWinningTeam === 'A' ? winnerDelta : loserDelta;
+        const teamBDelta = finalWinningTeam === 'B' ? winnerDelta : loserDelta;
+
+        const safeAdd = (rank: number, delta: number) => parseFloat((rank + delta).toFixed(2));
+
+        // AGGIORNAMENTO RECORD DEL MATCH (Con salvataggio dei delta)
         const { error: matchError } = await supabase
             .from('matches')
             .update({
                 status: 'completed',
                 winning_team: finalWinningTeam,
-                score: data.score
+                score: data.score,
+                team_a_delta: teamADelta,
+                team_b_delta: teamBDelta,
+                updated_at: new Date().toISOString()
             })
             .eq('id', data.matchId);
 
         if (matchError) throw new Error(`Errore chiusura partita: ${matchError.message}`);
 
-        // GENERAZIONE STRINGHE E SCRITTURA NELL'AUDIT LOG
-        const { data: playersInMatch } = await supabase
-            .from('players')
-            .select('id, first_name, last_name')
-            .in('id', allInvolvedIds);
+        // AGGIORNAMENTO DEL RANKING GIOCATORI SUL DATABASE
+        const playerUpdates = [
+            supabase.from('players').update({ ranking: safeAdd(teamA[0].ranking, teamADelta) }).eq('id', teamA[0].id),
+            supabase.from('players').update({ ranking: safeAdd(teamA[1].ranking, teamADelta) }).eq('id', teamA[1].id),
+            supabase.from('players').update({ ranking: safeAdd(teamB[0].ranking, teamBDelta) }).eq('id', teamB[0].id),
+            supabase.from('players').update({ ranking: safeAdd(teamB[1].ranking, teamBDelta) }).eq('id', teamB[1].id)
+        ];
+        await Promise.all(playerUpdates);
 
+        // ========================================================
+        // AUDIT LOG
+        // ========================================================
         const getName = (id: number) => {
             const p = playersInMatch?.find(pl => pl.id === id);
             return p ? `${p.first_name} ${p.last_name}` : 'Sconosciuto';
@@ -290,7 +340,9 @@ export async function resolveMatchWithRanking(data: {
             : `Vince il Team B (${nomeTeamB}) contro il Team A (${nomeTeamA})`;
 
         const operatore = `${currentUserPlayer.first_name} ${currentUserPlayer.last_name}`;
-        const logDetails = `L'operatore ${operatore} ha registrato il risultato: ${esitoDescrizione} [${stringaPunteggio}]`;
+
+        // Stringa Log arricchita con i Delta
+        const logDetails = `L'operatore ${operatore} ha registrato il risultato: ${esitoDescrizione} [${stringaPunteggio}]. Delta Rank: Team A (${teamADelta > 0 ? '+':''}${teamADelta}) - Team B (${teamBDelta > 0 ? '+':''}${teamBDelta})`;
 
         const { error: logError } = await logAction(
             'MATCH_RESOLVED',
@@ -300,6 +352,10 @@ export async function resolveMatchWithRanking(data: {
                 winning_team: finalWinningTeam,
                 score: stringaPunteggio,
                 is_completed: true,
+                deltas: {
+                    team_a: teamADelta,
+                    team_b: teamBDelta
+                },
                 teams: {
                     team_a: {
                         left_player_id: match.team_a_left_id,
@@ -310,12 +366,6 @@ export async function resolveMatchWithRanking(data: {
                         right_player_id: match.team_b_right_id
                     }
                 },
-                player_names: {
-                    team_a_left: getName(match.team_a_left_id),
-                    team_a_right: getName(match.team_a_right_id),
-                    team_b_left: getName(match.team_b_left_id),
-                    team_b_right: getName(match.team_b_right_id),
-                },
                 resolved_at: new Date().toISOString()
             }
         );
@@ -323,8 +373,14 @@ export async function resolveMatchWithRanking(data: {
         if (logError) console.error("❌ ERRORE SCRITTURA LOG RISOLUZIONE MATCH:", logError.message);
 
         console.log("✅ Server Action completata con successo!");
+
+        // Pulizia Cache per far ricaricare immediatamente le pagine interessate
         revalidatePath('/');
         revalidatePath('/admin/logs');
+        revalidatePath(`/player/${teamA[0].id}`);
+        revalidatePath(`/player/${teamA[1].id}`);
+        revalidatePath(`/player/${teamB[0].id}`);
+        revalidatePath(`/player/${teamB[1].id}`);
 
     } catch (globalError: any) {
         console.error("💥 ERRORE SERVER ACTION:", globalError.message);
@@ -334,7 +390,6 @@ export async function resolveMatchWithRanking(data: {
 
 /**
  * 4. AGGIORNAMENTO COMPONENTI IN LINEA (PARTITE APERTE)
- * 👉 RISOLTO: Rimosso completamente il parseInt per accettare l'UUID stringa intatto
  */
 export async function updateMatchPlayers(matchId: string, updatedFields: {
     club_id?: number | null;
@@ -346,7 +401,7 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
 }) {
     const supabase = await createClient();
 
-    // 0. CONTROLLO DI SICUREZZA (IL VERO MURO)
+    // 0. CONTROLLO DI SICUREZZA
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
         throw new Error("Accesso negato: devi effettuare il login per modificare una partita.");

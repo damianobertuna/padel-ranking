@@ -1,10 +1,10 @@
-import { defineConfig } from 'vitest/config';
-import tsconfigPaths from 'vite-tsconfig-paths'; // <-- 1. IMPORTA IL PLUGIN
+import { defineConfig, configDefaults } from 'vitest/config';
+import tsconfigPaths from 'vite-tsconfig-paths';
 
 export default defineConfig({
-    plugins: [tsconfigPaths()], // <-- 2. AGGIUNGILO NELL'ARRAY PLUGINS
+    plugins: [tsconfigPaths()],
     test: {
         environment: 'node',
-        // le tue altre configurazioni...
+        exclude: [...configDefaults.exclude, '**/e2e/**'],
     },
 });

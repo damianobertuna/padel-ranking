@@ -20,6 +20,8 @@ export interface Match {
     created_at: string;
     match_date?: string | null;
     club_id?: number | null;
+    team_a_delta?: number | null;
+    team_b_delta?: number | null;
 }
 
 export interface MatchWithResult {

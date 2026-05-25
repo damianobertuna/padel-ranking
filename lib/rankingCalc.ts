@@ -34,19 +34,24 @@ export function computeKingAndFanalino(players: Player[]): TitolariMatch {
     const lastPlaceRightIds: number[] = [];
     const lastPlaceBothIds: number[] = [];
 
-    // 3. Assegniamo i titoli confrontando il punteggio esatto di ciascun giocatore
+    // 3. Verifichiamo che la classifica NON sia piatta (MAX deve essere diverso da MIN)
+    const isLeftValid = maxRankingLeft !== minRankingLeft && maxRankingLeft !== -1;
+    const isRightValid = maxRankingRight !== minRankingRight && maxRankingRight !== -1;
+    const isBothValid = maxRankingBoth !== minRankingBoth && maxRankingBoth !== -1;
+
+    // 4. Assegniamo i titoli confrontando il punteggio esatto di ciascun giocatore
     for (const p of players) {
         const { id, ranking, preferred_side } = p;
 
-        // Assegnazione KING (Massimo per lato)
-        if (preferred_side === 'Left' && ranking === maxRankingLeft && maxRankingLeft !== -1) kingLeftIds.push(id);
-        if (preferred_side === 'Right' && ranking === maxRankingRight && maxRankingRight !== -1) kingRightIds.push(id);
-        if (preferred_side === 'Both' && ranking === maxRankingBoth && maxRankingBoth !== -1) kingBothIds.push(id);
+        // Assegnazione KING (Massimo per lato, valido solo se la classifica è sgranata)
+        if (preferred_side === 'Left' && isLeftValid && ranking === maxRankingLeft) kingLeftIds.push(id);
+        if (preferred_side === 'Right' && isRightValid && ranking === maxRankingRight) kingRightIds.push(id);
+        if (preferred_side === 'Both' && isBothValid && ranking === maxRankingBoth) kingBothIds.push(id);
 
-        // Assegnazione FANALINO (Minimo per lato)
-        if (preferred_side === 'Left' && ranking === minRankingLeft && minRankingLeft !== -1) lastPlaceLeftIds.push(id);
-        if (preferred_side === 'Right' && ranking === minRankingRight && minRankingRight !== -1) lastPlaceRightIds.push(id);
-        if (preferred_side === 'Both' && ranking === minRankingBoth && minRankingBoth !== -1) lastPlaceBothIds.push(id);
+        // Assegnazione FANALINO (Minimo per lato, valido solo se la classifica è sgranata)
+        if (preferred_side === 'Left' && isLeftValid && ranking === minRankingLeft) lastPlaceLeftIds.push(id);
+        if (preferred_side === 'Right' && isRightValid && ranking === minRankingRight) lastPlaceRightIds.push(id);
+        if (preferred_side === 'Both' && isBothValid && ranking === minRankingBoth) lastPlaceBothIds.push(id);
     }
 
     return {

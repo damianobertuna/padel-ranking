@@ -41,9 +41,8 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
         );
     }
 
-    // 2. Controllo Autenticazione: L'utente che guarda la pagina è il proprietario?
+    // 2. Controllo Autenticazione
     const { data: { user } } = await supabase.auth.getUser();
-    // Se l'utente è loggato e il suo ID Auth corrisponde allo user_id del giocatore, è lui!
     const isOwnProfile = Boolean(user && user.id === player.user_id);
 
     // 3. Recuperiamo tutti i giocatori per la decodifica dei nomi
@@ -53,7 +52,7 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
         return p ? `${p.first_name} ${p.last_name}` : 'Sconosciuto';
     };
 
-    // 4. Recuperiamo TUTTI i match completati in cui ha partecipato il giocatore
+    // 4. Recuperiamo TUTTI i match completati
     const { data: allMatches } = await supabase
         .from('matches')
         .select('*')
@@ -61,11 +60,10 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
         .or(`team_a_left_id.eq.${playerId},team_a_right_id.eq.${playerId},team_b_left_id.eq.${playerId},team_b_right_id.eq.${playerId}`)
         .order('updated_at', { ascending: false });
 
-    // 5. ELABORAZIONE DI TUTTE LE STATISTICHE AVANZATE (SET & GAME)
+    // 5. ELABORAZIONE STATISTICHE AVANZATE
     let victories = 0;
     let defeats = 0;
 
-    // Contatori analitici dei Set e dei Game
     let totalSetsWon = 0;
     let totalSetsLost = 0;
     let totalGamesWon = 0;
@@ -78,7 +76,7 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
         if (won) victories++;
         else defeats++;
 
-        // Analisi dettagliata del JSONB dei set
+        // Analisi Set
         const sets = (match.score || []) as Array<{team_a: number, team_b: number}>;
         sets.forEach(set => {
             const gameFatti = isTeamA ? set.team_a : set.team_b;
@@ -91,18 +89,21 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
             else if (gameSubiti > gameFatti) totalSetsLost++;
         });
 
+        // LETTURA DINAMICA DAL DB (fallback a 0 per match storici senza delta salvato)
+        const teamADelta = Number(match.team_a_delta || 0);
+        const teamBDelta = Number(match.team_b_delta || 0);
+
         return {
             ...match,
             userWon: won,
-            // Simuliamo il delta punti nello storico in base all'esito per dare un feedback visivo immediato
-            pointsDelta: won ? 15.40 : -11.20
+            // Il giocatore prende il delta calcolato e salvato per la sua fazione
+            pointsDelta: isTeamA ? teamADelta : teamBDelta
         };
     });
 
     const totalMatches = victories + defeats;
     const winRate = totalMatches > 0 ? parseFloat(((victories / totalMatches) * 100).toFixed(1)) : 0;
 
-    // Medie matematiche dei game
     const avgGamesWonPerMatch = totalMatches > 0 ? (totalGamesWon / totalMatches).toFixed(1) : '0.0';
     const totalGamesPlayed = totalGamesWon + totalGamesLost;
     const gameWinPercentage = totalGamesPlayed > 0 ? ((totalGamesWon / totalGamesPlayed) * 100).toFixed(1) : '0.0';
@@ -131,7 +132,6 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-col sm:flex-row justify-between items-center gap-6">
 
                     <div className="flex flex-col sm:flex-row items-center gap-6 w-full">
-                        {/* Selettore Avatar o Immagine Statica */}
                         {isOwnProfile ? (
                             <AvatarUpload playerId={player.id} currentAvatarUrl={player.avatar_url} />
                         ) : (
@@ -139,7 +139,6 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
                                 {player.avatar_url ? (
                                     <img src={player.avatar_url} alt={`Avatar di ${player.first_name}`} className="w-full h-full object-cover" />
                                 ) : (
-                                    /* Silhouette neutra di default se l'utente non ha impostato nulla */
                                     <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 font-black text-xl flex items-center justify-center shrink-0 uppercase tracking-tight">
                                         {player.first_name[0]}{player.last_name[0]}
                                     </div>
@@ -168,7 +167,6 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
                     </div>
                 </div>
 
-                {/* Griglia Widget Storici */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 w-full">
                     <WinRateWidget stats={statsForWidget} />
                     <GameAverageWidget
@@ -183,7 +181,6 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
                     <PartnersAndNemesisWidget playerId={playerId} enrichedMatches={enrichedMatches} allPlayers={allPlayers || []} />
                 </div>
 
-                {/* Elenco Partite */}
                 <div className="flex justify-between items-baseline mb-4">
                     <h2 className="text-xl font-bold text-slate-800">Storico Partite e Variazione Punti Rank</h2>
                     <span className="text-xs font-semibold text-slate-400 font-mono">Pagina {currentPage} di {totalPages}</span>
@@ -226,7 +223,6 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
                                             </div>
                                         </div>
 
-                                        {/* BLOCCO NUOVO: STATO ESITO + VARIAZIONE DEL RANKING IN TEMPO REALE */}
                                         <div className="shrink-0 flex flex-col items-end gap-1.5">
                                             {match.userWon ? (
                                                 <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
@@ -238,14 +234,17 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
                                                 </span>
                                             )}
 
-                                            {/* Tag Variazione Punti nello Storico */}
-                                            <div className={`text-xs font-mono font-black ${match.userWon ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                {match.userWon ? `+${match.pointsDelta.toFixed(2)}` : `${match.pointsDelta.toFixed(2)}`}
+                                            {/* LOGICA DISPLAY DELTA ROBUSTA: Si basa sul numero, formattando coerentemente segno e colore */}
+                                            <div className={`text-xs font-mono font-black ${
+                                                match.pointsDelta > 0 ? 'text-emerald-600' :
+                                                    match.pointsDelta < 0 ? 'text-rose-600' :
+                                                        'text-slate-500'
+                                            }`}>
+                                                {match.pointsDelta > 0 ? '+' : ''}{match.pointsDelta.toFixed(2)}
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Visualizzazione Set e Game */}
                                     <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-lg border border-slate-100 w-full sm:w-fit">
                                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1 select-none">Set:</span>
                                         <div className="flex items-center gap-1.5 font-mono font-black text-xs text-indigo-600">
@@ -270,7 +269,6 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
                     )}
                 </div>
 
-                {/* Navigazione Paginata */}
                 {totalPages > 1 && (
                     <div className="flex justify-center items-center gap-4 mt-6">
                         <Link href={`/player/${playerId}?page=${currentPage - 1}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all active:scale-95 ${currentPage <= 1 ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}>← Precedente</Link>
