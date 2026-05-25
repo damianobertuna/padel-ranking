@@ -120,7 +120,7 @@ export default async function Home({ searchParams }: PageProps) {
                                 <button type="submit" className="text-sm font-semibold text-red-600 hover:underline [-webkit-tap-highlight-color:transparent] active:opacity-50 transition-opacity">Esci</button>
                             </form>
                         ) : (
-                            <Link href="/login" className="text-sm font-bold text-indigo-600 hover:underline [-webkit-tap-highlight-color:transparent] active:opacity-50 transition-opacity">Accedi</Link>
+                            <Link href="/login" className="text-sm font-bold text-indigo-600 hover:underline [-webkit-tap-highlight-color:transparent] active:opacity-50 transition-opacity">Accedi / Registrati</Link>
                         )}
                     </div>
                 </div>

@@ -143,7 +143,7 @@ export default function Login() {
                         className={`w-1/2 py-2 rounded-lg transition-all ${!isSignUp ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
                         onClick={() => { setIsSignUp(false); setError(''); setMessage(''); }}
                     >
-                        Accedi
+                        Accedi / Registrati
                     </button>
                     <button
                         type="button"
