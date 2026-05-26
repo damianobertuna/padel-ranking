@@ -138,6 +138,14 @@ export default async function Home({ searchParams }: PageProps) {
                         </Link>
                     </div>
 
+                    <Link
+                        href="/guide"
+                        className="inline-flex items-center justify-center gap-1.5 px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-black rounded-full border border-emerald-200/60 transition-all shadow-xs ml-2"
+                    >
+                        <span>❓</span>
+                        <span>Come si usa</span>
+                    </Link>
+
                     {/* Contenitore pulsanti che va a capo su mobile */}
                     <div className="flex flex-wrap gap-2 w-full justify-center sm:justify-start">
                         {user && (
