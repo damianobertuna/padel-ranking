@@ -125,6 +125,25 @@ export async function createPendingMatch(data: {
 
     if (!currentUserPlayer) throw new Error("Profilo giocatore non trovato");
 
+    // --- CALCOLO DINAMICO ORGANIZZATORE E SICUREZZA ---
+    const selectedPlayerIds = [data.teamALeft, data.teamARight, data.teamBLeft, data.teamBRight].filter(Boolean) as number[];
+    const isCreatorInMatch = selectedPlayerIds.includes(currentUserPlayer.id);
+
+    let matchOrganizerId = null;
+
+    if (isCreatorInMatch) {
+        // Regola A: Se chi crea gioca, è lui il dominus.
+        matchOrganizerId = currentUserPlayer.id;
+    } else if (currentUserPlayer.role === 'admin') {
+        // Regola B: L'admin sta creando un match per terzi.
+        // Deleghiamo al PRIMO giocatore inserito (se esiste), altrimenti fallback (null).
+        matchOrganizerId = selectedPlayerIds.length > 0 ? selectedPlayerIds[0] : null;
+    } else {
+        // Edge Case / Sicurezza: Un utente base cerca di creare un match "fantasma".
+        throw new Error("OPERAZIONE NEGATA: Devi occupare almeno uno slot per creare una partita.");
+    }
+    // ----------------------------------------------------
+
     // Inseriamo il match in stato pending
     const { data: matchId, error: matchError } = await supabase
         .from('matches')
@@ -137,7 +156,8 @@ export async function createPendingMatch(data: {
                 team_b_left_id: data.teamBLeft,
                 team_b_right_id: data.teamBRight,
                 club_id: data.clubId || null,
-                status: 'pending'
+                status: 'pending',
+                organizer_id: matchOrganizerId // Applichiamo l'ID dinamico
             }
         ])
         .select('id')
@@ -149,7 +169,7 @@ export async function createPendingMatch(data: {
     const { data: playersInMatch } = await supabase
         .from('players')
         .select('id, first_name, last_name')
-        .in('id', [data.teamALeft, data.teamARight, data.teamBLeft, data.teamBRight].filter(Boolean));
+        .in('id', selectedPlayerIds); // Usiamo l'array già filtrato
 
     const getName = (id: number | null) => {
         if (id === null) return 'Slot Libero';
@@ -173,6 +193,7 @@ export async function createPendingMatch(data: {
             match_type: data.matchType,
             match_date: data.matchDate,
             club_id: data.clubId,
+            organizer_id: matchOrganizerId, // Salvato correttamente nel log
             teams: {
                 teamA: [data.teamALeft, data.teamARight],
                 teamB: [data.teamBLeft, data.teamBRight]
@@ -457,6 +478,153 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
             }
         );
     }
+
+    revalidatePath('/');
+}
+
+export async function leaveMatchAction(matchId: string) {
+    const supabase = await createClient();
+
+    // 1. Autenticazione e recupero profilo
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Utente non autenticato");
+
+    const { data: currentPlayer } = await supabase
+        .from('players')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+    if (!currentPlayer) throw new Error("Profilo giocatore non trovato");
+
+    // 2. Recupero del match per analizzare lo stato attuale
+    const { data: match, error: fetchError } = await supabase
+        .from('matches')
+        .select('*')
+        .eq('id', matchId)
+        .single();
+
+    if (fetchError || !match) throw new Error("Match non trovato");
+
+    // 3. Ricerca dello slot occupato dall'utente
+    let slotToClear: string | null = null;
+    if (match.team_a_left_id === currentPlayer.id) slotToClear = 'team_a_left_id';
+    else if (match.team_a_right_id === currentPlayer.id) slotToClear = 'team_a_right_id';
+    else if (match.team_b_left_id === currentPlayer.id) slotToClear = 'team_b_left_id';
+    else if (match.team_b_right_id === currentPlayer.id) slotToClear = 'team_b_right_id';
+
+    if (!slotToClear) {
+        throw new Error("Impossibile uscire: non sei iscritto a questa partita.");
+    }
+
+    // 4. Calcolo dei giocatori rimanenti
+    const allSlots = [
+        match.team_a_left_id, match.team_a_right_id,
+        match.team_b_left_id, match.team_b_right_id
+    ];
+
+    // Filtriamo via gli slot vuoti e l'utente che sta uscendo
+    const remainingPlayers = allSlots.filter(id => id !== null && id !== currentPlayer.id);
+
+    // 5. Preparazione Payload e Logica Passaggio di Testimone
+    let updatePayload: Record<string, any> = { [slotToClear]: null };
+    let shouldDeleteMatch = false;
+    let logMessage = `Il giocatore ${currentPlayer.first_name} ha lasciato la partita.`;
+
+    if (remainingPlayers.length === 0) {
+        // Edge Case: L'utente era l'ultimo rimasto. Distruggiamo il match.
+        shouldDeleteMatch = true;
+    } else if (match.organizer_id === currentPlayer.id) {
+        // L'utente che esce è l'organizzatore. Passaggio di testimone!
+        // Assegniamo la partita al primo giocatore superstite.
+        const newOrganizerId = remainingPlayers[0];
+        updatePayload.organizer_id = newOrganizerId;
+        logMessage += ` Il ruolo di Organizzatore è passato automaticamente al giocatore ID: ${newOrganizerId}.`;
+    }
+
+    // 6. Esecuzione Transazione Database
+    if (shouldDeleteMatch) {
+        const { error: deleteError } = await supabase.from('matches').delete().eq('id', matchId);
+        if (deleteError) throw new Error(`Errore eliminazione match vuoto: ${deleteError.message}`);
+
+        await logAction('MATCH_DELETED_AUTO', matchId, `Match #${matchId.slice(0,6)} eliminato automaticamente perché vuoto dopo l'uscita dell'ultimo giocatore.`);
+    } else {
+        const { error: updateError } = await supabase
+            .from('matches')
+            .update(updatePayload)
+            .eq('id', matchId);
+        if (updateError) throw new Error(`Errore aggiornamento slot: ${updateError.message}`);
+
+        await logAction('PLAYER_LEFT_MATCH', matchId, logMessage);
+    }
+
+    // 7. Invalida la cache di Vercel per aggiornare la UI istantaneamente
+    revalidatePath('/');
+}
+
+export async function joinMatchAction(matchId: string) {
+    const supabase = await createClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Utente non autenticato");
+
+    const { data: currentPlayer } = await supabase
+        .from('players')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+    if (!currentPlayer) throw new Error("Profilo giocatore non trovato");
+
+    const { data: match, error: fetchError } = await supabase
+        .from('matches')
+        .select('*')
+        .eq('id', matchId)
+        .single();
+
+    if (fetchError || !match) throw new Error("Match non trovato");
+
+    const allSlots = [
+        match.team_a_left_id, match.team_a_right_id,
+        match.team_b_left_id, match.team_b_right_id
+    ];
+
+    if (allSlots.includes(currentPlayer.id)) {
+        throw new Error("Sei già iscritto a questa partita.");
+    }
+
+    // --- LOGICA DI DOMINIO: COMPATIBILITÀ LATO ---
+    const preferredSide = currentPlayer.preferred_side || 'Both'; // Fallback di sicurezza
+    const canPlayLeft = preferredSide === 'Left' || preferredSide === 'Both';
+    const canPlayRight = preferredSide === 'Right' || preferredSide === 'Both';
+
+    let slotToFill: string | null = null;
+
+    // Cerchiamo prima a Sinistra (se il giocatore può giocarci)
+    if (canPlayLeft && !match.team_a_left_id) slotToFill = 'team_a_left_id';
+    else if (canPlayLeft && !match.team_b_left_id) slotToFill = 'team_b_left_id';
+
+    // Se non abbiamo trovato a sinistra, cerchiamo a Destra (se il giocatore può giocarci)
+    if (!slotToFill && canPlayRight && !match.team_a_right_id) slotToFill = 'team_a_right_id';
+    else if (!slotToFill && canPlayRight && !match.team_b_right_id) slotToFill = 'team_b_right_id';
+
+    if (!slotToFill) {
+        throw new Error(`Impossibile unirsi: nessuno slot disponibile per la tua preferenza (${preferredSide}).`);
+    }
+    // ---------------------------------------------
+
+    const { error: updateError } = await supabase
+        .from('matches')
+        .update({ [slotToFill]: currentPlayer.id })
+        .eq('id', matchId);
+
+    if (updateError) throw new Error(`Errore durante l'iscrizione: ${updateError.message}`);
+
+    await logAction(
+        'PLAYER_JOINED_MATCH',
+        matchId,
+        `Il giocatore ${currentPlayer.first_name} ${currentPlayer.last_name} si è unito automaticamente alla partita nello slot ${slotToFill}.`
+    );
 
     revalidatePath('/');
 }

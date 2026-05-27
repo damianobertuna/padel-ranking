@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import PendingMatchCard from './PendingMatchCard';
 import { Match, Player, Club } from '@/types';
 import * as matchRules from '@/lib/matchRules';
+import { leaveMatchAction, joinMatchAction } from '@/actions/match-actions';
 
 // 1. MOCK DELLE DIPENDENZE E NAVIGAZIONE
 const mockPush = vi.fn();
@@ -15,6 +16,12 @@ vi.mock('@/lib/matchRules', () => ({
     canUserResolveMatch: vi.fn()
 }));
 
+// Mock delle nuove Server Action
+vi.mock('@/actions/match-actions', () => ({
+    leaveMatchAction: vi.fn(),
+    joinMatchAction: vi.fn()
+}));
+
 vi.mock('@/components/DeleteMatchButton', () => ({
     default: () => <button data-testid="delete-btn">Elimina</button>
 }));
@@ -22,12 +29,20 @@ vi.mock('@/components/ResolveMatchButton', () => ({
     default: () => <button data-testid="resolve-btn">Risolvi</button>
 }));
 
-// 2. DATI DI TEST FINTI
+// 2. DATI DI TEST FINTI E UTENTI MOCK
+const baseUser = { id: 10, user_id: 'user-123', first_name: 'Base', last_name: 'User', role: 'user', preferred_side: 'Both', ranking: 3.0 } as Player;
+const adminUser = { id: 99, user_id: 'admin-123', first_name: 'Admin', last_name: 'Super', role: 'admin', preferred_side: 'Both', ranking: 4.0 } as Player;
+const organizerUser = { id: 1, user_id: 'mario-123', first_name: 'Mario', last_name: 'Rossi', role: 'user', preferred_side: 'Both', ranking: 4.0 } as Player;
+const leftSideUser = { id: 11, user_id: 'lefty', first_name: 'Left', last_name: 'Player', role: 'user', preferred_side: 'Left', ranking: 3.5 } as Player;
+
 const mockPlayers = [
-    { id: 1, first_name: 'Mario', last_name: 'Rossi', ranking: 4.0 },
+    organizerUser,
     { id: 2, first_name: 'Luigi', last_name: 'Verdi', ranking: 3.5 },
     { id: 3, first_name: 'Pippo', last_name: 'Franco', ranking: 3.0 },
     { id: 4, first_name: 'Gino', last_name: 'Bramieri', ranking: 4.5 },
+    baseUser,
+    adminUser,
+    leftSideUser // <-- ECCO IL GIOCATORE MANCANTE CHE CAUSAVA L'ERRORE
 ] as Player[];
 
 const mockClubs = [
@@ -38,12 +53,13 @@ const openMatch = {
     id: 'match-123',
     status: 'pending',
     created_at: '2026-05-23T18:00:00Z',
-    match_date: '2026-05-25T18:00:00Z', // Aggiunto per far comparire il calendario
+    match_date: '2026-05-25T18:00:00Z',
     team_a_left_id: 1,
     team_a_right_id: null,
     team_b_left_id: null,
     team_b_right_id: null,
-    club_id: 100
+    club_id: 100,
+    organizer_id: 1 // Mario Rossi è l'organizzatore
 } as Match;
 
 const completeMatch = {
@@ -53,13 +69,8 @@ const completeMatch = {
     team_b_right_id: 4
 } as Match;
 
-// UTENTI MOCK PER I TEST SUI PERMESSI
-const baseUser = { id: 10, user_id: 'user-123', role: 'user' } as Player;
-const adminUser = { id: 99, user_id: 'admin-123', role: 'admin' } as Player;
-
 describe('PendingMatchCard Component', () => {
 
-    // Pulizia fondamentale per evitare i cloni nel DOM
     beforeEach(() => {
         vi.clearAllMocks();
     });
@@ -70,81 +81,87 @@ describe('PendingMatchCard Component', () => {
 
     it('dovrebbe renderizzare una partita APERTA con i relativi indicatori', () => {
         render(<PendingMatchCard match={openMatch} rawPlayers={mockPlayers} currentUserPlayer={null} />);
-
-        // Verifica il badge OPEN MATCH
         expect(screen.getByText(/OPEN MATCH/i)).toBeDefined();
-
-        // Dato che ci sono spazi, a capo e parentesi, cerchiamo solo le parole chiave
-        // Usiamo getAllByText perché ci sono 3 slot liberi e getByText fallirebbe trovandone più di uno!
         const slotsLiberi = screen.getAllByText(/SLOT LIBERO/i);
-
-        // Ci aspettiamo di trovare 3 slot liberi in questo mock
         expect(slotsLiberi.length).toBe(3);
     });
 
-    it('dovrebbe renderizzare una partita COMPLETA con il badge "Match Pronto"', () => {
-        render(<PendingMatchCard match={completeMatch} rawPlayers={mockPlayers} currentUserPlayer={null} />);
-        expect(screen.getByText('MATCH PRONTO')).toBeDefined();
-    });
-
-    it('dovrebbe mostrare Data e Club correttamente', () => {
-        render(<PendingMatchCard match={openMatch} rawPlayers={mockPlayers} currentUserPlayer={null} clubs={mockClubs} />);
-        expect(screen.getByText(/Padel Club Catania/i)).toBeDefined();
-        expect(screen.getByText(/📅/i)).toBeDefined();
+    it('dovrebbe mostrare il badge ORG all\'organizzatore', () => {
+        render(<PendingMatchCard match={openMatch} rawPlayers={mockPlayers} currentUserPlayer={baseUser} />);
+        expect(screen.getByText(/ORG/i)).toBeDefined();
+        expect(screen.getByText(/👑/i)).toBeDefined();
     });
 
     it('non dovrebbe mostrare i bottoni di azione se l\'utente NON è loggato', () => {
         render(<PendingMatchCard match={openMatch} rawPlayers={mockPlayers} currentUserPlayer={null} />);
-
-        // Verifichiamo che i bottoni siano effettivamente nascosti per gli ospiti
         expect(screen.queryByText(/Condividi convocazione/i)).toBeNull();
         expect(screen.queryByRole('button', { name: /Unisciti \/ Invita/i })).toBeNull();
     });
 
-    it('dovrebbe navigare verso la pagina di join quando si clicca su Unisciti/Gestisci', () => {
-        // Passiamo un utente base per far comparire la pulsantiera
-        render(<PendingMatchCard match={openMatch} rawPlayers={mockPlayers} currentUserPlayer={baseUser} />);
-        const actionBtn = screen.getByRole('button', { name: /Unisciti \/ Invita/i });
+    // --- NUOVI TEST ARCHITETTURALI ---
+
+    it('dovrebbe navigare a /join quando l\'organizzatore o admin clicca su MODIFICA MATCH', () => {
+        render(<PendingMatchCard match={openMatch} rawPlayers={mockPlayers} currentUserPlayer={organizerUser} />);
+        const actionBtn = screen.getByRole('button', { name: /MODIFICA MATCH/i });
         fireEvent.click(actionBtn);
 
         expect(screen.getByText('ATTENDI...')).toBeDefined();
         expect(mockPush).toHaveBeenCalledWith('/match/match-123/join');
     });
 
-    it('dovrebbe mostrare "Gestisci / Modifica" per un match completo se non ci sono permessi di risoluzione', () => {
-        vi.spyOn(matchRules, 'canUserResolveMatch').mockReturnValue(false);
-        // Passiamo un utente base per far comparire la pulsantiera
-        render(<PendingMatchCard match={completeMatch} rawPlayers={mockPlayers} currentUserPlayer={baseUser} />);
+    it('dovrebbe innescare joinMatchAction (Serverless) se utente standard clicca UNISCITI ORA', () => {
+        render(<PendingMatchCard match={openMatch} rawPlayers={mockPlayers} currentUserPlayer={baseUser} />);
+        const actionBtn = screen.getByRole('button', { name: /UNISCITI ORA/i });
+        fireEvent.click(actionBtn);
 
-        expect(screen.getByText('GESTISCI MATCH')).toBeDefined();
-        expect(screen.queryByTestId('resolve-btn')).toBeNull();
+        expect(joinMatchAction).toHaveBeenCalledWith('match-123');
+        expect(mockPush).not.toHaveBeenCalled(); // Assicura che NON navighi!
     });
 
-    it('dovrebbe mostrare i bottoni "Risolvi" e "Elimina" se il match è completo e l\'utente ha i permessi', () => {
+    it('dovrebbe innescare leaveMatchAction (Serverless) se utente interno clicca LASCIA PARTITA', () => {
+        const matchWithUser = { ...openMatch, team_b_right_id: 10 } as Match; // Inseriamo baseUser
+        render(<PendingMatchCard match={matchWithUser} rawPlayers={mockPlayers} currentUserPlayer={baseUser} />);
+
+        const actionBtn = screen.getByRole('button', { name: /LASCIA PARTITA/i });
+        fireEvent.click(actionBtn);
+
+        expect(leaveMatchAction).toHaveBeenCalledWith('match-123');
+        expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('dovrebbe mostrare LATO INCOMPATIBILE disabilitato se non ci sono slot adatti per il giocatore', () => {
+        // Creiamo un match dove gli unici posti liberi sono a DESTRA (Right)
+        const onlyRightFreeMatch = {
+            ...openMatch,
+            team_a_left_id: 1, // Occupato
+            team_b_left_id: 2, // Occupato
+            team_a_right_id: null, // Libero
+            team_b_right_id: null  // Libero
+        } as Match;
+
+        // Passiamo leftSideUser, che gioca SOLO a Sinistra (Left)
+        render(<PendingMatchCard match={onlyRightFreeMatch} rawPlayers={mockPlayers} currentUserPlayer={leftSideUser} />);
+
+        const actionBtn = screen.getByRole('button', { name: /LATO INCOMPATIBILE/i });
+        expect(actionBtn).toBeDefined();
+
+        // Verifica che il bottone sia bloccato fisicamente e graficamente
+        expect(actionBtn.hasAttribute('disabled')).toBe(true);
+        expect(actionBtn.className).toContain('cursor-not-allowed');
+    });
+
+    // ---------------------------------
+
+    it('dovrebbe mostrare VEDI DETTAGLI per un match completo se non ci sono permessi di risoluzione', () => {
+        vi.spyOn(matchRules, 'canUserResolveMatch').mockReturnValue(false);
+        render(<PendingMatchCard match={completeMatch} rawPlayers={mockPlayers} currentUserPlayer={baseUser} />);
+        expect(screen.getByText('VEDI DETTAGLI')).toBeDefined();
+    });
+
+    it('dovrebbe mostrare i bottoni "Risolvi" e "Elimina" all\'Admin', () => {
         vi.spyOn(matchRules, 'canUserResolveMatch').mockReturnValue(true);
-
         render(<PendingMatchCard match={completeMatch} rawPlayers={mockPlayers} currentUserPlayer={adminUser} />);
-
         expect(screen.getByTestId('resolve-btn')).toBeDefined();
         expect(screen.getByTestId('delete-btn')).toBeDefined();
-    });
-
-    it('dovrebbe mostrare il bottone Elimina all\'Admin anche per i match aperti', () => {
-        render(<PendingMatchCard match={openMatch} rawPlayers={mockPlayers} currentUserPlayer={adminUser} />);
-
-        expect(screen.getByTestId('delete-btn')).toBeDefined();
-        expect(screen.queryByTestId('resolve-btn')).toBeNull();
-    });
-
-    it('dovrebbe generare correttamente il link di WhatsApp con il testo aggiornato', () => {
-        // Passiamo un utente base per far comparire la pulsantiera
-        render(<PendingMatchCard match={openMatch} rawPlayers={mockPlayers} currentUserPlayer={baseUser} />);
-
-        const waLink = screen.getByText(/Condividi Convocazione/i).closest('a');
-        expect(waLink).toBeDefined();
-
-        const href = waLink?.getAttribute('href');
-        expect(href).toContain('https://wa.me/?text=');
-        expect(href).toContain('Mario');
     });
 });

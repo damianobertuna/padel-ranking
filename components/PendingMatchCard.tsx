@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { canUserResolveMatch } from '@/lib/matchRules';
 import DeleteMatchButton from '@/components/DeleteMatchButton';
 import ResolveMatchButton from '@/components/ResolveMatchButton';
 import { useRouter } from "next/navigation";
 import { Match, PendingMatchCardProps, Club } from '@/types';
+// IMPORT DELLE DUE SERVER ACTION
+import { leaveMatchAction, joinMatchAction } from '@/actions/match-actions';
 
 export default function PendingMatchCard({
                                              match,
@@ -16,11 +18,12 @@ export default function PendingMatchCard({
                                          }: PendingMatchCardProps & { clubs?: Club[] }) {
 
     const [isManaging, setIsManaging] = useState(false);
+    const [isPending, startTransition] = useTransition();
     const router = useRouter();
 
     const matchClub = clubs?.find(c => c.id === match.club_id);
 
-    // --- NUOVA LOGICA: Calcolo del range di livello ---
+    // --- LOGICA LIVELLO ---
     const activePlayerIds = [
         match.team_a_left_id, match.team_a_right_id,
         match.team_b_left_id, match.team_b_right_id
@@ -38,7 +41,53 @@ export default function PendingMatchCard({
             ? `${minLvl.toFixed(2)}`
             : `${minLvl.toFixed(2)} - ${maxLvl.toFixed(2)}`;
     }
-    // ----------------------------------------------------
+
+    // --- LOGICA DI DOMINIO E RUOLI ---
+    const isMatchComplete = Boolean(match.team_a_left_id && match.team_a_right_id && match.team_b_left_id && match.team_b_right_id);
+    const isUserInMatch = currentUserPlayer && activePlayerIds.includes(currentUserPlayer.id);
+    const isAdmin = currentUserPlayer?.role === 'admin';
+    const isOrganizer = currentUserPlayer?.id === match.organizer_id;
+
+    // Fallback retrocompatibilità: Se il match è vecchio (organizer nullo), chi è dentro può gestirlo
+    const canManage = isAdmin || isOrganizer || (!match.organizer_id && isUserInMatch);
+
+    // --- CALCOLO COMPATIBILITÀ LATO ---
+    // Recuperiamo il profilo completo dell'utente loggato dall'array rawPlayers
+    const fullCurrentUser = currentUserPlayer
+        ? rawPlayers.find(p => p.id === currentUserPlayer.id)
+        : null;
+
+    const prefSide = fullCurrentUser?.preferred_side || 'Both';
+    const canPlayLeft = prefSide === 'Left' || prefSide === 'Both';
+    const canPlayRight = prefSide === 'Right' || prefSide === 'Both';
+
+    const hasCompatibleFreeSlot =
+        (canPlayLeft && (!match.team_a_left_id || !match.team_b_left_id)) ||
+        (canPlayRight && (!match.team_a_right_id || !match.team_b_right_id));
+
+    // --- MACCHINA A STATI PER L'AZIONE DEL BOTTONE ---
+    let primaryActionLabel = '';
+    let actionType: 'manage' | 'leave' | 'join' | 'view' = 'view';
+
+    if (canManage) {
+        primaryActionLabel = isMatchComplete ? 'GESTISCI MATCH' : 'MODIFICA MATCH';
+        actionType = 'manage';
+    } else if (isUserInMatch) {
+        primaryActionLabel = 'LASCIA PARTITA';
+        actionType = 'leave';
+    } else if (!isMatchComplete) {
+        if (hasCompatibleFreeSlot) {
+            primaryActionLabel = 'UNISCITI ORA';
+            actionType = 'join';
+        } else {
+            primaryActionLabel = 'LATO INCOMPATIBILE';
+            actionType = 'view';
+        }
+    } else {
+        primaryActionLabel = 'VEDI DETTAGLI';
+        actionType = 'view';
+    }
+    // ---------------------------------------------
 
     const generaLinkWhatsAppLocal = (m: Match) => {
         const getPlayerObj = (id: number | null) => rawPlayers.find(player => player.id === id) || null;
@@ -67,14 +116,29 @@ export default function PendingMatchCard({
 
         const p = rawPlayers.find(player => player.id === id);
         return (
-            <div className="text-xs font-black uppercase text-slate-900 truncate py-0.5 flex items-center justify-center gap-1">
-                <span>{p ? `${p.first_name} ${p.last_name}` : 'SCONOSCIUTO'}</span>
-                {p && <span className="text-[9px] font-mono font-bold text-blue-600 bg-blue-50 px-1 border border-blue-100 rounded-sm">{p.ranking.toFixed(2)}</span>}
+            <div className="w-full text-xs font-black uppercase text-slate-900 py-0.5 flex items-center justify-center gap-1.5 overflow-hidden">
+                <span className="truncate min-w-0">
+                    {p ? `${p.first_name} ${p.last_name}` : 'SCONOSCIUTO'}
+                </span>
+
+                {p && (
+                    <span className="shrink-0 text-[9px] font-mono font-bold text-blue-600 bg-blue-50 px-1 border border-blue-100 rounded-sm">
+                        {p.ranking.toFixed(2)}
+                    </span>
+                )}
+
+                {p && match.organizer_id === p.id && (
+                    <span
+                        className="shrink-0 px-1 py-0.5 bg-slate-900 text-amber-400 text-[8px] font-black tracking-widest uppercase rounded-sm flex items-center gap-0.5 shadow-sm"
+                        title="Organizzatore del Match"
+                    >
+                        <span>👑</span> ORG
+                    </span>
+                )}
             </div>
         );
     };
 
-    const isMatchComplete = Boolean(match.team_a_left_id && match.team_a_right_id && match.team_b_left_id && match.team_b_right_id);
     const authCtx = currentUserPlayer ? { userRole: currentUserPlayer.role as 'admin' | 'user', userPlayerId: currentUserPlayer.id } : null;
     const canResolve = isMatchComplete && canUserResolveMatch(authCtx, match as any);
 
@@ -88,7 +152,6 @@ export default function PendingMatchCard({
                     </span>
                 </div>
 
-                {/* VISUALIZZAZIONE FISSA DI DATA, CAMPO E LIVELLO */}
                 <div className="flex flex-col gap-1.5 mb-4 text-xs font-bold text-slate-500 bg-slate-50 p-3 rounded-sm border border-slate-200 uppercase tracking-wide">
                     {match.match_date && (
                         <div className="flex items-center gap-2">
@@ -99,18 +162,11 @@ export default function PendingMatchCard({
                     <div className="flex items-center gap-2 truncate">
                         <span className="text-slate-400">📍</span>
                         {matchClub?.maps_url ? (
-                            <a
-                                href={matchClub.maps_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-800 hover:underline transition-colors [-webkit-tap-highlight-color:transparent]"
-                            >
+                            <a href={matchClub.maps_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 hover:underline transition-colors [-webkit-tap-highlight-color:transparent]">
                                 {matchClub.name} {matchClub.city && <span className="font-medium text-slate-400">({matchClub.city})</span>}
                             </a>
                         ) : matchClub ? (
-                            <span className="text-slate-900">
-                                {matchClub.name} {matchClub.city && <span className="font-medium text-slate-400">({matchClub.city})</span>}
-                            </span>
+                            <span className="text-slate-900">{matchClub.name} {matchClub.city && <span className="font-medium text-slate-400">({matchClub.city})</span>}</span>
                         ) : (
                             <span className="italic text-slate-400 font-medium">CAMPO DA DEFINIRE</span>
                         )}
@@ -118,9 +174,7 @@ export default function PendingMatchCard({
 
                     <div className="flex items-center gap-2 mt-1 pt-1.5 border-t border-slate-200">
                         <span className="text-slate-400">📊</span>
-                        <span>
-                            RANK: <span className="text-slate-900 font-black">{levelText}</span>
-                        </span>
+                        <span>RANK: <span className="text-slate-900 font-black">{levelText}</span></span>
                     </div>
                 </div>
 
@@ -145,15 +199,33 @@ export default function PendingMatchCard({
                     </a>
 
                     <div className="flex gap-2 w-full">
+                        {/* --- BOTTONE DINAMICO CON MACCHINA A STATI --- */}
                         <button
                             onClick={() => {
-                                setIsManaging(true);
-                                router.push(`/match/${match.id}/join`);
+                                if (actionType === 'leave') {
+                                    startTransition(async () => {
+                                        try { await leaveMatchAction(match.id); }
+                                        catch (error: any) { alert(`Errore: ${error.message}`); }
+                                    });
+                                } else if (actionType === 'join') {
+                                    startTransition(async () => {
+                                        try { await joinMatchAction(match.id); }
+                                        catch (error: any) { alert(`Errore: ${error.message}`); }
+                                    });
+                                } else {
+                                    setIsManaging(true);
+                                    router.push(`/match/${match.id}/join`);
+                                }
                             }}
-                            disabled={isManaging}
-                            className="flex-[2] text-center bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-black uppercase tracking-wider py-3 rounded-sm transition-all duration-150 ease-out active:scale-[0.96] flex items-center justify-center gap-2 [-webkit-tap-highlight-color:transparent]"
+                            disabled={isManaging || isPending || actionType === 'view' && primaryActionLabel === 'LATO INCOMPATIBILE'}
+                            className={`flex-[2] text-center text-white text-[10px] font-black uppercase tracking-wider py-3 rounded-sm transition-all duration-150 ease-out flex items-center justify-center gap-2 [-webkit-tap-highlight-color:transparent]
+                                ${actionType === 'view' && primaryActionLabel === 'LATO INCOMPATIBILE'
+                                ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-80'
+                                : 'bg-slate-900 hover:bg-slate-800 active:scale-[0.96]'
+                            }
+                            `}
                         >
-                            {isManaging ? 'ATTENDI...' : (isMatchComplete ? 'GESTISCI MATCH' : 'UNISCITI / INVITA')}
+                            {(isManaging || isPending) ? 'ATTENDI...' : primaryActionLabel}
                         </button>
 
                         {canResolve && <ResolveMatchButton matchId={match.id} />}

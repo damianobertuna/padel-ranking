@@ -1,87 +1,145 @@
-import { deletePendingMatch, createPendingMatch, resolveMatchWithRanking } from './match-actions';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { logAction } from '@/lib/audit';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { leaveMatchAction, joinMatchAction } from './match-actions';
 import { createClient } from '@/lib/supabase/server';
+import { logAction } from '@/lib/audit';
 
-// 1. Mock dei moduli esterni
+// 1. MOCK DELLE DIPENDENZE
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
 vi.mock('@/lib/audit', () => ({ logAction: vi.fn().mockResolvedValue({ error: null }) }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 
-describe('Server Actions Match', () => {
+describe('Match Server Actions', () => {
     let mockSupabase: any;
+    let mockPlayer: any;
+    let mockMatch: any;
+    let updateSpy: any;
+    let deleteSpy: any;
 
     beforeEach(() => {
         vi.clearAllMocks();
 
-        // 2. Mock "Super-Catena" di Supabase
-        const mockQuery = {
-            select: vi.fn().mockReturnThis(),
-            eq: vi.fn().mockReturnThis(),
-            in: vi.fn().mockReturnThis(),
-            single: vi.fn(),
-            insert: vi.fn().mockReturnThis(),
-            update: vi.fn().mockReturnThis(),
-            delete: vi.fn().mockReturnThis(),
+        mockPlayer = { id: 10, first_name: 'Mario', last_name: 'Rossi', preferred_side: 'Both' };
+        mockMatch = {
+            id: 'match-123',
+            team_a_left_id: null, team_a_right_id: null,
+            team_b_left_id: null, team_b_right_id: null,
+            organizer_id: 99
+        };
+
+        // --- IL TRUCCO ARCHITETTURALE: Spie condivise ---
+        updateSpy = vi.fn().mockReturnThis();
+        deleteSpy = vi.fn().mockReturnThis();
+
+        const mockQueryBuilder = (table: string) => {
+            return {
+                select: vi.fn().mockReturnThis(),
+                eq: vi.fn().mockReturnThis(),
+                in: vi.fn().mockReturnThis(),
+                update: updateSpy, // Riferimento alla spia globale
+                delete: deleteSpy, // Riferimento alla spia globale
+                single: vi.fn().mockImplementation(() => {
+                    if (table === 'players') return Promise.resolve({ data: mockPlayer, error: null });
+                    if (table === 'matches') return Promise.resolve({ data: mockMatch, error: null });
+                    return Promise.resolve({ data: null, error: null });
+                }),
+                // Rende il finto builder "awaitable" per simulare supabase.from().update().eq()
+                then: function(resolve: any) {
+                    resolve({ data: null, error: null });
+                }
+            };
         };
 
         mockSupabase = {
-            auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'admin-1' } }, error: null }) },
-            from: vi.fn(() => mockQuery),
+            auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-123' } } }) },
+            from: vi.fn((table) => mockQueryBuilder(table)),
         };
 
         (createClient as any).mockResolvedValue(mockSupabase);
     });
 
-    describe('deletePendingMatch', () => {
-        it('dovrebbe cancellare il match e scrivere il log se utente è admin', async () => {
-            // Mock: AuthCheck(admin) + MatchFetch(pending) + PlayersFetch
-            mockSupabase.from().single
-                .mockResolvedValueOnce({ data: { id: 1, role: 'admin' } }) // currentUser
-                .mockResolvedValueOnce({ data: { id: 'm1', status: 'pending', team_a_left_id: 10 } }); // match
+    describe('joinMatchAction', () => {
+        it('dovrebbe impedire l\'ingresso se l\'utente è già nella partita', async () => {
+            mockMatch.team_a_right_id = 10;
+            await expect(joinMatchAction('match-123')).rejects.toThrow('Sei già iscritto a questa partita.');
+        });
 
-            mockSupabase.from().in.mockResolvedValueOnce({ data: [{ id: 10, first_name: 'Mario', last_name: 'Rossi' }] });
+        it('dovrebbe inserire un giocatore "Right" nel primo slot destro libero', async () => {
+            mockPlayer.preferred_side = 'Right';
+            mockMatch.team_a_left_id = null;
+            mockMatch.team_b_left_id = null;
+            mockMatch.team_a_right_id = null;
 
-            await deletePendingMatch('m1');
+            await expect(joinMatchAction('match-123')).resolves.not.toThrow();
 
-            expect(mockSupabase.from().delete).toHaveBeenCalled();
-            expect(logAction).toHaveBeenCalledWith('MATCH_DELETED', 'm1', expect.any(String), expect.any(Object));
+            // Ora l'updateSpy è correttamente monitorato!
+            expect(updateSpy).toHaveBeenCalledWith({ team_a_right_id: 10 });
+        });
+
+        it('dovrebbe bloccare l\'ingresso se non ci sono slot compatibili col lato del giocatore', async () => {
+            mockPlayer.preferred_side = 'Right';
+            mockMatch.team_a_right_id = 99;
+            mockMatch.team_b_right_id = 88;
+            mockMatch.team_a_left_id = null;
+            mockMatch.team_b_left_id = null;
+
+            await expect(joinMatchAction('match-123'))
+                .rejects.toThrow('Impossibile unirsi: nessuno slot disponibile per la tua preferenza (Right).');
         });
     });
 
-    describe('resolveMatchWithRanking', () => {
-        it('dovrebbe risolvere correttamente il match e loggare', async () => {
-            // Mock sequenziale: Auth(admin), CurrentUser, Match, Players
-            mockSupabase.from().single
-                .mockResolvedValueOnce({ data: { id: 99, role: 'admin' } }) // CurrentUser
-                .mockResolvedValueOnce({ data: { id: 'm1', status: 'pending', team_a_left_id: 1, team_a_right_id: 2, team_b_left_id: 3, team_b_right_id: 4 } }); // Match
+    describe('leaveMatchAction', () => {
+        it('dovrebbe impedire l\'uscita se l\'utente non è nella partita', async () => {
+            mockPlayer.id = 10;
+            mockMatch.team_a_left_id = 99;
+            await expect(leaveMatchAction('match-123')).rejects.toThrow('Impossibile uscire: non sei iscritto a questa partita.');
+        });
 
-            // Mock giocatori per log e ranking
-            mockSupabase.from().in.mockResolvedValueOnce({ data: [{id:1, first_name:'A', last_name:'A'}, {id:2, first_name:'B', last_name:'B'}, {id:3, first_name:'C', last_name:'C'}, {id:4, first_name:'D', last_name:'D'}] });
+        it('dovrebbe liberare lo slot se un giocatore normale esce', async () => {
+            mockPlayer.id = 10;
+            mockMatch.team_a_left_id = 10;
+            mockMatch.team_a_right_id = 20;
+            mockMatch.organizer_id = 20;
 
-            await resolveMatchWithRanking({
-                matchId: "m1",
-                score: [{ team_a: 6, team_b: 4 }, { team_a: 6, team_b: 2 }],
-                rankingUpdates: {}
+            await expect(leaveMatchAction('match-123')).resolves.not.toThrow();
+            expect(updateSpy).toHaveBeenCalledWith({ team_a_left_id: null });
+        });
+
+        it('dovrebbe cedere il ruolo di organizzatore al primo giocatore rimasto (Passaggio Testimone)', async () => {
+            mockPlayer.id = 10;
+            mockMatch.team_a_left_id = 10;
+            mockMatch.team_b_right_id = 30;
+            mockMatch.organizer_id = 10;
+
+            await expect(leaveMatchAction('match-123')).resolves.not.toThrow();
+
+            expect(updateSpy).toHaveBeenCalledWith({
+                team_a_left_id: null,
+                organizer_id: 30
             });
 
             expect(logAction).toHaveBeenCalledWith(
-                'MATCH_RESOLVED',
-                "m1",
-                expect.stringContaining("Vince il Team A"),
-                expect.objectContaining({ winning_team: 'A' })
+                'PLAYER_LEFT_MATCH',
+                'match-123',
+                expect.stringContaining('ruolo di Organizzatore è passato automaticamente al giocatore ID: 30')
             );
         });
 
-        it('dovrebbe bloccare se i set sono meno di 2', async () => {
-            mockSupabase.from().single.mockResolvedValueOnce({ data: { id: 99, role: 'admin' } })
-                .mockResolvedValueOnce({ data: { id: 'm1', status: 'pending' } });
+        it('dovrebbe ELIMINARE la partita se esce l\'ultimo giocatore rimasto', async () => {
+            mockPlayer.id = 10;
+            mockMatch.team_a_left_id = 10;
+            mockMatch.team_a_right_id = null;
+            mockMatch.team_b_left_id = null;
+            mockMatch.team_b_right_id = null;
 
-            await expect(resolveMatchWithRanking({
-                matchId: "m1",
-                score: [{ team_a: 6, team_b: 4 }],
-                rankingUpdates: {}
-            })).rejects.toThrow("I dati dei set sono incompleti");
+            await expect(leaveMatchAction('match-123')).resolves.not.toThrow();
+
+            expect(updateSpy).not.toHaveBeenCalled();
+            expect(deleteSpy).toHaveBeenCalled();
+            expect(logAction).toHaveBeenCalledWith(
+                'MATCH_DELETED_AUTO',
+                'match-123',
+                expect.stringContaining('eliminato automaticamente perché vuoto')
+            );
         });
     });
 });

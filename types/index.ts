@@ -15,13 +15,14 @@ export interface Match {
     team_a_right_id: number | null;
     team_b_left_id: number | null;
     team_b_right_id: number | null;
-    status: string;
+    status: 'pending' | 'completed';
     match_type: 'male' | 'female' | 'mixed';
     created_at: string;
     match_date?: string | null;
     club_id?: number | null;
     team_a_delta?: number | null;
     team_b_delta?: number | null;
+    organizer_id: number | null;
 }
 
 export interface MatchWithResult {
