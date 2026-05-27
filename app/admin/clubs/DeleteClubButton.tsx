@@ -1,27 +1,17 @@
-// app/admin/clubs/DeleteClubButton.tsx
 'use client';
-
 import { useTransition } from 'react';
 import { deleteClub } from '@/actions/club-actions';
 
 export default function DeleteClubButton({ clubId }: { clubId: number }) {
     const [isPending, startTransition] = useTransition();
 
-    const handleDelete = () => {
-        if (confirm("Sei sicuro di voler eliminare questo campo? I match associati diventeranno 'Non definito'.")) {
-            startTransition(async () => {
-                await deleteClub(clubId);
-            });
-        }
-    };
-
     return (
         <button
-            onClick={handleDelete}
+            onClick={() => confirm("Eliminare questo circolo?") && startTransition(() => deleteClub(clubId))}
             disabled={isPending}
-            className="text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+            className="text-[9px] font-black text-red-600 uppercase tracking-widest border border-red-200 px-3 py-1 hover:bg-red-50 disabled:opacity-50 rounded-sm"
         >
-            {isPending ? 'Elm...' : 'Elimina'}
+            {isPending ? '...' : 'ELIMINA'}
         </button>
     );
 }

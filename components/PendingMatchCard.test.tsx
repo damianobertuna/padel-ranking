@@ -71,16 +71,20 @@ describe('PendingMatchCard Component', () => {
     it('dovrebbe renderizzare una partita APERTA con i relativi indicatori', () => {
         render(<PendingMatchCard match={openMatch} rawPlayers={mockPlayers} currentUserPlayer={null} />);
 
-        expect(screen.getByText('Aperto')).toBeDefined();
+        // Verifica il badge OPEN MATCH
+        expect(screen.getByText(/OPEN MATCH/i)).toBeDefined();
 
-        // Siccome ci sono DUE slot "DX" vuoti (Team A e Team B), usiamo getAllByText
-        const emptyDxSlots = screen.getAllByText('➕ DX');
-        expect(emptyDxSlots.length).toBe(2);
+        // Dato che ci sono spazi, a capo e parentesi, cerchiamo solo le parole chiave
+        // Usiamo getAllByText perché ci sono 3 slot liberi e getByText fallirebbe trovandone più di uno!
+        const slotsLiberi = screen.getAllByText(/SLOT LIBERO/i);
+
+        // Ci aspettiamo di trovare 3 slot liberi in questo mock
+        expect(slotsLiberi.length).toBe(3);
     });
 
     it('dovrebbe renderizzare una partita COMPLETA con il badge "Match Pronto"', () => {
         render(<PendingMatchCard match={completeMatch} rawPlayers={mockPlayers} currentUserPlayer={null} />);
-        expect(screen.getByText('Match Pronto')).toBeDefined();
+        expect(screen.getByText('MATCH PRONTO')).toBeDefined();
     });
 
     it('dovrebbe mostrare Data e Club correttamente', () => {
@@ -93,7 +97,7 @@ describe('PendingMatchCard Component', () => {
         render(<PendingMatchCard match={openMatch} rawPlayers={mockPlayers} currentUserPlayer={null} />);
 
         // Verifichiamo che i bottoni siano effettivamente nascosti per gli ospiti
-        expect(screen.queryByText(/Condividi su WhatsApp/i)).toBeNull();
+        expect(screen.queryByText(/Condividi convocazione/i)).toBeNull();
         expect(screen.queryByRole('button', { name: /Unisciti \/ Invita/i })).toBeNull();
     });
 
@@ -103,7 +107,7 @@ describe('PendingMatchCard Component', () => {
         const actionBtn = screen.getByRole('button', { name: /Unisciti \/ Invita/i });
         fireEvent.click(actionBtn);
 
-        expect(screen.getByText('Caricamento...')).toBeDefined();
+        expect(screen.getByText('ATTENDI...')).toBeDefined();
         expect(mockPush).toHaveBeenCalledWith('/match/match-123/join');
     });
 
@@ -112,7 +116,7 @@ describe('PendingMatchCard Component', () => {
         // Passiamo un utente base per far comparire la pulsantiera
         render(<PendingMatchCard match={completeMatch} rawPlayers={mockPlayers} currentUserPlayer={baseUser} />);
 
-        expect(screen.getByText('Gestisci / Modifica')).toBeDefined();
+        expect(screen.getByText('GESTISCI MATCH')).toBeDefined();
         expect(screen.queryByTestId('resolve-btn')).toBeNull();
     });
 
@@ -136,7 +140,7 @@ describe('PendingMatchCard Component', () => {
         // Passiamo un utente base per far comparire la pulsantiera
         render(<PendingMatchCard match={openMatch} rawPlayers={mockPlayers} currentUserPlayer={baseUser} />);
 
-        const waLink = screen.getByText(/Condividi su WhatsApp/i).closest('a');
+        const waLink = screen.getByText(/Condividi Convocazione/i).closest('a');
         expect(waLink).toBeDefined();
 
         const href = waLink?.getAttribute('href');

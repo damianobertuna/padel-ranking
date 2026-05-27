@@ -99,204 +99,191 @@ export default async function Home({ searchParams }: PageProps) {
     const urlState = `gender=${currentGender}&sort=${currentSort}&playerPage=${playerPage}&page=${currentPage}`;
 
     return (
-        <main className="min-h-screen p-4 sm:p-8 bg-slate-100 flex flex-col items-center">
-            <div className="max-w-4xl w-full">
-
-                {/* BARRA DI AUTENTICAZIONE */}
-                <div className="w-full flex justify-between items-center mb-6 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                    <div className="min-w-0">
-                        {user ? (
-                            <p className="text-sm text-slate-600 truncate">
-                                Connesso come: <strong className="text-slate-900">{currentUserPlayer?.first_name} {currentUserPlayer?.last_name}</strong>
-                                <span className="ml-2 text-[10px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full font-bold uppercase">{currentUserPlayer?.role}</span>
-                            </p>
-                        ) : (
-                            <p className="text-sm text-slate-500">Modalità sola lettura</p>
-                        )}
-                    </div>
-                    <div className="shrink-0 pl-2">
-                        {user ? (
-                            <form action="/auth/signout" method="post">
-                                <button type="submit" className="text-sm font-semibold text-red-600 hover:underline [-webkit-tap-highlight-color:transparent] active:opacity-50 transition-opacity">Esci</button>
-                            </form>
-                        ) : (
-                            <Link href="/login" className="text-sm font-bold text-indigo-600 hover:underline [-webkit-tap-highlight-color:transparent] active:opacity-50 transition-opacity">Accedi / Registrati</Link>
-                        )}
-                    </div>
+        <main className="min-h-screen bg-slate-50 flex flex-col items-center text-slate-900 pb-20">
+            {/* Topbar stile istituzionale */}
+            <div className="w-full bg-slate-900 text-white flex justify-between items-center py-2 px-4 sm:px-8 shadow-sm text-xs font-semibold uppercase tracking-wider">
+                <div>
+                    {user ? (
+                        <span className="opacity-90">Account: <span className="font-bold text-white">{currentUserPlayer?.first_name} {currentUserPlayer?.last_name}</span></span>
+                    ) : (
+                        <span className="opacity-70">Lector Mode</span>
+                    )}
                 </div>
+                <div>
+                    {user ? (
+                        <form action="/auth/signout" method="post">
+                            <button type="submit" className="text-red-400 hover:text-red-300 font-bold transition-colors">Logout</button>
+                        </form>
+                    ) : (
+                        <Link href="/login" className="text-blue-400 hover:text-blue-300 font-bold transition-colors">Login / Register</Link>
+                    )}
+                </div>
+            </div>
 
-                {/* INTESTAZIONE */}
-                <div className="flex flex-col gap-4 mb-6">
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-                        <h1 className="text-3xl font-black text-slate-800 tracking-tight">RanKING Padel</h1>
-                        <Link
-                            href="/rules"
-                            className="inline-flex items-center justify-center gap-1.5 px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-black rounded-full border border-indigo-200/60 transition-all shadow-xs"
-                        >
-                            <span>📖</span>
-                            <span>Regolamento</span>
-                        </Link>
+            <div className="max-w-4xl w-full px-4 sm:px-8 mt-8">
+
+                {/* HEADER TITOLO E PULSANTI */}
+                <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-4 mb-8 pb-4 border-b-2 border-slate-900">
+                    <div>
+                        <h1 className="text-4xl sm:text-5xl font-black text-slate-900 uppercase tracking-tighter leading-none">RanKING<br/><span className="text-blue-600">Padel</span></h1>
                     </div>
 
-                    <Link
-                        href="/guide"
-                        className="inline-flex items-center justify-center gap-1.5 px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-black rounded-full border border-emerald-200/60 transition-all shadow-xs ml-2"
-                    >
-                        <span>❓</span>
-                        <span>Come si usa</span>
-                    </Link>
-
-                    {/* Contenitore pulsanti che va a capo su mobile */}
-                    <div className="flex flex-wrap gap-2 w-full justify-center sm:justify-start">
-                        {user && (
-                            <Link href="/new-match" className="flex-[1_1_100%] sm:flex-none text-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-xl text-sm shadow-sm">
-                                + Nuova Partita
+                    {/* Bottoni utente e admin ripristinati */}
+                    <div className="flex flex-col items-start md:items-end gap-2">
+                        <div className="flex flex-wrap gap-2">
+                            {user && (
+                                <Link href="/new-match" className="bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase tracking-wider py-2 px-4 text-xs transition-colors rounded-sm flex items-center justify-center">
+                                    + Nuova Partita
+                                </Link>
+                            )}
+                            <Link href="/rules" className="bg-slate-200 hover:bg-slate-300 text-slate-900 font-bold uppercase tracking-wider py-2 px-4 text-xs transition-colors rounded-sm flex items-center gap-1.5 justify-center">
+                                <span className="text-sm">📖</span> Regolamento
                             </Link>
-                        )}
+                            <Link href="/guide" className="bg-slate-200 hover:bg-slate-300 text-slate-900 font-bold uppercase tracking-wider py-2 px-4 text-xs transition-colors rounded-sm flex items-center gap-1.5 justify-center">
+                                <span className="text-sm">❓</span> Guida
+                            </Link>
+                        </div>
+
                         {currentUserPlayer?.role === 'admin' && (
-                            <>
-                                <Link href="/admin/players" className="flex-[1_1_45%] sm:flex-none bg-slate-800 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-slate-900 text-sm shadow-sm text-center">
+                            <div className="flex flex-wrap gap-2 mt-1">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:flex items-center mr-1">Admin Tools:</span>
+                                <Link href="/admin/players" className="bg-slate-900 hover:bg-slate-800 text-white font-bold uppercase tracking-wider py-1.5 px-3 text-[10px] transition-colors rounded-sm flex items-center gap-1.5">
                                     ⚙️ Giocatori
                                 </Link>
-                                <Link href="/admin/clubs" className="flex-[1_1_45%] sm:flex-none bg-slate-800 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-slate-900 text-sm shadow-sm text-center">
+                                <Link href="/admin/clubs" className="bg-slate-900 hover:bg-slate-800 text-white font-bold uppercase tracking-wider py-1.5 px-3 text-[10px] transition-colors rounded-sm flex items-center gap-1.5">
                                     📍 Club
                                 </Link>
-                                <Link href="/admin/logs" className="flex-[1_1_45%] sm:flex-none bg-indigo-600 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-indigo-700 text-sm shadow-sm text-center">
-                                    📋 Log
+                                <Link href="/admin/logs" className="bg-slate-900 hover:bg-slate-800 text-white font-bold uppercase tracking-wider py-1.5 px-3 text-[10px] transition-colors rounded-sm flex items-center gap-1.5">
+                                    📋 Logs
                                 </Link>
-                            </>
+                            </div>
                         )}
                     </div>
                 </div>
 
-                {/* NAVIGAZIONE A TAB (Migliorata per Mobile) */}
-                <div className="grid grid-cols-3 bg-slate-200/50 p-1 rounded-xl mb-6 shadow-inner w-full">
+                {/* NAVIGAZIONE TAB MINIMALE (Stile Navbar Sportiva) */}
+                <div className="flex w-full mb-6 border-b border-slate-300">
                     <Link
                         href={`/?tab=ranking&${urlState}`}
                         scroll={false}
-                        className={`flex items-center justify-center py-2 rounded-lg text-[11px] font-black transition-all ${currentTab === 'ranking' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}
+                        className={`flex-1 text-center py-3 text-sm font-black uppercase tracking-wider transition-colors ${currentTab === 'ranking' ? 'border-b-4 border-blue-600 text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}
                     >
-                        🏆 Classifica
+                        Rankings
                     </Link>
                     <Link
                         href={`/?tab=pending&${urlState}`}
                         scroll={false}
-                        className={`flex items-center justify-center py-2 rounded-lg text-[11px] font-black transition-all ${currentTab === 'pending' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}
+                        className={`flex-1 text-center py-3 text-sm font-black uppercase tracking-wider transition-colors ${currentTab === 'pending' ? 'border-b-4 border-blue-600 text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}
                     >
-                        🗓️ Match
+                        Match <span className="ml-1 opacity-70">({pendingMatches?.length || 0})</span>
                     </Link>
                     <Link
                         href={`/?tab=completed&${urlState}`}
                         scroll={false}
-                        className={`flex items-center justify-center py-2 rounded-lg text-[11px] font-black transition-all ${currentTab === 'completed' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}
+                        className={`flex-1 text-center py-3 text-sm font-black uppercase tracking-wider transition-colors ${currentTab === 'completed' ? 'border-b-4 border-blue-600 text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}
                     >
-                        ✅ Risultati
+                        Risultati
                     </Link>
                 </div>
 
                 {/* =========================================
-                    TAB 1: CLASSIFICA
+                    TAB 1: CLASSIFICA GIOCATORI (Stile FIP Table)
                 ========================================= */}
                 {currentTab === 'ranking' && (
-                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        {/* FILTRI DI ORDINAMENTO E DI GENERE (Migliorati per Mobile) */}
-                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3">
-                            <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Classifica Ufficiale</h2>
-                            <div className="flex flex-wrap gap-2">
-                                <div className="flex gap-1.5 bg-slate-200/60 p-1 rounded-xl border border-slate-200 text-[11px] font-bold">
-                                    <Link href={`/?tab=ranking&gender=M&sort=${currentSort}&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.94] ${currentGender === 'M' ? 'bg-white text-indigo-600 shadow-xs active:bg-slate-50' : 'text-slate-500 hover:text-slate-800 active:bg-slate-300/50'}`}>👨 Maschi</Link>
-                                    <Link href={`/?tab=ranking&gender=F&sort=${currentSort}&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.94] ${currentGender === 'F' ? 'bg-white text-indigo-600 shadow-xs active:bg-slate-50' : 'text-slate-500 hover:text-slate-800 active:bg-slate-300/50'}`}>👩 Femmine</Link>
-                                    <Link href={`/?tab=ranking&gender=all&sort=${currentSort}&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.94] ${currentGender === 'all' ? 'bg-white text-indigo-600 shadow-xs active:bg-slate-50' : 'text-slate-500 hover:text-slate-800 active:bg-slate-300/50'}`}>🌍 Generale</Link>
-                                </div>
-                                <div className="flex gap-1.5 bg-slate-200/60 p-1 rounded-xl border border-slate-200 text-[11px] font-bold">
-                                    <Link href={`/?tab=ranking&gender=${currentGender}&sort=ranking&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.94] ${currentSort === 'ranking' ? 'bg-white text-indigo-600 shadow-xs active:bg-slate-50' : 'text-slate-500 hover:text-slate-800 active:bg-slate-300/50'}`}>Punti Rank</Link>
-                                    <Link href={`/?tab=ranking&gender=${currentGender}&sort=played&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.94] ${currentSort === 'played' ? 'bg-white text-indigo-600 shadow-xs active:bg-slate-50' : 'text-slate-500 hover:text-slate-800 active:bg-slate-300/50'}`}>Giocate</Link>
-                                    <Link href={`/?tab=ranking&gender=${currentGender}&sort=winrate&playerPage=1&page=${currentPage}`} scroll={false} className={`px-2.5 py-1 rounded-lg transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.94] ${currentSort === 'winrate' ? 'bg-white text-indigo-600 shadow-xs active:bg-slate-50' : 'text-slate-500 hover:text-slate-800 active:bg-slate-300/50'}`}>Win Rate</Link>
-                                </div>
+                    <div className="animate-in fade-in duration-300">
+
+                        {/* BARRA FILTRI */}
+                        <div className="flex flex-col sm:flex-row justify-between bg-white border border-slate-200 p-2 mb-4 rounded-sm shadow-sm gap-2">
+                            <div className="flex gap-1 bg-slate-100 p-1 rounded-sm text-xs font-bold uppercase tracking-wider">
+                                <Link href={`/?tab=ranking&gender=M&sort=${currentSort}&playerPage=1`} scroll={false} className={`px-4 py-1.5 rounded-sm transition-colors ${currentGender === 'M' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Maschile</Link>
+                                <Link href={`/?tab=ranking&gender=F&sort=${currentSort}&playerPage=1`} scroll={false} className={`px-4 py-1.5 rounded-sm transition-colors ${currentGender === 'F' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Femminile</Link>
+                                <Link href={`/?tab=ranking&gender=all&sort=${currentSort}&playerPage=1`} scroll={false} className={`px-4 py-1.5 rounded-sm transition-colors ${currentGender === 'all' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Tutti</Link>
+                            </div>
+                            <div className="flex gap-1 bg-slate-100 p-1 rounded-sm text-xs font-bold uppercase tracking-wider">
+                                <Link href={`/?tab=ranking&gender=${currentGender}&sort=ranking&playerPage=1`} scroll={false} className={`px-3 py-1.5 rounded-sm transition-colors ${currentSort === 'ranking' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Punti</Link>
+                                <Link href={`/?tab=ranking&gender=${currentGender}&sort=played&playerPage=1`} scroll={false} className={`px-3 py-1.5 rounded-sm transition-colors ${currentSort === 'played' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Match</Link>
+                                <Link href={`/?tab=ranking&gender=${currentGender}&sort=winrate&playerPage=1`} scroll={false} className={`px-3 py-1.5 rounded-sm transition-colors ${currentSort === 'winrate' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Win %</Link>
                             </div>
                         </div>
 
-                        {/* LISTA GIOCATORI */}
-                        <div className="flex flex-col gap-2.5 mb-6">
+                        {/* LISTA GIOCATORI TIPO TABELLONE */}
+                        <div className="bg-white border border-slate-200 shadow-sm rounded-sm overflow-hidden">
+                            {/* Header Tabella */}
+                            <div className="hidden sm:flex items-center px-4 py-3 bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                <div className="w-12 text-center">Rank</div>
+                                <div className="flex-1 pl-4">Player</div>
+                                <div className="w-24 text-center">Side</div>
+                                <div className="w-24 text-center">Matches</div>
+                                <div className="w-24 text-right pr-2">Points</div>
+                            </div>
+
                             {paginatedPlayers.length > 0 ? (
                                 paginatedPlayers.map((player, index) => {
                                     const rankIndex = startIndex + index + 1;
                                     const playerId = player.id;
-                                    const king = kingLeftIds.includes(playerId) ? 'SX' : kingRightIds.includes(playerId) ? 'DX' : kingBothIds.includes(playerId) ? 'DX/SX' : null;
-                                    const last = lastPlaceLeftIds.includes(playerId) ? 'SX' : lastPlaceRightIds.includes(playerId) ? 'DX' : lastPlaceBothIds.includes(playerId) ? 'DX/SX' : null;
+                                    const king = kingLeftIds.includes(playerId) ? 'SX' : kingRightIds.includes(playerId) ? 'DX' : kingBothIds.includes(playerId) ? 'MIX' : null;
 
                                     return (
-                                        <Link key={player.id} href={`/player/${player.id}`} className="group w-full bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between transition-all duration-150 ease-out active:bg-slate-100 active:scale-[0.98] active:border-slate-300 touch-manipulation [-webkit-tap-highlight-color:transparent]">
-                                            <div className="flex items-center gap-3 min-w-0">
-                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black font-mono shrink-0 ${rankIndex === 1 ? 'bg-amber-100 text-amber-700 border border-amber-300' : rankIndex === 2 ? 'bg-slate-100 text-slate-600 border border-slate-300' : rankIndex === 3 ? 'bg-orange-100 text-orange-700 border border-orange-300' : 'bg-slate-50 text-slate-400'}`}>{rankIndex}°</div>
-                                                <div className="group w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
+                                        <Link key={player.id} href={`/player/${player.id}`} className="flex flex-row items-center px-4 py-3 border-b border-slate-100 hover:bg-slate-50 transition-colors group">
+                                            {/* Rank Number */}
+                                            <div className={`w-8 sm:w-12 text-center font-black text-lg sm:text-xl ${rankIndex === 1 ? 'text-amber-500' : 'text-slate-400 group-hover:text-slate-900'}`}>
+                                                {rankIndex}
+                                            </div>
+
+                                            {/* Info Giocatore */}
+                                            <div className="flex-1 flex items-center gap-3 pl-2 sm:pl-4 min-w-0">
+                                                <div className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-full bg-slate-200 border border-slate-300 overflow-hidden flex items-center justify-center">
                                                     {player.avatar_url ? (
-                                                        <img src={player.avatar_url} alt={`${player.first_name} Avatar`} className="w-full h-full object-cover" />
+                                                        <img src={player.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
                                                     ) : (
-                                                        <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 font-black text-xs flex items-center justify-center shrink-0 uppercase tracking-tight">{player.first_name[0]}{player.last_name[0]}</div>
+                                                        <span className="text-slate-500 font-bold text-xs uppercase">{player.first_name[0]}{player.last_name[0]}</span>
                                                     )}
                                                 </div>
-                                                <div className="min-w-0">
-                                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                                        <span className="font-bold text-slate-800 text-base truncate">{player.first_name} {player.last_name}</span>
-                                                        {king && <span className="bg-yellow-100 text-yellow-800 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shrink-0">King {king}</span>}
-                                                        {last && <span className="bg-red-100 text-red-800 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shrink-0">Fanalino {last}</span>}
+                                                <div className="flex flex-col min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-black text-slate-900 text-sm sm:text-base uppercase tracking-tight truncate">{player.first_name} {player.last_name}</span>
+                                                        {king && <span className="bg-amber-100 text-amber-800 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider hidden sm:inline-block">👑 KING</span>}
                                                     </div>
-                                                    <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-1 font-medium flex-wrap">
-                                                        <span className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${player.preferred_side === 'Left' ? 'bg-blue-50 text-blue-600' : player.preferred_side === 'Right' ? 'bg-emerald-50 text-emerald-600' : 'bg-purple-50 text-purple-600'}`}>{player.preferred_side === 'Left' ? 'SX' : player.preferred_side === 'Right' ? 'DX' : 'MIX'}</span>
-                                                        <span>Match: <strong className="text-slate-600">{player.total_played}</strong></span><span className="text-slate-200">•</span>
-                                                        <span>Win Rate: <strong className="text-slate-600">{player.win_rate.toFixed(1)}%</strong></span>
-                                                    </div>
+                                                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider sm:hidden block mt-0.5">
+                                                        {player.preferred_side} • {player.total_played} Match
+                                                    </span>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-3 shrink-0">
-                                                <div className="text-right">
-                                                    <div className="text-lg font-mono font-black text-indigo-600 leading-none">{currentSort === 'played' ? player.total_played : currentSort === 'winrate' ? `${player.win_rate.toFixed(1)}%` : player.ranking.toFixed(2)}</div>
-                                                    <span className="text-[9px] text-slate-400 uppercase tracking-tight font-bold">{currentSort === 'played' ? 'Partite' : currentSort === 'winrate' ? 'Rate' : 'Punti Rank'}</span>
-                                                </div>
-                                                <div className="flex items-center justify-center w-7 h-7 rounded-full bg-slate-100 text-slate-400 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors flex-shrink-0 ml-2">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-                                                </div>
+
+                                            {/* Dati Desktop */}
+                                            <div className="hidden sm:block w-24 text-center text-xs font-bold text-slate-500 uppercase">{player.preferred_side}</div>
+                                            <div className="hidden sm:block w-24 text-center text-xs font-bold text-slate-500">{player.total_played}</div>
+
+                                            {/* Punti Finali */}
+                                            <div className="w-20 sm:w-24 text-right flex flex-col justify-center shrink-0">
+                                                <span className="text-base sm:text-lg font-black text-blue-600 leading-none">{currentSort === 'played' ? player.total_played : currentSort === 'winrate' ? `${player.win_rate.toFixed(1)}%` : player.ranking.toFixed(2)}</span>
+                                                <span className="text-[9px] font-bold text-slate-400 uppercase sm:hidden">{currentSort === 'played' ? 'Match' : currentSort === 'winrate' ? 'Rate' : 'Pts'}</span>
                                             </div>
                                         </Link>
                                     );
                                 })
                             ) : (
-                                <p className="text-slate-500 italic text-sm p-4 bg-white rounded-xl border border-slate-200 text-center">Nessun giocatore registrato in questa categoria.</p>
+                                <div className="p-8 text-center text-slate-500 text-sm font-bold uppercase">Nessun atleta in questa categoria</div>
                             )}
                         </div>
 
-                        {/* CONTROLLI PAGINAZIONE GIOCATORI */}
+                        {/* PAGINAZIONE */}
                         {totalPlayerPages > 1 && (
-                            <div className="flex justify-center items-center gap-4 mb-10">
-                                <Link href={`/?tab=ranking&playerPage=${playerPage - 1}&page=${currentPage}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.96] active:bg-slate-100 ${playerPage <= 1 ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}>← Precedente</Link>
-                                <div className="text-xs font-bold text-slate-500 font-mono">Pag. {playerPage} / {totalPlayerPages}</div>
-                                <Link href={`/?tab=ranking&playerPage=${playerPage + 1}&page=${currentPage}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.96] active:bg-slate-100 ${playerPage >= totalPlayerPages ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}>Successiva →</Link>
+                            <div className="flex justify-between items-center mt-6 px-2">
+                                <Link href={`/?tab=ranking&playerPage=${playerPage - 1}&page=${currentPage}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-900 rounded-sm hover:bg-slate-100 transition-colors ${playerPage <= 1 ? 'pointer-events-none opacity-40' : ''}`}>← Prev</Link>
+                                <div className="text-xs font-bold text-slate-500">PAG {playerPage} / {totalPlayerPages}</div>
+                                <Link href={`/?tab=ranking&playerPage=${playerPage + 1}&page=${currentPage}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-900 rounded-sm hover:bg-slate-100 transition-colors ${playerPage >= totalPlayerPages ? 'pointer-events-none opacity-40' : ''}`}>Next →</Link>
                             </div>
                         )}
-
-                        {/* BANNER PUBBLICITARIO SPONSOR */}
-                        <div className="w-full bg-gradient-to-r from-indigo-950 to-slate-900 text-white p-5 rounded-xl shadow-sm mb-4 flex flex-col md:flex-row items-center justify-between gap-6 border border-slate-700">
-                            <div className="flex items-center gap-4 text-center md:text-left flex-col md:flex-row">
-                                <div className="bg-white p-2 rounded-md flex items-center justify-center shadow-sm max-w-[140px] shrink-0">
-                                    <img src="https://www.bionutrimed.it/templates/rt_gemini/custom/images/loghi/bionutrimed_logo_small.png" alt="BioNutriMed Logo" className="h-10 w-auto object-contain select-none" />
-                                </div>
-                                <div>
-                                    <h3 className="text-base font-bold tracking-wide text-slate-100">Vuoi scalare il Ranking? Cura la tua nutrizione!</h3>
-                                    <p className="text-xs text-slate-300 max-w-xl mt-1 leading-relaxed">Scopri come un'alimentazione strategica su misura può aumentare la tua resistenza nei match più lunghi e velocizzare il recovery muscolare.</p>
-                                </div>
-                            </div>
-                            <a href="https://www.bionutrimed.it/prenota/prenota-visita-in-studio.html" target="_blank" rel="noopener noreferrer" className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs uppercase tracking-wider py-3 px-5 rounded-lg transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.96] active:bg-emerald-700 shadow-sm text-center w-full md:w-auto shrink-0">🌐 Prenota una visita</a>
-                        </div>
                     </div>
                 )}
 
                 {/* =========================================
-                    TAB 2: IN PROGRAMMA
+                    TAB 2: MATCH IN PROGRAMMA
                 ========================================= */}
                 {currentTab === 'pending' && (
-                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                    <div className="animate-in fade-in duration-300">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {pendingMatches && pendingMatches.length > 0 ? (
                                 pendingMatches.map((match) => (
                                     <PendingMatchCard
@@ -308,76 +295,77 @@ export default async function Home({ searchParams }: PageProps) {
                                     />
                                 ))
                             ) : (
-                                <p className="text-slate-500 italic col-span-2 text-center p-8 bg-white rounded-xl border border-slate-200">Non ci sono partite in programma al momento.</p>
+                                <div className="col-span-2 p-10 bg-white border border-slate-200 text-center text-slate-500 font-bold uppercase text-sm rounded-sm">Nessun match programmato</div>
                             )}
                         </div>
                     </div>
                 )}
 
                 {/* =========================================
-                    TAB 3: RISULTATI RECENTI
+                    TAB 3: RISULTATI COMPLETATI
                 ========================================= */}
                 {currentTab === 'completed' && (
-                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        <div className="flex justify-between items-baseline mb-4">
-                            <h2 className="text-lg font-bold text-slate-800">Storico Partite</h2>
-                            <span className="text-xs font-semibold text-slate-400 font-mono">Pagina {currentPage} di {totalPages}</span>
-                        </div>
+                    <div className="animate-in fade-in duration-300 space-y-4">
+                        {completedMatches && completedMatches.length > 0 ? (
+                            completedMatches.map((match) => {
+                                const winner = match.winning_team;
+                                const sets = (match.score || []) as Array<{team_a: number, team_b: number}>;
+                                const matchClub = clubsList.find(c => c.id === match.club_id);
 
-                        <div className="space-y-3">
-                            {completedMatches && completedMatches.length > 0 ? (
-                                completedMatches.map((match) => {
-                                    const winner = match.winning_team;
-                                    const sets = (match.score || []) as Array<{team_a: number, team_b: number}>;
-                                    const matchClub = clubsList.find(c => c.id === match.club_id);
+                                return (
+                                    <div key={match.id} className="bg-white border border-slate-200 rounded-sm shadow-sm overflow-hidden">
+                                        {/* Barra Superiore Dati Match */}
+                                        <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                                            <span>{new Date(match.updated_at).toLocaleDateString('it-IT')}</span>
+                                            <span>{matchClub ? matchClub.name : 'Location N/D'}</span>
+                                        </div>
 
-                                    return (
-                                        <div key={match.id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-3">
-                                            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                                                <div className={`flex flex-col items-center sm:items-start p-3 rounded-xl w-full sm:w-5/12 ${winner === 'A' ? 'bg-green-50 border-l-4 border-l-green-500 font-semibold' : 'opacity-60'}`}>
-                                                    <div className="flex items-center gap-1.5 mb-1"><span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Coppia A</span>{winner === 'A' && <span className="bg-green-200 text-green-800 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">WIN 🎉</span>}</div>
-                                                    <div className="text-sm text-slate-800 truncate w-full text-center sm:text-left">{getPlayerNameWithRanking(match.team_a_left_id, playersWithStats)}</div>
-                                                    <div className="text-sm text-slate-800 truncate w-full text-center sm:text-left">{getPlayerNameWithRanking(match.team_a_right_id, playersWithStats)}</div>
+                                        {/* Corpo del Risultato */}
+                                        <div className="flex flex-col sm:flex-row items-center p-0 sm:p-2">
+
+                                            {/* Team A */}
+                                            <div className={`flex-1 w-full sm:w-auto p-4 flex flex-col justify-center ${winner === 'A' ? 'bg-emerald-50/50' : ''}`}>
+                                                <div className="flex items-center gap-2 mb-1.5">
+                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">TEAM A</span>
+                                                    {winner === 'A' && <span className="bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-sm uppercase tracking-wider">WINNER</span>}
                                                 </div>
-                                                <div className="flex flex-col items-center justify-center shrink-0">
-                                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 select-none">Punteggio</div>
-                                                    <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 font-mono font-black text-sm text-indigo-600 shadow-inner">
-                                                        {sets.length > 0 ? sets.map((set, sIdx) => (<span key={sIdx} className="bg-white px-1.5 py-0.5 rounded border border-slate-200/60 shadow-sm">{set.team_a}-{set.team_b}</span>)) : <span className="text-xs font-normal text-slate-400 italic">Dato pre-set</span>}
-                                                    </div>
-                                                </div>
-                                                <div className={`flex flex-col items-center sm:items-end p-3 rounded-xl w-full sm:w-5/12 text-center sm:text-right ${winner === 'B' ? 'bg-green-50 border-r-4 border-r-green-500 font-semibold' : 'opacity-60'}`}>
-                                                    <div className="flex items-center sm:flex-row-reverse gap-1.5 mb-1"><span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Coppia B</span>{winner === 'B' && <span className="bg-green-200 text-green-800 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">WIN 🎉</span>}</div>
-                                                    <div className="text-sm text-slate-800 truncate w-full text-center sm:text-right">{getPlayerNameWithRanking(match.team_b_left_id, playersWithStats)}</div>
-                                                    <div className="text-sm text-slate-800 truncate w-full text-center sm:text-right">{getPlayerNameWithRanking(match.team_b_right_id, playersWithStats)}</div>
+                                                <div className="text-sm font-black text-slate-900 uppercase">{getPlayerNameWithRanking(match.team_a_left_id, playersWithStats)}</div>
+                                                <div className="text-sm font-black text-slate-900 uppercase">{getPlayerNameWithRanking(match.team_a_right_id, playersWithStats)}</div>
+                                            </div>
+
+                                            {/* Punteggio Centrale */}
+                                            <div className="px-6 py-4 flex items-center justify-center border-y sm:border-y-0 sm:border-x border-slate-100 bg-slate-50 w-full sm:w-auto">
+                                                <div className="flex gap-2">
+                                                    {sets.length > 0 ? sets.map((set, sIdx) => (
+                                                        <div key={sIdx} className="bg-white border border-slate-200 px-3 py-2 text-base font-black text-slate-900 text-center rounded-sm min-w-[2.5rem]">
+                                                            {set.team_a}<br/><span className="text-slate-300 font-normal">-</span><br/>{set.team_b}
+                                                        </div>
+                                                    )) : <span className="text-xs font-bold text-slate-400">N/D</span>}
                                                 </div>
                                             </div>
-                                            <div className="text-[10px] text-slate-400 text-center sm:text-left font-medium border-t border-slate-50 pt-2 flex flex-col sm:flex-row sm:justify-between items-center gap-2">
-                                                <span>Disputata il {new Date(match.updated_at).toLocaleDateString('it-IT')}</span>
-                                                {matchClub && (
-                                                    <span className="inline-flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded border border-slate-100 text-slate-500">
-                                                        <span>📍</span>
-                                                        {matchClub.maps_url ? (
-                                                            <a href={matchClub.maps_url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline font-bold transition-colors [-webkit-tap-highlight-color:transparent] active:text-indigo-800">{matchClub.name} {matchClub.city ? `(${matchClub.city})` : ''}</a>
-                                                        ) : (
-                                                            <span className="font-bold text-slate-600">{matchClub.name} {matchClub.city ? `(${matchClub.city})` : ''}</span>
-                                                        )}
-                                                    </span>
-                                                )}
+
+                                            {/* Team B */}
+                                            <div className={`flex-1 w-full sm:w-auto p-4 flex flex-col justify-center sm:text-right ${winner === 'B' ? 'bg-emerald-50/50' : ''}`}>
+                                                <div className="flex items-center sm:justify-end gap-2 mb-1.5">
+                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">TEAM B</span>
+                                                    {winner === 'B' && <span className="bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-sm uppercase tracking-wider">WINNER</span>}
+                                                </div>
+                                                <div className="text-sm font-black text-slate-900 uppercase">{getPlayerNameWithRanking(match.team_b_left_id, playersWithStats)}</div>
+                                                <div className="text-sm font-black text-slate-900 uppercase">{getPlayerNameWithRanking(match.team_b_right_id, playersWithStats)}</div>
                                             </div>
                                         </div>
-                                    );
-                                })
-                            ) : (
-                                <p className="text-slate-500 italic text-center p-8 bg-white rounded-xl border border-slate-200">Nessun match completato.</p>
-                            )}
-                        </div>
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            <div className="p-8 text-center text-slate-500 font-bold uppercase text-sm border border-slate-200 bg-white rounded-sm">Nessun match registrato</div>
+                        )}
 
-                        {/* CONTROLLI PAGINAZIONE MATCH */}
                         {totalPages > 1 && (
-                            <div className="flex justify-center items-center gap-4 mt-6">
-                                <Link href={`/?tab=completed&page=${currentPage - 1}&playerPage=${playerPage}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.96] active:bg-slate-100 ${currentPage <= 1 ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}>← Precedente</Link>
-                                <div className="text-xs font-bold text-slate-500 font-mono">{currentPage} / {totalPages}</div>
-                                <Link href={`/?tab=completed&page=${currentPage + 1}&playerPage=${playerPage}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-xl shadow-sm transition-all duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.96] active:bg-slate-100 ${currentPage >= totalPages ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}>Successiva →</Link>
+                            <div className="flex justify-between items-center mt-6">
+                                <Link href={`/?tab=completed&page=${currentPage - 1}&playerPage=${playerPage}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-900 rounded-sm hover:bg-slate-100 transition-colors ${currentPage <= 1 ? 'pointer-events-none opacity-40' : ''}`}>← Prev</Link>
+                                <div className="text-xs font-bold text-slate-500">PAG {currentPage} / {totalPages}</div>
+                                <Link href={`/?tab=completed&page=${currentPage + 1}&playerPage=${playerPage}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-900 rounded-sm hover:bg-slate-100 transition-colors ${currentPage >= totalPages ? 'pointer-events-none opacity-40' : ''}`}>Next →</Link>
                             </div>
                         )}
                     </div>

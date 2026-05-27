@@ -11,332 +11,100 @@ export default function CreateMatchForm() {
     const supabase = createClient();
     const router = useRouter();
 
-    // Stati per i dati scaricati dal DB
     const [players, setPlayers] = useState<Player[]>([]);
     const [clubs, setClubs] = useState<Club[]>([]);
-
-    // Stati per i form e le selezioni
     const [teamALeft, setTeamALeft] = useState<number | ''>('');
     const [teamARight, setTeamARight] = useState<number | ''>('');
     const [teamBLeft, setTeamBLeft] = useState<number | ''>('');
     const [teamBRight, setTeamBRight] = useState<number | ''>('');
     const [matchType, setMatchType] = useState<'male' | 'female' | 'mixed'>('male');
     const [clubId, setClubId] = useState<number | ''>('');
-
-    // Stato per la gestione di data e ora del match
-    const [matchDate, setMatchDate] = useState<string>(() => {
-        const now = new Date();
-        const tzOffset = now.getTimezoneOffset() * 60000;
-        return new Date(now.getTime() - tzOffset).toISOString().slice(0, 16);
-    });
-
-    // Stati per la gestione della validazione in tempo reale
+    const [matchDate, setMatchDate] = useState<string>(() => new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16));
     const [levelError, setLevelError] = useState<boolean>(false);
     const [duplicateError, setDuplicateError] = useState<boolean>(false);
     const [loading, setLoading] = useState<boolean>(false);
-    const [submitError, setSubmitError] = useState<string>('');
 
-    // Caricamento iniziale in parallelo di anagrafica giocatori e club
     useEffect(() => {
         async function loadData() {
-            try {
-                const [playersRes, clubsRes] = await Promise.all([
-                    supabase.from('players')
-                        .select('id, first_name, last_name, ranking, preferred_side, gender')
-                        .order('ranking', { ascending: false })
-                        .order('last_name', { ascending: true }),
-                    supabase.from('clubs').select('*').order('name', { ascending: true })
-                ]);
-
-                if (playersRes.error) {
-                    console.error("❌ Errore Supabase Giocatori:", playersRes.error.message);
-                    setSubmitError(`Impossibile caricare i giocatori: ${playersRes.error.message}`);
-                    return;
-                }
-
-                if (playersRes.data) setPlayers(playersRes.data);
-                if (clubsRes.data) setClubs(clubsRes.data);
-
-            } catch (err) {
-                console.error("💥 Errore imprevisto:", err);
-            }
+            const [playersRes, clubsRes] = await Promise.all([
+                supabase.from('players').select('id, first_name, last_name, ranking, preferred_side, gender').order('last_name'),
+                supabase.from('clubs').select('*').order('name')
+            ]);
+            if (playersRes.data) setPlayers(playersRes.data);
+            if (clubsRes.data) setClubs(clubsRes.data);
         }
         loadData();
     }, [supabase]);
 
-    // EFFETTO DI VALIDAZIONE DINAMICA: Controlla cloni e divario tecnico (< 0.25)
     useEffect(() => {
-        const selectedIds = [teamALeft, teamARight, teamBLeft, teamBRight]
-            .filter((val): val is number => typeof val === 'number');
-
-        if (selectedIds.length === 0) {
-            setLevelError(false);
-            setDuplicateError(false);
-            return;
-        }
-
-        const hasDuplicates = new Set(selectedIds).size !== selectedIds.length;
-        setDuplicateError(hasDuplicates);
-
-        if (hasDuplicates) {
-            setLevelError(false);
-            return;
-        }
-
-        if (selectedIds.length < 2) {
-            setLevelError(false);
-            return;
-        }
-
-        const selectedRankings = selectedIds
-            .map(id => players.find(p => p.id === id)?.ranking)
-            .filter((ranking): ranking is number => ranking !== undefined);
-
-        if (selectedRankings.length >= 2) {
-            const maxLevel = Math.max(...selectedRankings);
-            const minLevel = Math.min(...selectedRankings);
-            const difference = maxLevel - minLevel;
-
-            if (parseFloat(difference.toFixed(2)) > 0.25) {
-                setLevelError(true);
-            } else {
-                setLevelError(false);
-            }
-        }
+        const selectedIds = [teamALeft, teamARight, teamBLeft, teamBRight].filter((v): v is number => typeof v === 'number');
+        setDuplicateError(new Set(selectedIds).size !== selectedIds.length);
+        if (selectedIds.length < 2) { setLevelError(false); return; }
+        const rks = selectedIds.map(id => players.find(p => p.id === id)?.ranking).filter((r): r is number => r !== undefined);
+        setLevelError(Math.max(...rks) - Math.min(...rks) > 0.25);
     }, [teamALeft, teamARight, teamBLeft, teamBRight, players]);
 
-    // Filtri dinamici per dividere i giocatori in base al lato di campo preferito
-    const leftSidePlayers = players.filter(p => {
-        const isCorrectSide = p.preferred_side === 'Left' || p.preferred_side === 'Both';
-        if (matchType === 'male') return isCorrectSide && p.gender === 'M';
-        if (matchType === 'female') return isCorrectSide && p.gender === 'F';
-        return isCorrectSide;
-    });
-    const rightSidePlayers = players.filter(p => {
-        const isCorrectSide = p.preferred_side === 'Right' || p.preferred_side === 'Both';
-        if (matchType === 'male') return isCorrectSide && p.gender === 'M';
-        if (matchType === 'female') return isCorrectSide && p.gender === 'F';
-        return isCorrectSide;
-    });
+    const leftSidePlayers = players.filter(p => (p.preferred_side === 'Left' || p.preferred_side === 'Both') && (matchType === 'mixed' || (matchType === 'male' ? p.gender === 'M' : p.gender === 'F')));
+    const rightSidePlayers = players.filter(p => (p.preferred_side === 'Right' || p.preferred_side === 'Both') && (matchType === 'mixed' || (matchType === 'male' ? p.gender === 'M' : p.gender === 'F')));
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (levelError || duplicateError) return;
-
         setLoading(true);
-        setSubmitError('');
-
         try {
-            await createMatch({
-                matchDate: matchDate,
-                matchType: matchType,
-                teamALeft: teamALeft || null,
-                teamARight: teamARight || null,
-                teamBLeft: teamBLeft || null,
-                teamBRight: teamBRight || null,
-                clubId: clubId || null
-            });
-
+            await createMatch({ matchDate, matchType, teamALeft: teamALeft || null, teamARight: teamARight || null, teamBLeft: teamBLeft || null, teamBRight: teamBRight || null, clubId: clubId || null });
             router.push('/');
-            router.refresh();
-        } catch (err: any) {
-            console.error(err);
-            setSubmitError(err.message || 'Errore durante la creazione del match.');
-            setLoading(false);
-        }
+        } catch (err: any) { setLoading(false); }
     };
 
     return (
-        <main className="min-h-screen p-4 sm:p-8 bg-slate-50 flex flex-col items-center justify-center">
-            <div className="w-full max-w-2xl bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-
-                <div className="mb-4">
-                    <BackToHomeButton />
-                </div>
-
-                <h1 className="text-xl font-black text-slate-800 mb-6">Nuova Partita</h1>
-
-                {submitError && (
-                    <div className="bg-rose-50 border border-rose-200 text-rose-700 p-3 rounded-xl mb-5 text-xs font-bold">
-                        {submitError}
-                    </div>
-                )}
+        <main className="min-h-screen p-4 sm:p-8 bg-slate-50 flex flex-col items-center">
+            <div className="w-full max-w-3xl bg-white border border-slate-200 shadow-sm p-6 rounded-sm">
+                <div className="mb-6"><BackToHomeButton /></div>
+                <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-8">Nuova Partita</h1>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
-
-                    {/* SELEZIONE DATA/ORA E CAMPO DA GIOCO */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                                Data e Ora
-                            </label>
-                            <input
-                                type="datetime-local"
-                                required
-                                value={matchDate}
-                                onChange={e => setMatchDate(e.target.value)}
-                                className="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-medium text-sm text-slate-800 focus:outline-none focus:border-indigo-500"
-                            />
-                        </div>
-
-                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                                Campo da Gioco (Opzionale)
-                            </label>
-                            <select
-                                value={clubId}
-                                onChange={e => setClubId(e.target.value ? parseInt(e.target.value, 10) : '')}
-                                className="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-medium text-sm text-slate-800 focus:outline-none focus:border-indigo-500"
-                            >
-                                <option value="">📍 Non definito</option>
-                                {clubs.map(club => (
-                                    <option key={club.id} value={club.id}>
-                                        {club.name} {club.city ? `(${club.city})` : ''}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+                        <input type="datetime-local" required value={matchDate} onChange={e => setMatchDate(e.target.value)} className="w-full p-2 border border-slate-300 text-sm font-bold bg-slate-50 rounded-sm" />
+                        <select value={clubId} onChange={e => setClubId(e.target.value ? parseInt(e.target.value) : '')} className="w-full p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm">
+                            <option value="">NON DEFINITO</option>
+                            {clubs.map(c => <option key={c.id} value={c.id}>{c.name} {c.city ? `(${c.city})` : ''}</option>)}
+                        </select>
                     </div>
 
-                    {/* SELETTORE TIPOLOGIA MATCH */}
-                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
-                            Categoria Partita
-                        </label>
-                        <div className="flex gap-2">
-                            {(['male', 'female', 'mixed'] as const).map((type) => {
-                                const labels = { male: '👨 Maschile', female: '👩 Femminile', mixed: '🌍 Misto' };
-                                return (
-                                    <button
-                                        key={type}
-                                        type="button"
-                                        onClick={() => {
-                                            setMatchType(type);
-                                            setTeamALeft(''); setTeamARight(''); setTeamBLeft(''); setTeamBRight('');
-                                        }}
-                                        className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase transition-all border shadow-sm active:scale-95 ${
-                                            matchType === type
-                                                ? 'bg-indigo-600 text-white border-indigo-600'
-                                                : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'
-                                        }`}
-                                    >
-                                        {labels[type]}
-                                    </button>
-                                );
-                            })}
-                        </div>
+                    <div className="flex bg-slate-100 p-1 rounded-sm gap-1">
+                        {(['male', 'female', 'mixed'] as const).map(type => {
+                            const labels = { male: 'MASCHILE', female: 'FEMMINILE', mixed: 'MISTO' };
+                            return (
+                                <button key={type} type="button" onClick={() => { setMatchType(type); setTeamALeft(''); setTeamARight(''); setTeamBLeft(''); setTeamBRight(''); }} className={`flex-1 py-2 text-[9px] font-black uppercase tracking-widest ${matchType === type ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>
+                                    {labels[type]}
+                                </button>
+                            );
+                        })}
                     </div>
 
-                    {/* Griglia dei due Team */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-                        {/* CARD TEAM A */}
-                        <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-100 flex flex-col space-y-4">
-                            <h2 className="text-blue-800 font-black text-base tracking-tight">Team A</h2>
-
-                            <div>
-                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Left Player (SX)</label>
-                                <select
-                                    value={teamALeft}
-                                    onChange={e => setTeamALeft(e.target.value ? parseInt(e.target.value, 10) : '')}
-                                    className="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-medium text-sm focus:outline-none focus:border-blue-500"
-                                >
-                                    <option value="">Seleziona Giocatore (Vuoto)</option>
-                                    {leftSidePlayers.map(p => (
-                                        <option key={p.id} value={p.id}>{p.first_name} {p.last_name} ({p.ranking.toFixed(2)})</option>
-                                    ))}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {[
+                            { label: 'TEAM A', setters: [setTeamALeft, setTeamARight], vals: [teamALeft, teamARight], border: 'border-blue-600' },
+                            { label: 'TEAM B', setters: [setTeamBLeft, setTeamBRight], vals: [teamBLeft, teamBRight], border: 'border-red-600' }
+                        ].map((t, i) => (
+                            <div key={i} className={`p-4 border-t-4 ${t.border} bg-slate-50 rounded-sm`}>
+                                <h2 className="text-[9px] font-black uppercase mb-3">{t.label}</h2>
+                                <select value={t.vals[0]} onChange={e => t.setters[0](e.target.value ? parseInt(e.target.value) : '')} className="w-full p-2 mb-2 text-[10px] font-bold border border-slate-300 rounded-sm">
+                                    <option value="">GIOCATORE SX</option>
+                                    {leftSidePlayers.filter(p => p.id === t.vals[0] || ![teamALeft, teamARight, teamBLeft, teamBRight].includes(p.id)).map(p => <option key={p.id} value={p.id}>{p.last_name} {p.first_name} — {p.ranking.toFixed(2)}</option>)}
+                                </select>
+                                <select value={t.vals[1]} onChange={e => t.setters[1](e.target.value ? parseInt(e.target.value) : '')} className="w-full p-2 text-[10px] font-bold border border-slate-300 rounded-sm">
+                                    <option value="">GIOCATORE DX</option>
+                                    {rightSidePlayers.filter(p => p.id === t.vals[1] || ![teamALeft, teamARight, teamBLeft, teamBRight].includes(p.id)).map(p => <option key={p.id} value={p.id}>{p.last_name} {p.first_name} — {p.ranking.toFixed(2)}</option>)}
                                 </select>
                             </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Right Player (DX)</label>
-                                <select
-                                    value={teamARight}
-                                    onChange={e => setTeamARight(e.target.value ? parseInt(e.target.value, 10) : '')}
-                                    className="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-medium text-sm focus:outline-none focus:border-blue-500"
-                                >
-                                    <option value="">Seleziona Giocatore (Vuoto)</option>
-                                    {rightSidePlayers.map(p => (
-                                        <option key={p.id} value={p.id}>{p.first_name} {p.last_name} ({p.ranking.toFixed(2)})</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-
-                        {/* CARD TEAM B */}
-                        <div className="bg-rose-50/40 p-5 rounded-2xl border border-rose-100 flex flex-col space-y-4">
-                            <h2 className="text-rose-800 font-black text-base tracking-tight">Team B</h2>
-
-                            <div>
-                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Left Player (SX)</label>
-                                <select
-                                    value={teamBLeft}
-                                    onChange={e => setTeamBLeft(e.target.value ? parseInt(e.target.value, 10) : '')}
-                                    className="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-medium text-sm focus:outline-none focus:border-rose-500"
-                                >
-                                    <option value="">Seleziona Giocatore (Vuoto)</option>
-                                    {leftSidePlayers.map(p => (
-                                        <option key={p.id} value={p.id}>{p.first_name} {p.last_name} ({p.ranking.toFixed(2)})</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Right Player (DX)</label>
-                                <select
-                                    value={teamBRight}
-                                    onChange={e => setTeamBRight(e.target.value ? parseInt(e.target.value, 10) : '')}
-                                    className="w-full p-2.5 border border-slate-200 rounded-xl bg-white font-medium text-sm focus:outline-none focus:border-rose-500"
-                                >
-                                    <option value="">Seleziona Giocatore (Vuoto)</option>
-                                    {rightSidePlayers.map(p => (
-                                        <option key={p.id} value={p.id}>{p.first_name} {p.last_name} ({p.ranking.toFixed(2)})</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-
+                        ))}
                     </div>
 
-                    {/* BANNER DI ERRORE DUPLICATI */}
-                    {duplicateError && (
-                        <div className="flex items-center justify-center space-x-2 p-3 bg-rose-50 border border-rose-200 rounded-xl transition-all">
-                            <span className="text-base">❌</span>
-                            <p className="text-xs font-black text-rose-700 tracking-tight">
-                                Errore: Lo stesso giocatore è stato inserito in più posizioni!
-                            </p>
-                        </div>
-                    )}
-
-                    {/* BANNER DI ALERT SCOMPENSO LIVELLO */}
-                    {levelError && (
-                        <div className="flex items-center justify-center space-x-2 p-3 bg-amber-50 border border-amber-200 rounded-xl transition-all animate-pulse">
-                            <span className="text-base">⚠️</span>
-                            <p className="text-xs font-black text-amber-700 tracking-tight">
-                                Attenzione: La differenza di livello supera il limite di 0.25!
-                            </p>
-                        </div>
-                    )}
-
-                    {/* BOTTONE DI INVIO CON SPINNER REATTIVO */}
-                    <button
-                        type="submit"
-                        disabled={levelError || duplicateError || loading || (!teamALeft && !teamARight && !teamBLeft && !teamBRight)}
-                        className="w-full bg-slate-800 hover:bg-slate-900 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-all shadow-sm active:scale-[0.99] text-sm flex items-center justify-center gap-2"
-                    >
-                        {loading ? (
-                            <>
-                                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                <span>Creazione in corso...</span>
-                            </>
-                        ) : (
-                            'Crea Partita'
-                        )}
+                    {(duplicateError || levelError) && <div className="p-3 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest">{duplicateError ? "ERRORE: GIOCATORE DUPLICATO." : "ERRORE: DIVARIO TECNICO > 0.25."}</div>}
+                    <button type="submit" disabled={levelError || duplicateError || loading} className="w-full bg-slate-900 text-white font-black text-xs uppercase py-4 rounded-sm hover:bg-black disabled:opacity-50">
+                        {loading ? 'CREAZIONE...' : 'CONFERMA PARTITA'}
                     </button>
-
                 </form>
             </div>
         </main>

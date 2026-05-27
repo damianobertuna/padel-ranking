@@ -3,14 +3,13 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { updatePlayerByAdmin } from '../../../actions/player-actions';
 import { SubmitButton } from './SubmitButton';
-import BackToHomeButton from "@/components/BackToHomeButton"; // 👈 Importiamo il pulsante intelligente
+import BackToHomeButton from "@/components/BackToHomeButton";
 
-export const revalidate = 0; // Evita cache aggressiva
+export const revalidate = 0;
 
 export default async function AdminPlayersManagement() {
     const supabase = await createClient();
 
-    // 1. Controllo di sicurezza lato server
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) redirect('/login');
 
@@ -22,115 +21,85 @@ export default async function AdminPlayersManagement() {
 
     if (!adminCheck || adminCheck.role !== 'admin') {
         return (
-            <main className="min-h-screen p-8 bg-slate-100 flex flex-col items-center justify-center">
-                <p className="text-red-600 font-bold text-lg mb-4">🚫 Accesso Negato. Questa pagina è riservata agli amministratori.</p>
-                <Link href="/" className="text-indigo-600 underline">Torna alla Home</Link>
+            <main className="min-h-screen p-8 bg-slate-50 flex flex-col items-center justify-center">
+                <p className="text-red-600 font-black uppercase text-sm mb-4 tracking-widest">🚫 Accesso Negato.</p>
+                <Link href="/" className="text-blue-600 font-bold underline text-xs uppercase tracking-wider">Torna alla Home</Link>
             </main>
         );
     }
 
-    // 2. Scarichiamo la lista di TUTTI i giocatori
     const { data: allPlayers } = await supabase
         .from('players')
         .select('*')
         .order('last_name', { ascending: true });
 
     return (
-        <main className="min-h-screen p-8 bg-slate-100 flex flex-col items-center">
+        <main className="min-h-screen p-4 sm:p-8 bg-slate-50 flex flex-col items-center">
             <div className="max-w-4xl w-full">
-
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <BackToHomeButton />
-                        <h1 className="text-3xl font-bold text-slate-800 mt-2">Gestione Giocatori (Admin)</h1>
-                    </div>
+                <div className="mb-8 border-b-2 border-slate-900 pb-4">
+                    <BackToHomeButton />
+                    <h1 className="text-3xl font-black text-slate-900 mt-2 uppercase tracking-tighter">Gestione Atleti</h1>
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Area Amministrativa Federale</p>
                 </div>
 
-                <div className="space-y-6">
+                <div className="space-y-3">
                     {(allPlayers || []).map((player) => (
-                        <div key={player.id} className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
-
-                            {/* Form di modifica per ogni singolo giocatore */}
-                            <form action={updatePlayerByAdmin} className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+                        <div key={player.id} className="bg-white p-4 border border-slate-200 shadow-sm rounded-sm">
+                            <form action={updatePlayerByAdmin} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                                 <input type="hidden" name="playerId" value={player.id} />
 
-                                {/* Nome e Cognome */}
-                                <div className="sm:col-span-2 grid grid-cols-2 gap-2">
+                                {/* Dati Anagrafici */}
+                                <div className="md:col-span-4 grid grid-cols-2 gap-2">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Nome</label>
-                                        <input
-                                            type="text"
-                                            name="firstName"
-                                            defaultValue={player.first_name}
-                                            required
-                                            className="w-full p-2 border rounded bg-white text-slate-950 font-medium"
-                                        />
+                                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Nome</label>
+                                        <input type="text" name="firstName" defaultValue={player.first_name} required className="w-full p-2 border border-slate-300 bg-slate-50 text-sm font-bold text-slate-900 rounded-sm" />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Cognome</label>
-                                        <input
-                                            type="text"
-                                            name="lastName"
-                                            defaultValue={player.last_name}
-                                            required
-                                            className="w-full p-2 border rounded bg-white text-slate-950 font-medium"
-                                        />
+                                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Cognome</label>
+                                        <input type="text" name="lastName" defaultValue={player.last_name} required className="w-full p-2 border border-slate-300 bg-slate-50 text-sm font-bold text-slate-900 rounded-sm" />
                                     </div>
                                 </div>
 
-                                {/* Ranking Punti */}
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Ranking</label>
-                                    <input
-                                        type="number"
-                                        name="ranking"
-                                        step="0.01"
-                                        min="1.00"
-                                        max="7.00"
-                                        defaultValue={player.ranking}
-                                        required
-                                        className="w-full p-2 border rounded bg-white text-slate-950 font-mono font-bold text-indigo-600"
-                                    />
+                                {/* Ranking */}
+                                <div className="md:col-span-2">
+                                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Ranking</label>
+                                    <input type="number" name="ranking" step="0.01" min="1.00" max="7.00" defaultValue={player.ranking} required className="w-full p-2 border border-slate-300 bg-blue-50 text-sm font-black text-blue-700 rounded-sm" />
                                 </div>
 
-                                {/* Pulsante di salvataggio riallineato tramite componente Client */}
-                                <div className="flex justify-end">
-                                    <SubmitButton /> {/* 👈 RISOLTO: Ora gestisce lo spinner autonomamente sul client */}
-                                </div>
-
-                                {/* Opzioni avanzate: Lato, Mano e Ruolo */}
-                                <div className="sm:col-span-4 grid grid-cols-3 gap-4 pt-2 border-t border-slate-100 mt-2">
+                                {/* Opzioni */}
+                                <div className="md:col-span-5 grid grid-cols-3 gap-2">
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-500 mb-1">Lato Campo</label>
-                                        <select name="preferredSide" defaultValue={player.preferred_side} className="w-full p-1.5 border rounded bg-slate-50 text-slate-800 text-xs font-semibold">
-                                            <option value="Left">Sinistra (SX)</option>
-                                            <option value="Right">Destra (DX)</option>
-                                            <option value="Both">Entrambi (SX/DX)</option> {/* 👈 RISOLTO: Allineato alla bacheca Trello */}
+                                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Lato</label>
+                                        <select name="preferredSide" defaultValue={player.preferred_side} className="w-full p-2 border border-slate-300 bg-white text-[10px] font-bold text-slate-800 rounded-sm">
+                                            <option value="Left">SX</option>
+                                            <option value="Right">DX</option>
+                                            <option value="Both">MIX</option>
                                         </select>
                                     </div>
-
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-500 mb-1">Mano Dominante</label>
-                                        <select name="dominantHand" defaultValue={player.dominant_hand || 'Destro'} className="w-full p-1.5 border rounded bg-slate-50 text-slate-800 text-xs font-semibold">
-                                            <option value="Destro">Destro</option>
-                                            <option value="Mancino">Mancino</option>
+                                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Mano</label>
+                                        <select name="dominantHand" defaultValue={player.dominant_hand || 'Destro'} className="w-full p-2 border border-slate-300 bg-white text-[10px] font-bold text-slate-800 rounded-sm">
+                                            <option value="Destro">DX</option>
+                                            <option value="Mancino">SX</option>
                                         </select>
                                     </div>
-
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-500 mb-1">Permessi Sistema</label>
-                                        <select name="role" defaultValue={player.role || 'user'} className="w-full p-1.5 border rounded bg-slate-50 text-slate-800 text-xs font-semibold">
-                                            <option value="user">Utente Base</option>
-                                            <option value="admin">Amministratore</option>
+                                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Ruolo</label>
+                                        <select name="role" defaultValue={player.role || 'user'} className="w-full p-2 border border-slate-300 bg-white text-[10px] font-bold text-slate-800 rounded-sm">
+                                            <option value="user">USER</option>
+                                            <option value="admin">ADMIN</option>
                                         </select>
                                     </div>
                                 </div>
 
+                                {/* Azione */}
+                                <div className="md:col-span-1 flex justify-end">
+                                    <SubmitButton />
+                                </div>
                             </form>
                         </div>
                     ))}
                 </div>
-
             </div>
         </main>
     );

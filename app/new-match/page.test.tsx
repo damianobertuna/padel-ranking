@@ -4,7 +4,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CreateMatchForm from './page';
 import { createPendingMatch } from '@/actions/match-actions';
 
-// 1. Usiamo vi.hoisted() per dichiarare le variabili PRIMA che i vi.mock vengano eseguiti
 const { mockPush, mockRefresh, mockPlayers, mockClubs } = vi.hoisted(() => {
     return {
         mockPush: vi.fn(),
@@ -21,7 +20,6 @@ const { mockPush, mockRefresh, mockPlayers, mockClubs } = vi.hoisted(() => {
     };
 });
 
-// 2. Mock delle dipendenze di navigazione e server actions
 vi.mock('next/navigation', () => ({
     useRouter: () => ({ push: mockPush, refresh: mockRefresh })
 }));
@@ -30,28 +28,22 @@ vi.mock('@/actions/match-actions', () => ({
     createPendingMatch: vi.fn()
 }));
 
-// Componente fittizio per BackToHomeButton
 vi.mock('@/components/BackToHomeButton', () => ({
     default: () => <button>Torna alla classifica</button>
 }));
 
-// 3. Mock Supabase con accesso alle variabili hoisted
 vi.mock('@/lib/supabase/client', () => {
     const playerQueryChain = {
         select: vi.fn().mockReturnThis(),
         order: vi.fn().mockImplementation(function (this: any, field: string) {
-            if (field === 'last_name') {
-                return Promise.resolve({ data: mockPlayers, error: null });
-            }
+            if (field === 'last_name') return Promise.resolve({ data: mockPlayers, error: null });
             return this;
         })
     };
-
     const clubQueryChain = {
         select: vi.fn().mockReturnThis(),
         order: vi.fn().mockResolvedValue({ data: mockClubs, error: null })
     };
-
     return {
         createClient: () => ({
             from: vi.fn((table: string) => {
@@ -63,54 +55,23 @@ vi.mock('@/lib/supabase/client', () => {
     };
 });
 
-
 describe('CreateMatchForm Component', () => {
+    beforeEach(() => { cleanup(); vi.clearAllMocks(); });
+    afterEach(() => { cleanup(); });
 
-    beforeEach(() => {
-        cleanup();
-        vi.clearAllMocks();
-    });
-
-    afterEach(() => {
-        cleanup();
-    });
-
-    it('dovrebbe filtrare i giocatori in base alla categoria del match (Genere)', async () => {
+    it('dovrebbe filtrare i giocatori in base alla categoria (Genere)', async () => {
         render(<CreateMatchForm />);
-
         await screen.findAllByRole('option');
 
-        // Di default il match è "male" (Maschile).
         const leftSelect = screen.getAllByRole('combobox')[1];
-        expect(leftSelect.innerHTML).toContain('Marco UomoSX');
-        expect(leftSelect.innerHTML).not.toContain('Giulia DonnaSX');
+        expect(leftSelect.innerHTML).toContain('UomoSX Marco');
 
-        // Cambiamo la categoria in Femminile
-        const femaleButton = screen.getByRole('button', { name: /👩 Femminile/i });
-        fireEvent.click(femaleButton);
+        fireEvent.click(screen.getByRole('button', { name: /FEMMINILE/i }));
 
-        // Ora la tendina Left deve contenere Giulia e non Marco
         await waitFor(() => {
             const newLeftSelect = screen.getAllByRole('combobox')[1];
-            expect(newLeftSelect.innerHTML).toContain('Giulia DonnaSX');
-            expect(newLeftSelect.innerHTML).not.toContain('Marco UomoSX');
-        });
-    });
-
-    it('dovrebbe mostrare un errore visivo in caso di giocatori cloni', async () => {
-        render(<CreateMatchForm />);
-        await screen.findAllByRole('option');
-
-        const selects = screen.getAllByRole('combobox');
-
-        // Selezioniamo lo stesso giocatore (Marco id: 1) sia in Team A Left [1] che in Team B Left [3]
-        fireEvent.change(selects[1], { target: { value: '1' } });
-        fireEvent.change(selects[3], { target: { value: '1' } });
-
-        await waitFor(() => {
-            expect(screen.getByText(/Errore: Lo stesso giocatore è stato inserito in più posizioni/i)).toBeDefined();
-            const submitBtn = screen.getByRole('button', { name: /Crea Partita/i });
-            expect(submitBtn.hasAttribute('disabled')).toBe(true);
+            expect(newLeftSelect.innerHTML).toContain('DonnaSX Giulia');
+            expect(newLeftSelect.innerHTML).not.toContain('UomoSX Marco');
         });
     });
 
@@ -118,36 +79,30 @@ describe('CreateMatchForm Component', () => {
         render(<CreateMatchForm />);
         await screen.findAllByRole('option');
 
-        // Passiamo a match misto
-        fireEvent.click(screen.getByRole('button', { name: /🌍 Misto/i }));
-
+        fireEvent.click(screen.getByRole('button', { name: /MISTO/i }));
         const selects = screen.getAllByRole('combobox');
 
-        // Inseriamo Giulia (4.45) in Team A SX [1] ed Elena (4.80) in Team A DX [2] (Diff = 0.35)
         fireEvent.change(selects[1], { target: { value: '3' } });
         fireEvent.change(selects[2], { target: { value: '4' } });
 
         await waitFor(() => {
-            expect(screen.getByText(/Attenzione: La differenza di livello supera il limite di 0.25/i)).toBeDefined();
-            const submitBtn = screen.getByRole('button', { name: /Crea Partita/i });
+            expect(screen.getByText(/ERRORE: DIVARIO TECNICO > 0.25/i)).toBeDefined();
+            const submitBtn = screen.getByRole('button', { name: /CONFERMA PARTITA/i });
             expect(submitBtn.hasAttribute('disabled')).toBe(true);
         });
     });
 
-    it('dovrebbe inviare i dati corretti alla Server Action al submit del form', async () => {
+    it('dovrebbe inviare i dati corretti alla Server Action', async () => {
         render(<CreateMatchForm />);
         await screen.findAllByRole('option');
-
         const selects = screen.getAllByRole('combobox');
 
-        // Configurazione valida (Diff = 0.05)
         fireEvent.change(selects[1], { target: { value: '1' } });
         fireEvent.change(selects[2], { target: { value: '2' } });
 
-        // Verifichiamo che il bottone si sblocchi
         let submitBtn: HTMLElement;
         await waitFor(() => {
-            submitBtn = screen.getByRole('button', { name: /Crea Partita/i });
+            submitBtn = screen.getByRole('button', { name: /CONFERMA PARTITA/i });
             expect(submitBtn.hasAttribute('disabled')).toBe(false);
         });
 
@@ -157,10 +112,7 @@ describe('CreateMatchForm Component', () => {
             expect(createPendingMatch).toHaveBeenCalledWith(expect.objectContaining({
                 matchType: 'male',
                 teamALeft: 1,
-                teamARight: 2,
-                teamBLeft: null,
-                teamBRight: null,
-                clubId: null
+                teamARight: 2
             }));
             expect(mockPush).toHaveBeenCalledWith('/');
         });

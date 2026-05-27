@@ -66,7 +66,7 @@ describe('JoinMatchPage Unit Tests', () => {
 
     it('dovrebbe mostrare il loader durante il caricamento iniziale', () => {
         render(<JoinMatchPage />);
-        expect(screen.getByText(/Caricamento dettagli match.../i)).toBeDefined();
+        expect(screen.getByText(/Caricamento.../i)).toBeDefined();
     });
 
     it('dovrebbe renderizzare correttamente il form dopo il caricamento', async () => {
@@ -74,12 +74,12 @@ describe('JoinMatchPage Unit Tests', () => {
 
         // Aspettiamo che il loader sparisca e appaia il form
         await waitFor(() => {
-            expect(screen.queryByText(/Caricamento dettagli match.../i)).toBeNull();
+            expect(screen.queryByText(/Caricamento.../i)).toBeNull();
         });
 
         // Ora il form viene renderizzato e i select (combobox) sono presenti!
         const selects = await screen.findAllByRole('combobox');
         expect(selects.length).toBeGreaterThan(0);
-        expect(screen.getByText(/Gestisci Partita/i)).toBeDefined();
+        expect(screen.getByText(/Modifica Partita/i)).toBeDefined();
     });
 });
