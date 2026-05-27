@@ -78,6 +78,26 @@ export default function ResolveMatch() {
 
     if (pageLoading) return <main className="min-h-screen flex items-center justify-center text-[10px] font-black uppercase tracking-widest">Caricamento referto...</main>;
 
+    // === GUARDIA TYPESCRIPT ===
+    // Se il caricamento è finito ma il match non c'è, mostriamo un 404 e fermiamo l'esecuzione.
+    // Questo rassicura TypeScript che da qui in poi "match" non sarà mai null.
+    if (!match) {
+        return (
+            <main className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-50">
+                <div className="bg-white border border-slate-200 shadow-sm p-6 rounded-sm text-center max-w-sm w-full">
+                    <h1 className="text-xl font-black text-red-600 uppercase tracking-tighter mb-2">
+                        ERRORE 404
+                    </h1>
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">
+                        Referto non trovato o partita non valida.
+                    </p>
+                    <BackToHomeButton />
+                </div>
+            </main>
+        );
+    }
+    // ==========================
+
     return (
         <main className="min-h-screen p-4 sm:p-8 bg-slate-50 flex flex-col items-center">
             <div className="max-w-md w-full bg-white border border-slate-200 shadow-sm p-6 rounded-sm">
@@ -109,7 +129,7 @@ export default function ResolveMatch() {
 
                     <div className="text-center font-black text-[10px] uppercase text-slate-900 mb-4 border-b border-slate-100 pb-4">
                         {getPlayerName(match.team_a_left_id)} / {getPlayerName(match.team_a_right_id)}
-                        <span className="block text-[8px] text-slate-400">VS</span>
+                        <span className="block text-[8px] text-slate-400 mt-1 mb-1">VS</span>
                         {getPlayerName(match.team_b_left_id)} / {getPlayerName(match.team_b_right_id)}
                     </div>
 
@@ -121,7 +141,7 @@ export default function ResolveMatch() {
                         </div>
                     ))}
 
-                    <button type="submit" disabled={submitting} className="w-full bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest py-4 rounded-sm hover:bg-black disabled:opacity-50">
+                    <button type="submit" disabled={submitting} className="w-full bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest py-4 rounded-sm hover:bg-black disabled:opacity-50 mt-4">
                         {submitting ? 'ELABORAZIONE...' : 'CONFERMA E CALCOLA RANKING'}
                     </button>
                 </form>
