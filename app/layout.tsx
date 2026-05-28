@@ -150,15 +150,15 @@ export default async function RootLayout({
         </div>
       </footer>
 
-      {/* Configurazione ed esecuzione Iubenda Cookie Banner */}
-      <Script id="iubenda-cs-config" strategy="afterInteractive">
-        {`
+      {/* 1. Configurazione Iubenda (Eseguita in modo sincrono nativo) */}
+      <script dangerouslySetInnerHTML={{
+          __html: `
                         var _iub = _iub || [];
                         _iub.csConfiguration = {
                             "askConsentAtCookiePolicyUpdate": true,
                             "floatingPreferencesButtonDisplay": "bottom-right",
                             "perPurposeConsent": true,
-                            "siteId": 89843982, 
+                            "siteId": IL_TUO_SITE_ID, /* <-- Assicurati che questo sia il numero corretto! */
                             "whitelabel": false,
                             "cookiePolicyId": 89843982,
                             "lang": "it",
@@ -172,9 +172,13 @@ export default async function RootLayout({
                                 "rejectButtonDisplay": true
                             }
                         };
-                    `}
-      </Script>
+                    `
+      }} />
+
+      {/* 2. Motore Cookie Iubenda (Asincrono, caricato DOPO la configurazione) */}
       <Script src="https://cdn.iubenda.com/cs/iubenda_cs.js" strategy="afterInteractive" />
+
+      {/* 3. Motore per aprire le policy legali nei link */}
       <Script src="https://cdn.iubenda.com/iubenda.js" strategy="lazyOnload" />
       </body>
       </html>
