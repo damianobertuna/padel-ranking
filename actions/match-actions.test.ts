@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { leaveMatchAction, joinMatchAction } from './match-actions';
+import { leaveMatchAction, joinMatchAction, resolveMatchWithRanking } from './match-actions';
 import { createClient } from '@/lib/supabase/server';
 import { logAction } from '@/lib/audit';
 
@@ -141,5 +141,102 @@ describe('Match Server Actions', () => {
                 expect.stringContaining('eliminato automaticamente perché vuoto')
             );
         });
+    });
+});
+
+describe('resolveMatchWithRanking (Logica Punteggi e Regole)', () => {
+    let updateSpy: any;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        updateSpy = vi.fn().mockReturnThis();
+    });
+
+    const executeResolve = async (teamA: number[], teamB: number[], winningTeam: 'A'|'B') => {
+        const matchData = {
+            id: 'm1', status: 'pending',
+            team_a_left_id: teamA[0], team_a_right_id: teamA[1],
+            team_b_left_id: teamB[0], team_b_right_id: teamB[1]
+        };
+
+        (createClient as any).mockResolvedValueOnce({
+            auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
+            from: vi.fn((table) => {
+                const mockAll = [
+                    {id:1, preferred_side:'Left', ranking: 5.0}, // KING SX
+                    {id:2, preferred_side:'Left', ranking: 3.0}, // Normale SX (1)
+                    {id:3, preferred_side:'Left', ranking: 1.0}, // FANALINO SX
+                    {id:4, preferred_side:'Right', ranking: 5.0},// KING DX
+                    {id:5, preferred_side:'Right', ranking: 3.0},// Normale DX (1)
+                    {id:6, preferred_side:'Right', ranking: 1.0},// FANALINO DX
+                    {id:7, preferred_side:'Left', ranking: 3.1}, // Normale SX (2)
+                    {id:8, preferred_side:'Right', ranking: 3.1},// Normale DX (2)
+                    {id:9, preferred_side:'Both', ranking: 5.0}, // KING MIX
+                    {id:10, preferred_side:'Both', ranking: 3.0} // Normale MIX (Sblocca il titolo King per ID 9)
+                ];
+
+                return {
+                    select: vi.fn().mockReturnThis(),
+                    eq: vi.fn().mockReturnThis(),
+                    in: vi.fn().mockImplementation((c, ids: number[]) => {
+                        return Promise.resolve({ data: mockAll.filter(p => ids.includes(p.id)), error: null });
+                    }),
+                    update: updateSpy,
+                    single: vi.fn().mockImplementation(() => table === 'matches' ? Promise.resolve({ data: matchData, error: null }) : Promise.resolve({ data: { id: 99 }, error: null })),
+                    then: function(res: any) {
+                        if (table === 'players') res({ data: mockAll, error: null });
+                        else res({ data: null, error: null });
+                    }
+                };
+            })
+        });
+
+        const score = winningTeam === 'A' ? [{team_a: 6, team_b: 4}, {team_a: 6, team_b: 4}] : [{team_a: 4, team_b: 6}, {team_a: 4, team_b: 6}];
+        await resolveMatchWithRanking({ matchId: 'm1', score });
+    };
+
+    it('Regola 5: Partita tra Normali (2,5 vs 7,8) -> +0.05 / -0.05', async () => {
+        await executeResolve([2, 5], [7, 8], 'A');
+        expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ team_a_delta: 0.05, team_b_delta: -0.05 }));
+    });
+
+    it('Regola 7: Normali battono un King (1,5 perdono contro 7,8) -> +0.10 / -0.05', async () => {
+        await executeResolve([1, 5], [7, 8], 'B');
+        expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ team_a_delta: -0.05, team_b_delta: 0.10 }));
+    });
+
+    it('Regola 7: Malus due King battuti da Normali (1,4 perdono contro 7,8) -> +0.10 / -0.10', async () => {
+        await executeResolve([1, 4], [7, 8], 'B');
+        expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ team_a_delta: -0.10, team_b_delta: 0.10 }));
+    });
+
+    it('Regola 7 (Neutralizzazione): King batte King (1,5 battono 4,7) -> +0.05 / -0.05', async () => {
+        await executeResolve([1, 5], [4, 7], 'A');
+        expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ team_a_delta: 0.05, team_b_delta: -0.05 }));
+    });
+
+    it('Regola 8: Fanalino vince (3,5 battono 7,8) -> +0.10 / -0.05', async () => {
+        await executeResolve([3, 5], [7, 8], 'A');
+        expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ team_a_delta: 0.10, team_b_delta: -0.05 }));
+    });
+
+    it('Regola 8 (Neutralizzazione): Fanalino batte Fanalino (3,5 battono 6,7) -> +0.05 / -0.05', async () => {
+        await executeResolve([3, 5], [6, 7], 'A');
+        expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ team_a_delta: 0.05, team_b_delta: -0.05 }));
+    });
+
+    it('Regola 7 (Neutralizzazione Incrociata): King SX batte King MIX (1,5 battono 9,7) -> +0.05 / -0.05', async () => {
+        // ID 1 (King SX) sfida ID 9 (King MIX). Anche se sono categorie diverse,
+        // il sistema deve riconoscerli entrambi come King e annullare i bonus.
+        await executeResolve([1, 5], [9, 7], 'A');
+        expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ team_a_delta: 0.05, team_b_delta: -0.05 }));
+    });
+
+    it('Regola 7 (Bugfix Neutralizzazione Totale): 2 King vs 1 King (1,4 perdono contro 9,7) -> +0.05 / -0.05', async () => {
+        // Team A ha due King (ID 1 e 4). Team B ha un King (ID 9). Team B vince.
+        // La presenza di King in entrambe le squadre attiva la Neutralizzazione Assoluta.
+        // Qualsiasi altro bonus (anche derivante da Fanalini o paradossi) deve essere bloccato.
+        await executeResolve([1, 4], [9, 7], 'B');
+        expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ team_a_delta: -0.05, team_b_delta: 0.05 }));
     });
 });

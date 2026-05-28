@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { logAction } from "@/lib/audit";
+import { computeKingAndFanalino } from "@/lib/rankingCalc";
 
 // Interfaccia per la struttura del set
 export interface SetScore {
@@ -270,32 +271,16 @@ export async function resolveMatchWithRanking(data: {
         }
 
         // Troviamo i massimi (King) e minimi (Fanalino) globali
-        const { data: allPlayers } = await supabase.from('players').select('preferred_side, ranking');
-        const thresholds = {
-            Left: { max: -Infinity, min: Infinity },
-            Right: { max: -Infinity, min: Infinity },
-            Both: { max: -Infinity, min: Infinity }
-        };
+        // Troviamo i massimi (King) e minimi (Fanalino) globali usando la funzione ufficiale
+        const { data: allPlayers } = await supabase.from('players').select('*');
 
-        allPlayers?.forEach(p => {
-            const side = p.preferred_side as 'Left' | 'Right' | 'Both';
-            if (p.ranking > thresholds[side].max) thresholds[side].max = p.ranking;
-            if (p.ranking < thresholds[side].min) thresholds[side].min = p.ranking;
-        });
+        const {
+            kingLeftIds, kingRightIds, kingBothIds,
+            lastPlaceLeftIds, lastPlaceRightIds, lastPlaceBothIds
+        } = computeKingAndFanalino(allPlayers || []);
 
-        const isKing = (p: any) => {
-            const sideKey = p.preferred_side as 'Left' | 'Right' | 'Both';
-            const side = thresholds[sideKey];
-            if (!side) return false;
-            return side.max !== side.min && p.ranking === side.max;
-        };
-
-        const isFanalino = (p: any) => {
-            const sideKey = p.preferred_side as 'Left' | 'Right' | 'Both';
-            const side = thresholds[sideKey];
-            if (!side) return false;
-            return side.max !== side.min && p.ranking === side.min;
-        };
+        const isKing = (p: any) => kingLeftIds.includes(p.id) || kingRightIds.includes(p.id) || kingBothIds.includes(p.id);
+        const isFanalino = (p: any) => lastPlaceLeftIds.includes(p.id) || lastPlaceRightIds.includes(p.id) || lastPlaceBothIds.includes(p.id);
 
         // Dividiamo le squadre
         const teamA = playersInMatch.filter(p => p.id === match.team_a_left_id || p.id === match.team_a_right_id);
@@ -304,20 +289,46 @@ export async function resolveMatchWithRanking(data: {
         const winners = finalWinningTeam === 'A' ? teamA : teamB;
         const losers = finalWinningTeam === 'A' ? teamB : teamA;
 
-        // Calcoliamo i Delta in base alle Regole Ufficiali
+        // --- APPLICAZIONE REGOLE 7 E 8 (Con Neutralizzazioni) ---
+        // Prevenzione Paradosso: Se un giocatore è l'unico della sua categoria (es. unico MIX),
+        // il sistema potrebbe segnarlo sia King che Fanalino. La regola King ha la priorità assoluta.
+        const isStrictKing = (p: any) => isKing(p);
+        const isStrictFanalino = (p: any) => isFanalino(p) && !isKing(p);
+
+        const winnersHaveKing = winners.some(isStrictKing);
+        const losersHaveKing = losers.some(isStrictKing);
+        const bothTeamsHaveKing = winnersHaveKing && losersHaveKing;
+
+        const winnersHaveFanalino = winners.some(isStrictFanalino);
+        const losersHaveFanalino = losers.some(isStrictFanalino);
+        const bothTeamsHaveFanalino = winnersHaveFanalino && losersHaveFanalino;
+
         let winnerDelta = 0.05;
         let loserDelta = -0.05;
 
-        if (winners.some(isFanalino) || losers.some(isKing)) {
-            winnerDelta = 0.10; // Bonus sconfiggere King o Fanalino vince
-        }
+        // Neutralizzazione Assoluta: Se c'è uno scontro tra King o tra Fanalini,
+        // TUTTI i moltiplicatori si annullano, bloccando l'analisi successiva. [cite: 160, 163]
+        if (bothTeamsHaveKing || bothTeamsHaveFanalino) {
+            winnerDelta = 0.05;
+            loserDelta = -0.05;
+        } else {
+            // Regola 7: King (Bonus e Malus)
+            if (losersHaveKing && !winnersHaveKing) {
+                winnerDelta = 0.10;
+            }
+            if (losers.every(isStrictKing) && !winnersHaveKing) {
+                loserDelta = -0.10;
+            }
 
-        if (losers.every(isKing)) {
-            loserDelta = -0.10; // Malus se vengono sconfitti due King in coppia
+            // Regola 8: Fanalino (Bonus Vittoria)
+            if (winnersHaveFanalino) {
+                winnerDelta = 0.10;
+            }
         }
 
         const teamADelta = finalWinningTeam === 'A' ? winnerDelta : loserDelta;
         const teamBDelta = finalWinningTeam === 'B' ? winnerDelta : loserDelta;
+        // ---------------------------------------------------------
 
         const safeAdd = (rank: number, delta: number) => parseFloat((rank + delta).toFixed(2));
 

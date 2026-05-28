@@ -3,7 +3,6 @@ import { describe, it, expect } from 'vitest';
 import { computeKingAndFanalino } from './rankingCalc';
 import { Player } from '@/types';
 
-// Helper rapido per creare giocatori mock nei test
 const createMockPlayer = (id: number, side: 'Left' | 'Right' | 'Both', ranking: number): Player => ({
     id,
     first_name: `Player${id}`,
@@ -57,15 +56,15 @@ describe('Engine Calcolo King e Fanalino', () => {
         expect(res.lastPlaceLeftIds.length).toBe(2);
     });
 
-    it('should NOT assign titles to a single player if they are alone (flat ranking)', () => {
+    it('should award the title of King, but NOT that of Taillight, to a single player', () => {
         const players = [
-            createMockPlayer(1, 'Left', 4.50), // Da solo: max e min coincidono (classifica piatta)
+            createMockPlayer(1, 'Left', 4.50), // Da solo: max e min coincidono
         ];
 
         const res = computeKingAndFanalino(players);
 
-        // Ci aspettiamo array vuoti grazie al controllo di validità interno
-        expect(res.kingLeftIds).toEqual([]);
+        // ID 1 is King (being the highest score), but the Fanalini array remains empty (no gap)
+        expect(res.kingLeftIds).toEqual([1]);
         expect(res.lastPlaceLeftIds).toEqual([]);
     });
 });

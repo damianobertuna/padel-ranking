@@ -34,24 +34,25 @@ export function computeKingAndFanalino(players: Player[]): TitolariMatch {
     const lastPlaceRightIds: number[] = [];
     const lastPlaceBothIds: number[] = [];
 
-    // 3. Verifichiamo che la classifica NON sia piatta (MAX deve essere diverso da MIN)
-    const isLeftValid = maxRankingLeft !== minRankingLeft && maxRankingLeft !== -1;
-    const isRightValid = maxRankingRight !== minRankingRight && maxRankingRight !== -1;
-    const isBothValid = maxRankingBoth !== minRankingBoth && maxRankingBoth !== -1;
+    // 3. LOGICA DI DOMINIO: Un Fanalino esiste SOLO se c'è un dislivello (il Max deve essere maggiore del Min).
+    // Se c'è un solo giocatore, o se sono tutti a pari merito, non ci sono Fanalini.
+    const hasLeftGap = maxRankingLeft > minRankingLeft;
+    const hasRightGap = maxRankingRight > minRankingRight;
+    const hasBothGap = maxRankingBoth > minRankingBoth;
 
-    // 4. Assegniamo i titoli confrontando il punteggio esatto di ciascun giocatore
+    // 4. Assegnazione Titoli
     for (const p of players) {
         const { id, ranking, preferred_side } = p;
 
-        // Assegnazione KING (Massimo per lato, valido solo se la classifica è sgranata)
-        if (preferred_side === 'Left' && isLeftValid && ranking === maxRankingLeft) kingLeftIds.push(id);
-        if (preferred_side === 'Right' && isRightValid && ranking === maxRankingRight) kingRightIds.push(id);
-        if (preferred_side === 'Both' && isBothValid && ranking === maxRankingBoth) kingBothIds.push(id);
+        // Assegnazione KING (Sei al vertice. Se siete tutti pari, siete tutti King)
+        if (preferred_side === 'Left' && maxRankingLeft !== -1 && ranking === maxRankingLeft) kingLeftIds.push(id);
+        if (preferred_side === 'Right' && maxRankingRight !== -1 && ranking === maxRankingRight) kingRightIds.push(id);
+        if (preferred_side === 'Both' && maxRankingBoth !== -1 && ranking === maxRankingBoth) kingBothIds.push(id);
 
-        // Assegnazione FANALINO (Minimo per lato, valido solo se la classifica è sgranata)
-        if (preferred_side === 'Left' && isLeftValid && ranking === minRankingLeft) lastPlaceLeftIds.push(id);
-        if (preferred_side === 'Right' && isRightValid && ranking === minRankingRight) lastPlaceRightIds.push(id);
-        if (preferred_side === 'Both' && isBothValid && ranking === minRankingBoth) lastPlaceBothIds.push(id);
+        // Assegnazione FANALINO (Sei in fondo. Applicabile SOLO se c'è un distacco in classifica)
+        if (preferred_side === 'Left' && hasLeftGap && ranking === minRankingLeft) lastPlaceLeftIds.push(id);
+        if (preferred_side === 'Right' && hasRightGap && ranking === minRankingRight) lastPlaceRightIds.push(id);
+        if (preferred_side === 'Both' && hasBothGap && ranking === minRankingBoth) lastPlaceBothIds.push(id);
     }
 
     return {

@@ -59,6 +59,18 @@ export default async function Home({ searchParams }: PageProps) {
         lastPlaceBothIds
     } = computeKingAndFanalino(playersWithStats);
 
+    // --- OPTION A: Mappa dei Titoli per le Card (Hash Map O(1)) ---
+    const playerTitlesMap: Record<number, { type: 'KING' | 'FANALINO', label: string }> = {};
+
+    kingLeftIds.forEach(id => playerTitlesMap[id] = { type: 'KING', label: 'KING SX' });
+    kingRightIds.forEach(id => playerTitlesMap[id] = { type: 'KING', label: 'KING DX' });
+    kingBothIds.forEach(id => playerTitlesMap[id] = { type: 'KING', label: 'KING MIX' });
+
+    lastPlaceLeftIds.forEach(id => playerTitlesMap[id] = { type: 'FANALINO', label: 'FAN SX' });
+    lastPlaceRightIds.forEach(id => playerTitlesMap[id] = { type: 'FANALINO', label: 'FAN DX' });
+    lastPlaceBothIds.forEach(id => playerTitlesMap[id] = { type: 'FANALINO', label: 'FAN MIX' });
+    // --------------------------------------------------------------
+
     const filteredPlayers = playersWithStats.filter(player => {
         if (currentGender === 'all') return true;
         return player.gender === currentGender;
@@ -306,6 +318,7 @@ export default async function Home({ searchParams }: PageProps) {
                                         rawPlayers={playersWithStats || []}
                                         currentUserPlayer={currentUserPlayer}
                                         clubs={clubsList}
+                                        playerTitles={playerTitlesMap}
                                     />
                                 ))
                             ) : (

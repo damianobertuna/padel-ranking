@@ -14,7 +14,8 @@ export default function PendingMatchCard({
                                              match,
                                              rawPlayers,
                                              currentUserPlayer,
-                                             clubs
+                                             clubs,
+                                             playerTitles
                                          }: PendingMatchCardProps & { clubs?: Club[] }) {
 
     const [isManaging, setIsManaging] = useState(false);
@@ -115,6 +116,8 @@ export default function PendingMatchCard({
         );
 
         const p = rawPlayers.find(player => player.id === id);
+        const titleInfo = p && playerTitles ? playerTitles[p.id] : null;
+
         return (
             <div className="w-full text-xs font-black uppercase text-slate-900 py-0.5 flex items-center justify-center gap-1.5 overflow-hidden">
                 <span className="truncate min-w-0">
@@ -124,6 +127,12 @@ export default function PendingMatchCard({
                 {p && (
                     <span className="shrink-0 text-[9px] font-mono font-bold text-blue-600 bg-blue-50 px-1 border border-blue-100 rounded-sm">
                         {p.ranking.toFixed(2)}
+                    </span>
+                )}
+
+                {titleInfo && titleInfo.type === 'KING' && (
+                    <span className="shrink-0 px-1 py-0.5 bg-amber-100 text-amber-800 text-[8px] font-black tracking-widest uppercase rounded-sm flex items-center shadow-sm" title="King">
+                        👑 {titleInfo.label}
                     </span>
                 )}
 
