@@ -158,7 +158,7 @@ export default async function RootLayout({
                             "askConsentAtCookiePolicyUpdate": true,
                             "floatingPreferencesButtonDisplay": "bottom-right",
                             "perPurposeConsent": true,
-                            "siteId": IL_TUO_SITE_ID, /* <-- Assicurati che questo sia il numero corretto! */
+                            "siteId": 4547620,
                             "whitelabel": false,
                             "cookiePolicyId": 89843982,
                             "lang": "it",
