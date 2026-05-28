@@ -124,8 +124,22 @@ export default async function Home({ searchParams }: PageProps) {
 
                 {/* HEADER TITOLO E PULSANTI */}
                 <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-4 mb-8 pb-4 border-b-2 border-slate-900">
-                    <div>
-                        <h1 className="text-4xl sm:text-5xl font-black text-slate-900 uppercase tracking-tighter leading-none">RanKING<br/><span className="text-blue-600">Padel</span></h1>
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        {/* LOGO */}
+                        <div className="shrink-0 flex items-center justify-center">
+                            <img
+                                src="/padel_ranking_logo.svg"
+                                alt="RanKING Padel Logo"
+                                className="w-14 h-14 sm:w-20 sm:h-20 object-contain mix-blend-multiply"
+                            />
+                        </div>
+
+                        {/* TESTO */}
+                        <div>
+                            <h1 className="text-4xl sm:text-4xl font-black text-slate-900 uppercase tracking-tighter leading-none">
+                                RanKING<br/><span className="text-blue-600">Padel</span>
+                            </h1>
+                        </div>
                     </div>
 
                     {/* Bottoni utente e admin ripristinati */}
