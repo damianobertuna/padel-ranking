@@ -304,10 +304,15 @@ export default async function Home({ searchParams }: PageProps) {
 
                                             {/* Punteggio Centrale */}
                                             <div className="px-6 py-4 flex items-center justify-center border-y sm:border-y-0 sm:border-x border-slate-100 bg-slate-50 w-full sm:w-auto">
-                                                <div className="flex gap-2">
+                                                <div className="flex flex-wrap items-center justify-center gap-2">
                                                     {sets.length > 0 ? sets.map((set, sIdx) => (
-                                                        <div key={sIdx} className="bg-white border border-slate-200 px-3 py-2 text-base font-black text-slate-900 text-center rounded-sm min-w-[2.5rem]">
-                                                            {set.team_a}<br/><span className="text-slate-300 font-normal">-</span><br/>{set.team_b}
+                                                        <div
+                                                            key={sIdx}
+                                                            className="bg-white border border-slate-200 px-3 py-1.5 text-base font-black text-slate-900 text-center rounded-sm flex items-center justify-center gap-1.5 min-w-[3.5rem] shadow-sm"
+                                                        >
+                                                            <span>{set.team_a}</span>
+                                                            <span className="text-slate-300 font-normal">-</span>
+                                                            <span>{set.team_b}</span>
                                                         </div>
                                                     )) : <span className="text-xs font-bold text-slate-400">N/D</span>}
                                                 </div>
