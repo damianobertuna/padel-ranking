@@ -73,17 +73,40 @@ export default function JoinMatchPage() {
     const isLeft = (p: Player) => (p.preferred_side === 'Left' || p.preferred_side === 'Both') && (matchType === 'mixed' || (matchType === 'male' ? p.gender === 'M' : p.gender === 'F'));
     const isRight = (p: Player) => (p.preferred_side === 'Right' || p.preferred_side === 'Both') && (matchType === 'mixed' || (matchType === 'male' ? p.gender === 'M' : p.gender === 'F'));
 
+    // --- CALCOLO TITOLI (KING / FANALINO PER LATO E GENERE) ---
+    const playerTitlesMap: Record<number, { type: 'KING' | 'FANALINO', label: string }> = {};
+    const sidesConfig = [
+        { value: 'Left', suffix: 'SX' },
+        { value: 'Right', suffix: 'DX' },
+        { value: 'Both', suffix: 'MIX' }
+    ];
+
+    ['M', 'F'].forEach(gender => {
+        sidesConfig.forEach(side => {
+            const group = [...players]
+                .filter(p => p.gender === gender && p.preferred_side === side.value)
+                .sort((a, b) => b.ranking - a.ranking);
+
+            if (group.length > 0) {
+                playerTitlesMap[group[0].id] = { type: 'KING', label: `👑 KING ${side.suffix}` };
+                if (group.length > 1) {
+                    playerTitlesMap[group[group.length - 1].id] = { type: 'FANALINO', label: `🐢 FAN ${side.suffix}` };
+                }
+            }
+        });
+    });
+
     if (loadingPage) return <main className="min-h-screen flex items-center justify-center text-[10px] font-black uppercase tracking-widest">Caricamento...</main>;
 
     return (
-        <main className="w-full max-w-4xl mx-auto px-4 sm:px-8">
-            <div className="max-w-3xl w-full bg-white border border-slate-200 shadow-sm p-6 rounded-sm">
+        <main className="w-full max-w-4xl mx-auto px-4 sm:px-8 mt-6">
+            <div className="bg-white border border-slate-200 shadow-sm p-6 sm:p-8 rounded-sm">
                 <div className="mb-6"><BackToHomeButton tab="pending" /></div>
                 <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-8">Modifica Partita</h1>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <select value={selectedClub} onChange={e => setSelectedClub(e.target.value ? parseInt(e.target.value) : '')} className="w-full p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm">
+                        <select value={selectedClub} onChange={e => setSelectedClub(e.target.value ? parseInt(e.target.value) : '')} className="w-full p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm cursor-pointer">
                             <option value="">NESSUN CIRCOLO DEFINITO</option>
                             {clubs.map(c => <option key={c.id} value={c.id}>{c.name} {c.address ? `| ${c.address}` : ''} {c.city ? `(${c.city})` : ''}</option>)}
                         </select>
@@ -91,7 +114,7 @@ export default function JoinMatchPage() {
                             {(['male', 'female', 'mixed'] as const).map(type => {
                                 const labels = { male: 'MASCHILE', female: 'FEMMINILE', mixed: 'MISTO' };
                                 return (
-                                    <button key={type} type="button" onClick={() => { setMatchType(type); setTeamALeft(''); setTeamARight(''); setTeamBLeft(''); setTeamBRight(''); }} className={`flex-1 py-2 text-[9px] font-black uppercase tracking-widest ${matchType === type ? 'bg-slate-900 text-white' : 'text-slate-500'}`}>
+                                    <button key={type} type="button" onClick={() => { setMatchType(type); setTeamALeft(''); setTeamARight(''); setTeamBLeft(''); setTeamBRight(''); }} className={`flex-1 py-2 text-[9px] font-black uppercase tracking-widest transition-colors ${matchType === type ? 'bg-slate-900 text-white rounded-sm shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}>
                                         {labels[type]}
                                     </button>
                                 );
@@ -105,23 +128,37 @@ export default function JoinMatchPage() {
                             { label: 'TEAM B', team: [teamBLeft, teamBRight], setters: [setTeamBLeft, setTeamBRight], border: 'border-red-600' }
                         ].map((t, i) => (
                             <div key={i} className={`p-4 border-t-4 ${t.border} bg-slate-50 rounded-sm`}>
-                                <h2 className="text-[9px] font-black uppercase mb-3">{t.label}</h2>
-                                <select value={t.team[0]} onChange={e => t.setters[0](e.target.value ? parseInt(e.target.value) : '')} className="w-full p-2 mb-2 text-[10px] font-bold border border-slate-300 rounded-sm">
+                                <h2 className="text-[9px] font-black uppercase tracking-widest mb-3">{t.label}</h2>
+                                <select value={t.team[0]} onChange={e => t.setters[0](e.target.value ? parseInt(e.target.value) : '')} className="w-full p-2 mb-2 text-[10px] font-bold border border-slate-300 rounded-sm cursor-pointer">
                                     <option value="">GIOCATORE SX</option>
-                                    {players.filter(p => isLeft(p) && (p.id === t.team[0] || ![teamALeft, teamARight, teamBLeft, teamBRight].includes(p.id))).map(p => <option key={p.id} value={p.id}>{p.last_name} {p.first_name} — {p.ranking.toFixed(2)}</option>)}
+                                    {players.filter(p => isLeft(p) && (p.id === t.team[0] || ![teamALeft, teamARight, teamBLeft, teamBRight].includes(p.id))).map(p => {
+                                        const title = playerTitlesMap[p.id];
+                                        return (
+                                            <option key={p.id} value={p.id}>
+                                                {p.last_name} {p.first_name} — {p.ranking.toFixed(2)}{title ? ` ${title.label}` : ''}
+                                            </option>
+                                        );
+                                    })}
                                 </select>
-                                <select value={t.team[1]} onChange={e => t.setters[1](e.target.value ? parseInt(e.target.value) : '')} className="w-full p-2 text-[10px] font-bold border border-slate-300 rounded-sm">
+                                <select value={t.team[1]} onChange={e => t.setters[1](e.target.value ? parseInt(e.target.value) : '')} className="w-full p-2 text-[10px] font-bold border border-slate-300 rounded-sm cursor-pointer">
                                     <option value="">GIOCATORE DX</option>
-                                    {players.filter(p => isRight(p) && (p.id === t.team[1] || ![teamALeft, teamARight, teamBLeft, teamBRight].includes(p.id))).map(p => <option key={p.id} value={p.id}>{p.last_name} {p.first_name} — {p.ranking.toFixed(2)}</option>)}
+                                    {players.filter(p => isRight(p) && (p.id === t.team[1] || ![teamALeft, teamARight, teamBLeft, teamBRight].includes(p.id))).map(p => {
+                                        const title = playerTitlesMap[p.id];
+                                        return (
+                                            <option key={p.id} value={p.id}>
+                                                {p.last_name} {p.first_name} — {p.ranking.toFixed(2)}{title ? ` ${title.label}` : ''}
+                                            </option>
+                                        );
+                                    })}
                                 </select>
                             </div>
                         ))}
                     </div>
 
-                    {duplicateError && <div className="p-3 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest">ERRORE: GIOCATORE DUPLICATO O NON VALIDO.</div>}
-                    {levelError && <div className="p-3 bg-amber-500 text-white text-[9px] font-black uppercase tracking-widest">ERRORE: DIVARIO TECNICO &gt; 0.25.</div>}
+                    {duplicateError && <div className="p-3 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest rounded-sm">ERRORE: GIOCATORE DUPLICATO O NON VALIDO.</div>}
+                    {levelError && <div className="p-3 bg-amber-500 text-white text-[9px] font-black uppercase tracking-widest rounded-sm">ERRORE: DIVARIO TECNICO &gt; 0.25.</div>}
 
-                    <button type="submit" disabled={submitting || duplicateError || levelError} className="w-full bg-slate-900 text-white font-black text-xs uppercase py-4 rounded-sm hover:bg-black disabled:opacity-50">
+                    <button type="submit" disabled={submitting || duplicateError || levelError} className="w-full bg-slate-900 text-white font-black text-xs uppercase tracking-widest py-4 rounded-sm hover:bg-black disabled:opacity-50 transition-colors">
                         {submitting ? 'SALVATAGGIO...' : 'CONFERMA MODIFICHE'}
                     </button>
                 </form>
