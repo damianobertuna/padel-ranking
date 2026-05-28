@@ -247,7 +247,10 @@ export default async function Home({ searchParams }: PageProps) {
                                 paginatedPlayers.map((player, index) => {
                                     const rankIndex = startIndex + index + 1;
                                     const playerId = player.id;
-                                    const king = kingLeftIds.includes(playerId) ? 'SX' : kingRightIds.includes(playerId) ? 'DX' : kingBothIds.includes(playerId) ? 'MIX' : null;
+
+                                    // Calcolo dinamico dei lati per King e Fanalino
+                                    const kingSide = kingLeftIds.includes(playerId) ? 'SX' : kingRightIds.includes(playerId) ? 'DX' : kingBothIds.includes(playerId) ? 'MIX' : null;
+                                    const fanalinoSide = lastPlaceLeftIds.includes(playerId) ? 'SX' : lastPlaceRightIds.includes(playerId) ? 'DX' : lastPlaceBothIds.includes(playerId) ? 'MIX' : null;
 
                                     return (
                                         <Link key={player.id} href={`/player/${player.id}`} className="flex flex-row items-center px-4 py-3 border-b border-slate-100 hover:bg-slate-50 transition-colors group">
@@ -268,11 +271,24 @@ export default async function Home({ searchParams }: PageProps) {
                                                 <div className="flex flex-col min-w-0">
                                                     <div className="flex items-center gap-2">
                                                         <span className="font-black text-slate-900 text-sm sm:text-base uppercase tracking-tight truncate">{player.first_name} {player.last_name}</span>
-                                                        {king && <span className="bg-amber-100 text-amber-800 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider hidden sm:inline-block">👑 KING</span>}
+
+                                                        {/* BADGE KING (Ora dinamico) */}
+                                                        {kingSide && (
+                                                            <span className="bg-amber-100 text-amber-800 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider hidden sm:inline-flex items-center shadow-sm" title="King">
+                                    👑 KING {kingSide}
+                                </span>
+                                                        )}
+
+                                                        {/* BADGE FANALINO (Aggiunto) */}
+                                                        {fanalinoSide && (
+                                                            <span className="bg-slate-700 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider hidden sm:inline-flex items-center shadow-sm" title="Fanalino">
+                                    🐢 FAN {fanalinoSide}
+                                </span>
+                                                        )}
                                                     </div>
                                                     <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider sm:hidden block mt-0.5">
-                                                        {player.preferred_side} • {player.total_played} Match
-                                                    </span>
+                            {player.preferred_side} • {player.total_played} Match
+                        </span>
                                                 </div>
                                             </div>
 

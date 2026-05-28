@@ -119,31 +119,41 @@ export default function PendingMatchCard({
         const titleInfo = p && playerTitles ? playerTitles[p.id] : null;
 
         return (
-            <div className="w-full text-xs font-black uppercase text-slate-900 py-0.5 flex items-center justify-center gap-1.5 overflow-hidden">
-                <span className="truncate min-w-0">
+            <div className="w-full py-1 flex flex-col items-center justify-center gap-1 overflow-hidden">
+                {/* RIGA 1: NOME DEL GIOCATORE (Full Width) */}
+                <span className="w-full text-center text-[11px] sm:text-xs font-black uppercase text-slate-900 truncate">
                     {p ? `${p.first_name} ${p.last_name}` : 'SCONOSCIUTO'}
                 </span>
 
-                {p && (
-                    <span className="shrink-0 text-[9px] font-mono font-bold text-blue-600 bg-blue-50 px-1 border border-blue-100 rounded-sm">
-                        {p.ranking.toFixed(2)}
-                    </span>
-                )}
+                {/* RIGA 2: RANKING E BADGES (Wrap) */}
+                <div className="flex flex-wrap items-center justify-center gap-1.5">
+                    {p && (
+                        <span className="shrink-0 text-[9px] font-mono font-bold text-blue-600 bg-blue-50 px-1 border border-blue-100 rounded-sm">
+                            {p.ranking.toFixed(2)}
+                        </span>
+                    )}
 
-                {titleInfo && titleInfo.type === 'KING' && (
-                    <span className="shrink-0 px-1 py-0.5 bg-amber-100 text-amber-800 text-[8px] font-black tracking-widest uppercase rounded-sm flex items-center shadow-sm" title="King">
-                        👑 {titleInfo.label}
-                    </span>
-                )}
+                    {titleInfo && titleInfo.type === 'KING' && (
+                        <span className="shrink-0 px-1 py-0.5 bg-amber-100 text-amber-800 text-[8px] font-black tracking-widest uppercase rounded-sm flex items-center shadow-sm" title="King">
+                            👑 {titleInfo.label}
+                        </span>
+                    )}
 
-                {p && match.organizer_id === p.id && (
-                    <span
-                        className="shrink-0 px-1 py-0.5 bg-slate-900 text-amber-400 text-[8px] font-black tracking-widest uppercase rounded-sm flex items-center gap-0.5 shadow-sm"
-                        title="Organizzatore del Match"
-                    >
-                        <span>👑</span> ORG
-                    </span>
-                )}
+                    {titleInfo && titleInfo.type === 'FANALINO' && (
+                        <span className="shrink-0 px-1 py-0.5 bg-slate-700 text-white text-[8px] font-black tracking-widest uppercase rounded-sm flex items-center shadow-sm" title="Fanalino">
+                            🐢 {titleInfo.label}
+                        </span>
+                    )}
+
+                    {p && match.organizer_id === p.id && (
+                        <span
+                            className="shrink-0 px-1 py-0.5 bg-slate-900 text-amber-400 text-[8px] font-black tracking-widest uppercase rounded-sm flex items-center gap-0.5 shadow-sm"
+                            title="Organizzatore del Match"
+                        >
+                            👑 ORG
+                        </span>
+                    )}
+                </div>
             </div>
         );
     };
