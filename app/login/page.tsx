@@ -57,8 +57,8 @@ export default function Login() {
     const isButtonDisabled = loading || (isSignUp && !acceptedPrivacy);
 
     return (
-        <main className="min-h-screen p-4 sm:p-8 bg-slate-50 flex flex-col items-center justify-center">
-            <div className="mb-4"><BackToHomeButton></BackToHomeButton></div>
+        <main className="w-full max-w-4xl mx-auto px-4 sm:px-8">
+            <div className="mb-4 mt-3"><BackToHomeButton></BackToHomeButton></div>
 
             <div className="max-w-lg w-full bg-white border border-slate-200 shadow-sm p-8 rounded-sm">
 
