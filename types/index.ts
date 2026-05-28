@@ -38,6 +38,7 @@ export interface PendingMatchCardProps {
     match: Match;
     rawPlayers: Player[];
     currentUserPlayer: { id: number; role: string } | null;
+    playerTitles?: Record<number, { type: 'KING' | 'FANALINO', label: string }>;
 }
 
 export interface Club {

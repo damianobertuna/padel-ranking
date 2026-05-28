@@ -2,14 +2,12 @@
 
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { useRouter } from 'next/navigation';
 import { logUserLogin } from '@/actions/auth-actions';
 import AvatarUpload from '@/components/AvatarUpload';
 import BackToHomeButton from "@/components/BackToHomeButton";
 
 export default function Login() {
     const supabase = createClient();
-    const router = useRouter();
     const [isSignUp, setIsSignUp] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -21,9 +19,11 @@ export default function Login() {
     const [gender, setGender] = useState<'M' | 'F'>('M');
     const [phone, setPhone] = useState('');
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-    const [privacyAccepted, setPrivacyAccepted] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    // Stato per la checkbox (usato solo in fase di registrazione)
+    const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
 
     const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -50,6 +50,12 @@ export default function Login() {
         } catch (err: any) { setError(err.message); setLoading(false); }
     };
 
+    // La logica di disabilitazione del bottone:
+    // Se stiamo caricando (loading) -> disabilita sempre.
+    // Se siamo in "Registrazione" (!isSignUp è falso) -> disabilita SE la privacy NON è accettata.
+    // Se siamo in "Login" -> ignora la privacy e abilita.
+    const isButtonDisabled = loading || (isSignUp && !acceptedPrivacy);
+
     return (
         <main className="min-h-screen p-4 sm:p-8 bg-slate-50 flex flex-col items-center justify-center">
             <div className="mb-4"><BackToHomeButton></BackToHomeButton></div>
@@ -57,8 +63,8 @@ export default function Login() {
             <div className="max-w-lg w-full bg-white border border-slate-200 shadow-sm p-8 rounded-sm">
 
                 <div className="flex border-b border-slate-900 mb-8">
-                    <button className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest ${!isSignUp ? 'bg-slate-900 text-white' : 'text-slate-500'}`} onClick={() => setIsSignUp(false)}>Login</button>
-                    <button className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest ${isSignUp ? 'bg-slate-900 text-white' : 'text-slate-500'}`} onClick={() => setIsSignUp(true)}>Registrati</button>
+                    <button type="button" className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest ${!isSignUp ? 'bg-slate-900 text-white' : 'text-slate-500'}`} onClick={() => setIsSignUp(false)}>Login</button>
+                    <button type="button" className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest ${isSignUp ? 'bg-slate-900 text-white' : 'text-slate-500'}`} onClick={() => setIsSignUp(true)}>Registrati</button>
                 </div>
 
                 {error && <div className="p-3 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest mb-4">{error}</div>}
@@ -82,14 +88,47 @@ export default function Login() {
                                 <select className="p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm" value={preferredSide} onChange={e => setPreferredSide(e.target.value)}><option value="Left">LATO SX</option><option value="Right">LATO DX</option><option value="Both">BOTH</option></select>
                                 <select className="p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm" value={dominantHand} onChange={e => setDominantHand(e.target.value)}><option value="Destro">DESTRO</option><option value="Mancino">MANCINO</option></select>
                             </div>
-                            <label className="flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase"><input type="checkbox" required checked={privacyAccepted} onChange={e => setPrivacyAccepted(e.target.checked)} /> Accetto privacy</label>
                         </div>
                     )}
 
                     <input type="email" placeholder="EMAIL" className="w-full p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm" value={email} onChange={e => setEmail(e.target.value)} required />
                     <input type="password" placeholder="PASSWORD" className="w-full p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm" value={password} onChange={e => setPassword(e.target.value)} required />
 
-                    <button type="submit" disabled={loading} className="w-full bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest py-4 rounded-sm hover:bg-black disabled:opacity-50">
+                    {/* CHECKBOX PRIVACY POLICY (Mostrata SOLO durante la registrazione) */}
+                    {isSignUp && (
+                        <div className="flex items-start gap-3 my-4 p-3 bg-slate-50 border border-slate-200 rounded-sm">
+                            <div className="flex items-center h-5">
+                                <input
+                                    id="privacy"
+                                    name="privacy"
+                                    type="checkbox"
+                                    required={isSignUp}
+                                    checked={acceptedPrivacy}
+                                    onChange={(e) => setAcceptedPrivacy(e.target.checked)}
+                                    className="w-4 h-4 border border-slate-300 rounded bg-slate-50 focus:ring-3 focus:ring-blue-300 accent-blue-600 cursor-pointer"
+                                />
+                            </div>
+                            <div className="text-[10px] sm:text-xs text-slate-500 leading-tight">
+                                <label htmlFor="privacy" className="font-medium cursor-pointer">
+                                    Ho letto e accetto la{' '}
+                                </label>
+                                <a
+                                    href="https://www.iubenda.com/privacy-policy/89843982"
+                                    className="iubenda-white iubenda-noiframe iubenda-embed font-bold text-slate-900 hover:text-blue-600 underline decoration-slate-300 hover:decoration-blue-600 transition-colors"
+                                    title="Privacy Policy"
+                                >
+                                    Privacy Policy
+                                </a>
+                                {' '}e acconsento al trattamento dei miei dati personali per la gestione del servizio.
+                            </div>
+                        </div>
+                    )}
+
+                    <button
+                        type="submit"
+                        disabled={isButtonDisabled}
+                        className="w-full bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest py-4 rounded-sm hover:bg-black disabled:opacity-50 transition-colors"
+                    >
                         {loading ? 'ELABORAZIONE...' : isSignUp ? 'REGISTRATI' : 'ACCEDI'}
                     </button>
                 </form>

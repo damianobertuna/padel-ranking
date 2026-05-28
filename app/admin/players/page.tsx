@@ -34,9 +34,9 @@ export default async function AdminPlayersManagement() {
         .order('last_name', { ascending: true });
 
     return (
-        <main className="min-h-screen p-4 sm:p-8 bg-slate-50 flex flex-col items-center">
+        <main className="w-full max-w-4xl mx-auto px-4 sm:px-8">
             <div className="max-w-4xl w-full">
-                <div className="mb-8 border-b-2 border-slate-900 pb-4">
+                <div className="mb-8 mt-2 border-b-2 border-slate-900 pb-4">
                     <BackToHomeButton />
                     <h1 className="text-3xl font-black text-slate-900 mt-2 uppercase tracking-tighter">Gestione Atleti</h1>
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Area Amministrativa Federale</p>

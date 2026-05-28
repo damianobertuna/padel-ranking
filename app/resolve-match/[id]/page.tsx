@@ -99,8 +99,8 @@ export default function ResolveMatch() {
     // ==========================
 
     return (
-        <main className="min-h-screen p-4 sm:p-8 bg-slate-50 flex flex-col items-center">
-            <div className="max-w-md w-full bg-white border border-slate-200 shadow-sm p-6 rounded-sm">
+        <main className="w-full max-w-4xl mx-auto px-4 sm:px-8">
+            <div className=" w-full bg-white border border-slate-200 shadow-sm p-6 rounded-sm">
                 <div className="mb-6"><BackToHomeButton /></div>
                 <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-6">Referto Gara</h1>
 

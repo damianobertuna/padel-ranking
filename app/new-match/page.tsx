@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { createPendingMatch as createMatch } from '@/actions/match-actions';
 import { useRouter } from 'next/navigation';
 import { Player, Club } from '@/types';
 import BackToHomeButton from "@/components/BackToHomeButton";
+import { computeKingAndFanalino } from "@/lib/rankingCalc";
 
 export default function CreateMatchForm() {
     const supabase = createClient();
@@ -44,6 +45,40 @@ export default function CreateMatchForm() {
         setLevelError(Math.max(...rks) - Math.min(...rks) > 0.25);
     }, [teamALeft, teamARight, teamBLeft, teamBRight, players]);
 
+    // --- CALCOLO TITOLI GLOBALE (Memoizzato per performance) ---
+    const playerTitlesMap = useMemo(() => {
+        if (!players || players.length === 0) return {};
+
+        const {
+            kingLeftIds, kingRightIds, kingBothIds,
+            lastPlaceLeftIds, lastPlaceRightIds, lastPlaceBothIds
+        } = computeKingAndFanalino(players);
+
+        const map: Record<number, { type: 'KING' | 'FANALINO', label: string }> = {};
+
+        kingLeftIds.forEach(id => map[id] = { type: 'KING', label: 'KING SX' });
+        kingRightIds.forEach(id => map[id] = { type: 'KING', label: 'KING DX' });
+        kingBothIds.forEach(id => map[id] = { type: 'KING', label: 'KING MIX' });
+
+        lastPlaceLeftIds.forEach(id => map[id] = { type: 'FANALINO', label: 'FAN SX' });
+        lastPlaceRightIds.forEach(id => map[id] = { type: 'FANALINO', label: 'FAN DX' });
+        lastPlaceBothIds.forEach(id => map[id] = { type: 'FANALINO', label: 'FAN MIX' });
+
+        return map;
+    }, [players]);
+
+    // Helper per costruire la stringa della tendina dinamicamente
+    const getPlayerDisplayString = (p: Player) => {
+        let display = `${p.last_name} ${p.first_name} — ${p.ranking.toFixed(2)}`;
+        const titleInfo = playerTitlesMap[p.id];
+        if (titleInfo) {
+            if (titleInfo.type === 'KING') display += ` 👑 ${titleInfo.label}`;
+            if (titleInfo.type === 'FANALINO') display += ` 🐢 ${titleInfo.label}`;
+        }
+        return display;
+    };
+    // -----------------------------------------------------------
+
     const leftSidePlayers = players.filter(p => (p.preferred_side === 'Left' || p.preferred_side === 'Both') && (matchType === 'mixed' || (matchType === 'male' ? p.gender === 'M' : p.gender === 'F')));
     const rightSidePlayers = players.filter(p => (p.preferred_side === 'Right' || p.preferred_side === 'Both') && (matchType === 'mixed' || (matchType === 'male' ? p.gender === 'M' : p.gender === 'F')));
 
@@ -51,15 +86,26 @@ export default function CreateMatchForm() {
         e.preventDefault();
         setLoading(true);
         try {
-            await createMatch({ matchDate, matchType, teamALeft: teamALeft || null, teamARight: teamARight || null, teamBLeft: teamBLeft || null, teamBRight: teamBRight || null, clubId: clubId || null });
-            router.push('/');
-        } catch (err: any) { setLoading(false); }
+            await createMatch({
+                matchDate,
+                matchType,
+                teamALeft: teamALeft || null,
+                teamARight: teamARight || null,
+                teamBLeft: teamBLeft || null,
+                teamBRight: teamBRight || null,
+                clubId: clubId || null
+            });
+            router.push('/?tab=pending');
+            router.refresh();
+        } catch (err: any) {
+            setLoading(false);
+        }
     };
 
     return (
-        <main className="min-h-screen p-4 sm:p-8 bg-slate-50 flex flex-col items-center">
+        <main className="w-full max-w-4xl mx-auto px-4 sm:px-8">
             <div className="w-full max-w-3xl bg-white border border-slate-200 shadow-sm p-6 rounded-sm">
-                <div className="mb-6"><BackToHomeButton /></div>
+                <div className="mb-6"><BackToHomeButton tab={"pending"}/></div>
                 <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-8">Nuova Partita</h1>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
@@ -91,11 +137,15 @@ export default function CreateMatchForm() {
                                 <h2 className="text-[9px] font-black uppercase mb-3">{t.label}</h2>
                                 <select value={t.vals[0]} onChange={e => t.setters[0](e.target.value ? parseInt(e.target.value) : '')} className="w-full p-2 mb-2 text-[10px] font-bold border border-slate-300 rounded-sm">
                                     <option value="">GIOCATORE SX</option>
-                                    {leftSidePlayers.filter(p => p.id === t.vals[0] || ![teamALeft, teamARight, teamBLeft, teamBRight].includes(p.id)).map(p => <option key={p.id} value={p.id}>{p.last_name} {p.first_name} — {p.ranking.toFixed(2)}</option>)}
+                                    {leftSidePlayers.filter(p => p.id === t.vals[0] || ![teamALeft, teamARight, teamBLeft, teamBRight].includes(p.id)).map(p =>
+                                        <option key={p.id} value={p.id}>{getPlayerDisplayString(p)}</option>
+                                    )}
                                 </select>
                                 <select value={t.vals[1]} onChange={e => t.setters[1](e.target.value ? parseInt(e.target.value) : '')} className="w-full p-2 text-[10px] font-bold border border-slate-300 rounded-sm">
                                     <option value="">GIOCATORE DX</option>
-                                    {rightSidePlayers.filter(p => p.id === t.vals[1] || ![teamALeft, teamARight, teamBLeft, teamBRight].includes(p.id)).map(p => <option key={p.id} value={p.id}>{p.last_name} {p.first_name} — {p.ranking.toFixed(2)}</option>)}
+                                    {rightSidePlayers.filter(p => p.id === t.vals[1] || ![teamALeft, teamARight, teamBLeft, teamBRight].includes(p.id)).map(p =>
+                                        <option key={p.id} value={p.id}>{getPlayerDisplayString(p)}</option>
+                                    )}
                                 </select>
                             </div>
                         ))}

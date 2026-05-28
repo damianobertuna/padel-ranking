@@ -76,7 +76,7 @@ export default function JoinMatchPage() {
     if (loadingPage) return <main className="min-h-screen flex items-center justify-center text-[10px] font-black uppercase tracking-widest">Caricamento...</main>;
 
     return (
-        <main className="min-h-screen p-4 sm:p-8 bg-slate-50 flex flex-col items-center">
+        <main className="w-full max-w-4xl mx-auto px-4 sm:px-8">
             <div className="max-w-3xl w-full bg-white border border-slate-200 shadow-sm p-6 rounded-sm">
                 <div className="mb-6"><BackToHomeButton tab="pending" /></div>
                 <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-8">Modifica Partita</h1>

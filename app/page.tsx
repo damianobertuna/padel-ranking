@@ -111,82 +111,8 @@ export default async function Home({ searchParams }: PageProps) {
     const urlState = `gender=${currentGender}&sort=${currentSort}&playerPage=${playerPage}&page=${currentPage}`;
 
     return (
-        <main className="min-h-screen bg-slate-50 flex flex-col items-center text-slate-900 pb-20">
-            {/* Topbar stile istituzionale */}
-            <div className="w-full bg-slate-900 text-white flex justify-between items-center py-2 px-4 sm:px-8 shadow-sm text-xs font-semibold uppercase tracking-wider">
-                <div>
-                    {user ? (
-                        <span className="opacity-90">Account: <span className="font-bold text-white">{currentUserPlayer?.first_name} {currentUserPlayer?.last_name}</span></span>
-                    ) : (
-                        <span className="opacity-70">Lector Mode</span>
-                    )}
-                </div>
-                <div>
-                    {user ? (
-                        <form action="/auth/signout" method="post">
-                            <button type="submit" className="text-red-400 hover:text-red-300 font-bold transition-colors">Logout</button>
-                        </form>
-                    ) : (
-                        <Link href="/login" className="text-blue-400 hover:text-blue-300 font-bold transition-colors">Login / Register</Link>
-                    )}
-                </div>
-            </div>
-
-            <div className="max-w-4xl w-full px-4 sm:px-8 mt-8">
-
-                {/* HEADER TITOLO E PULSANTI */}
-                <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-4 mb-8 pb-4 border-b-2 border-slate-900">
-                    <div className="flex items-center gap-2 sm:gap-3">
-                        {/* LOGO */}
-                        <div className="shrink-0 flex items-center justify-center">
-                            <img
-                                src="/padel_ranking_logo.svg"
-                                alt="RanKING Padel Logo"
-                                className="w-14 h-14 sm:w-20 sm:h-20 object-contain mix-blend-multiply"
-                            />
-                        </div>
-
-                        {/* TESTO */}
-                        <div>
-                            <h1 className="text-4xl sm:text-4xl font-black text-slate-900 uppercase tracking-tighter leading-none">
-                                RanKING<br/><span className="text-blue-600">Padel</span>
-                            </h1>
-                        </div>
-                    </div>
-
-                    {/* Bottoni utente e admin ripristinati */}
-                    <div className="flex flex-col items-start md:items-end gap-2">
-                        <div className="flex flex-wrap gap-2">
-                            {user && (
-                                <Link href="/new-match" className="bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase tracking-wider py-2 px-4 text-xs transition-colors rounded-sm flex items-center justify-center">
-                                    + Nuova Partita
-                                </Link>
-                            )}
-                            <Link href="/rules" className="bg-slate-200 hover:bg-slate-300 text-slate-900 font-bold uppercase tracking-wider py-2 px-4 text-xs transition-colors rounded-sm flex items-center gap-1.5 justify-center">
-                                <span className="text-sm">📖</span> Regolamento
-                            </Link>
-                            <Link href="/guide" className="bg-slate-200 hover:bg-slate-300 text-slate-900 font-bold uppercase tracking-wider py-2 px-4 text-xs transition-colors rounded-sm flex items-center gap-1.5 justify-center">
-                                <span className="text-sm">❓</span> Guida
-                            </Link>
-                        </div>
-
-                        {currentUserPlayer?.role === 'admin' && (
-                            <div className="flex flex-wrap gap-2 mt-1">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:flex items-center mr-1">Admin Tools:</span>
-                                <Link href="/admin/players" className="bg-slate-900 hover:bg-slate-800 text-white font-bold uppercase tracking-wider py-1.5 px-3 text-[10px] transition-colors rounded-sm flex items-center gap-1.5">
-                                    ⚙️ Giocatori
-                                </Link>
-                                <Link href="/admin/clubs" className="bg-slate-900 hover:bg-slate-800 text-white font-bold uppercase tracking-wider py-1.5 px-3 text-[10px] transition-colors rounded-sm flex items-center gap-1.5">
-                                    📍 Club
-                                </Link>
-                                <Link href="/admin/logs" className="bg-slate-900 hover:bg-slate-800 text-white font-bold uppercase tracking-wider py-1.5 px-3 text-[10px] transition-colors rounded-sm flex items-center gap-1.5">
-                                    📋 Logs
-                                </Link>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
+        <main className="bg-slate-50 flex flex-col items-center text-slate-900">
+            <div className="max-w-4xl w-full px-4 sm:px-8">
                 {/* NAVIGAZIONE TAB MINIMALE (Stile Navbar Sportiva) */}
                 <div className="flex w-full mb-6 border-b border-slate-300">
                     <Link
@@ -413,31 +339,6 @@ export default async function Home({ searchParams }: PageProps) {
                         )}
                     </div>
                 )}
-
-                {/* =========================================
-                    BANNER PUBBLICITARIO SPONSOR (Visibile ovunque)
-                ========================================= */}
-                <div className="mt-3 w-full bg-slate-900 text-white p-4 sm:p-5 mb-6 flex flex-col md:flex-row items-center justify-between gap-6 border-l-4 border-emerald-500">
-                    <div className="flex items-center gap-4 text-center md:text-left flex-col md:flex-row">
-                        <div className="bg-white p-2 flex items-center justify-center min-w-[140px] shrink-0">
-                            <img src="https://www.bionutrimed.it/templates/rt_gemini/custom/images/loghi/bionutrimed_logo_small.png" alt="BioNutriMed Logo" className="h-10 w-auto object-contain select-none" />
-                        </div>
-                        <div>
-                            <h3 className="text-sm font-black uppercase tracking-widest text-emerald-400">Vuoi scalare il Ranking? Cura la tua nutrizione!</h3>
-                            <p className="text-[9px] sm:text-[10px] font-bold text-slate-300 mt-1.5 leading-relaxed uppercase tracking-wide">
-                                Scopri come un'alimentazione strategica su misura può aumentare la tua resistenza nei match più lunghi e velocizzare il recovery muscolare.
-                            </p>
-                        </div>
-                    </div>
-                    <a
-                        href="https://www.bionutrimed.it/prenota/prenota-visita-in-studio.html"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-black text-[10px] uppercase tracking-widest py-3 px-5 transition-colors text-center w-full md:w-auto shrink-0"
-                    >
-                        PRENOTA UNA VISITA
-                    </a>
-                </div>
             </div>
         </main>
     );

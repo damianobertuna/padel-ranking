@@ -114,7 +114,7 @@ describe('CreateMatchForm Component', () => {
                 teamALeft: 1,
                 teamARight: 2
             }));
-            expect(mockPush).toHaveBeenCalledWith('/');
+            expect(mockPush).toHaveBeenCalledWith('/?tab=pending');
         });
     });
 });

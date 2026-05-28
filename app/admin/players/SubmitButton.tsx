@@ -9,7 +9,7 @@ export function SubmitButton() {
         <button
             type="submit"
             disabled={pending}
-            className="w-full md:w-auto bg-slate-900 hover:bg-black disabled:bg-slate-300 disabled:text-slate-500 text-white font-black text-[9px] uppercase tracking-widest py-2 px-4 rounded-sm transition-all shadow-none active:scale-[0.98] flex items-center justify-center gap-1.5 whitespace-nowrap min-w-[70px]"
+            className="w-full md:w-auto bg-slate-900 hover:bg-black disabled:bg-slate-300 disabled:text-slate-500 text-white font-black text-[9px] uppercase tracking-widest py-2 px-4 rounded-sm transition-all shadow-none active:scale-[0.98] flex items-center justify-center gap-1.5 whitespace-nowrap min-w-[60px]"
         >
             {pending ? (
                 <>

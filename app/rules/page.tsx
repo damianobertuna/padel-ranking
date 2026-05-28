@@ -4,7 +4,7 @@ import BackToHomeButton from "@/components/BackToHomeButton";
 
 export default function RegulationsPage() {
     return (
-        <main className="min-h-screen bg-slate-50 p-4 sm:p-8 flex flex-col items-center">
+        <main className="w-full max-w-4xl mx-auto px-4 sm:px-8">
             <div className="max-w-4xl w-full bg-white p-6 sm:p-10 border border-slate-200 shadow-sm rounded-sm">
 
                 <div className="mb-8"><BackToHomeButton /></div>
