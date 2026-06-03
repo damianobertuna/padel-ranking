@@ -63,7 +63,7 @@ export default async function AdminPlayersManagement() {
                                 {/* Ranking */}
                                 <div className="md:col-span-2">
                                     <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Ranking</label>
-                                    <input type="number" name="ranking" step="0.01" min="1.00" max="7.00" defaultValue={player.ranking} required className="w-full p-2 border border-slate-300 bg-blue-50 text-sm font-black text-blue-700 rounded-sm" />
+                                    <input type="number" name="ranking" step="0.05" min="1.00" max="7.00" defaultValue={player.ranking} required className="w-full p-2 border border-slate-300 bg-blue-50 text-sm font-black text-blue-700 rounded-sm" />
                                 </div>
 
                                 {/* Opzioni */}
