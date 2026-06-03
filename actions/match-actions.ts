@@ -248,7 +248,18 @@ export async function resolveMatchWithRanking(data: {
         let setsWonA = 0;
         let setsWonB = 0;
 
-        data.score.forEach(set => {
+        // AGGIORNAMENTO: Ciclo forEach con validazione di coerenza
+        data.score.forEach((set, index) => {
+            // Controlla se il set è coerente con le regole del Padel
+            if (!isSetValid(set.team_a, set.team_b, index)) {
+                throw new Error(
+                    `Punteggio non valido al Set ${index + 1}: [${set.team_a}-${set.team_b}]. ` +
+                    (index < 2
+                        ? `I set normali finiscono a 6 (con 2 di scarto) o a 7 (7-5, 7-6).`
+                        : `Il terzo set deve finire a 6, 7 oppure essere un Super Tie-Break a 10 (con 2 di scarto).`)
+                );
+            }
+
             if (set.team_a > set.team_b) setsWonA++;
             else if (set.team_b > set.team_a) setsWonB++;
         });
@@ -668,4 +679,44 @@ export async function joinMatchAction(matchId: string) {
     );
 
     revalidatePath('/');
+}
+
+// Funzione helper per validare un singolo set di Padel/Tennis
+function isSetValid(teamA: number, teamB: number, setIndex: number): boolean {
+    if (teamA < 0 || teamB < 0) return false;
+    if (teamA === teamB) return false; // Nel padel un set non finisce mai in pareggio
+
+    const winner = Math.max(teamA, teamB);
+    const loser = Math.min(teamA, teamB);
+    const diff = winner - loser;
+
+    // --- REGOLE SET 1 e SET 2 (Indici 0 e 1) ---
+    if (setIndex < 2) {
+        // Vittoria standard a 6 (es. 6-0, 6-4)
+        if (winner === 6 && loser <= 4) return true;
+        // Vittoria a 7 (7-5 oppure 7-6)
+        if (winner === 7 && (loser === 5 || loser === 6)) return true;
+
+        return false;
+    }
+
+    // --- REGOLE SET 3 (Indice 2) ---
+    if (setIndex === 2) {
+        // Caso A: È stato giocato un set normale
+        if (winner === 6 && loser <= 4) return true;
+        if (winner === 7 && (loser === 5 || loser === 6)) return true;
+
+        // Caso B: È stato giocato un Super Tie-Break a 10
+        if (winner >= 10 && diff >= 2) {
+            // Se vince a 10 spaccati, il perdente deve avere da 0 a 8
+            if (winner === 10 && loser <= 8) return true;
+            // Se si va a oltranza (es. 11-9, 12-10, 15-13), lo scarto DEVE essere esattamente 2
+            if (winner > 10 && diff === 2) return true;
+        }
+
+        return false;
+    }
+
+    // Ignora eventuali 4° o 5° set non supportati
+    return false;
 }
