@@ -162,6 +162,7 @@ export default async function RootLayout({
                             "whitelabel": false,
                             "cookiePolicyId": 89843982,
                             "lang": "it",
+                            "localConsentDomain": "padel-ranking-plum.vercel.app",
                             "banner": {
                                 "acceptButtonDisplay": true,
                                 "closeButtonDisplay": false,
