@@ -7,7 +7,6 @@ import DeleteMatchButton from '@/components/DeleteMatchButton';
 import ResolveMatchButton from '@/components/ResolveMatchButton';
 import { useRouter } from "next/navigation";
 import { Match, PendingMatchCardProps, Club } from '@/types';
-// IMPORT DELLE DUE SERVER ACTION
 import { leaveMatchAction, joinMatchAction } from '@/actions/match-actions';
 
 export default function PendingMatchCard({
@@ -49,11 +48,11 @@ export default function PendingMatchCard({
     const isAdmin = currentUserPlayer?.role === 'admin';
     const isOrganizer = currentUserPlayer?.id === match.organizer_id;
 
-    // Fallback retrocompatibilità: Se il match è vecchio (organizer nullo), chi è dentro può gestirlo
+    // La VERA regola di autorizzazione:
+    // Puoi gestire se sei Admin, se sei l'Organizzatore, oppure (per i vecchi match senza org) se sei in campo.
     const canManage = isAdmin || isOrganizer || (!match.organizer_id && isUserInMatch);
 
     // --- CALCOLO COMPATIBILITÀ LATO ---
-    // Recuperiamo il profilo completo dell'utente loggato dall'array rawPlayers
     const fullCurrentUser = currentUserPlayer
         ? rawPlayers.find(p => p.id === currentUserPlayer.id)
         : null;
@@ -120,36 +119,27 @@ export default function PendingMatchCard({
 
         return (
             <div className="w-full py-1 flex flex-col items-center justify-center gap-1 overflow-hidden">
-                {/* RIGA 1: NOME DEL GIOCATORE (Full Width) */}
                 <span className="w-full text-center text-[11px] sm:text-xs font-black uppercase text-slate-900 truncate">
                     {p ? `${p.first_name} ${p.last_name}` : 'SCONOSCIUTO'}
                 </span>
-
-                {/* RIGA 2: RANKING E BADGES (Wrap) */}
                 <div className="flex flex-wrap items-center justify-center gap-1.5">
                     {p && (
                         <span className="shrink-0 text-[9px] font-mono font-bold text-blue-600 bg-blue-50 px-1 border border-blue-100 rounded-sm">
                             {p.ranking.toFixed(2)}
                         </span>
                     )}
-
                     {titleInfo && titleInfo.type === 'KING' && (
                         <span className="shrink-0 px-1 py-0.5 bg-amber-100 text-amber-800 text-[8px] font-black tracking-widest uppercase rounded-sm flex items-center shadow-sm" title="King">
                             👑 {titleInfo.label}
                         </span>
                     )}
-
                     {titleInfo && titleInfo.type === 'FANALINO' && (
                         <span className="shrink-0 px-1 py-0.5 bg-slate-700 text-white text-[8px] font-black tracking-widest uppercase rounded-sm flex items-center shadow-sm" title="Fanalino">
                             🐢 {titleInfo.label}
                         </span>
                     )}
-
                     {p && match.organizer_id === p.id && (
-                        <span
-                            className="shrink-0 px-1 py-0.5 bg-slate-900 text-amber-400 text-[8px] font-black tracking-widest uppercase rounded-sm flex items-center gap-0.5 shadow-sm"
-                            title="Organizzatore del Match"
-                        >
+                        <span className="shrink-0 px-1 py-0.5 bg-slate-900 text-amber-400 text-[8px] font-black tracking-widest uppercase rounded-sm flex items-center gap-0.5 shadow-sm" title="Organizzatore del Match">
                             👑 ORG
                         </span>
                     )}
@@ -177,7 +167,6 @@ export default function PendingMatchCard({
                             <span className="text-slate-400">📅</span> {new Date(match.match_date).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                         </div>
                     )}
-
                     <div className="flex items-center gap-2 truncate">
                         <span className="text-slate-400">📍</span>
                         {matchClub?.maps_url ? (
@@ -190,7 +179,6 @@ export default function PendingMatchCard({
                             <span className="italic text-slate-400 font-medium">CAMPO DA DEFINIRE</span>
                         )}
                     </div>
-
                     <div className="flex items-center gap-2 mt-1 pt-1.5 border-t border-slate-200">
                         <span className="text-slate-400">📊</span>
                         <span>RANK: <span className="text-slate-900 font-black">{levelText}</span></span>
@@ -218,7 +206,6 @@ export default function PendingMatchCard({
                     </a>
 
                     <div className="flex gap-2 w-full">
-                        {/* --- BOTTONE DINAMICO CON MACCHINA A STATI --- */}
                         <button
                             onClick={() => {
                                 if (actionType === 'leave') {
@@ -231,14 +218,14 @@ export default function PendingMatchCard({
                                         try { await joinMatchAction(match.id); }
                                         catch (error: any) { alert(`Errore: ${error.message}`); }
                                     });
-                                } else {
+                                } else if (actionType === 'manage') {
                                     setIsManaging(true);
                                     router.push(`/match/${match.id}/join`);
                                 }
                             }}
-                            disabled={isManaging || isPending || actionType === 'view' && primaryActionLabel === 'LATO INCOMPATIBILE'}
+                            disabled={isManaging || isPending || actionType === 'view'}
                             className={`flex-[2] text-center text-white text-[10px] font-black uppercase tracking-wider py-3 rounded-sm transition-all duration-150 ease-out flex items-center justify-center gap-2 [-webkit-tap-highlight-color:transparent]
-                                ${actionType === 'view' && primaryActionLabel === 'LATO INCOMPATIBILE'
+                                ${actionType === 'view'
                                 ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-80'
                                 : 'bg-slate-900 hover:bg-slate-800 active:scale-[0.96]'
                             }

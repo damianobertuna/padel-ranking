@@ -165,3 +165,50 @@ describe('PendingMatchCard Component', () => {
         expect(screen.getByTestId('delete-btn')).toBeDefined();
     });
 });
+
+describe('Controllo Autorizzazioni: Tasto Gestisci Incontro', () => {
+
+    // Array fittizio minimo per non far crashare i metodi .find() del componente
+    const mockRawPlayers = [
+        { id: 99, ranking: 4.50, first_name: 'Admin', last_name: 'User', preferred_side: 'Both' },
+        { id: 1, ranking: 4.00, first_name: 'Mario', last_name: 'Rossi', preferred_side: 'Left' },
+        { id: 2, ranking: 4.10, first_name: 'Luigi', last_name: 'Verdi', preferred_side: 'Right' },
+        { id: 3, ranking: 3.80, first_name: 'Peach', last_name: 'Pink', preferred_side: 'Left' },
+        { id: 4, ranking: 3.90, first_name: 'Daisy', last_name: 'Yellow', preferred_side: 'Right' },
+        { id: 5, ranking: 4.20, first_name: 'Toad', last_name: 'Mushroom', preferred_side: 'Both' }
+    ] as any;
+
+    it('dovrebbe mostrare il tasto se l\'utente è ADMIN (anche se non gioca)', () => {
+        const adminUser = { id: 99, role: 'admin' } as any;
+        const match = { id: 'm1', team_a_left_id: 1, team_a_right_id: 2 } as any;
+
+        // Estraiamo getByText e unmount per isolare questo singolo test
+        const { getByText, unmount } = render(<PendingMatchCard match={match} currentUserPlayer={adminUser} rawPlayers={mockRawPlayers} />);
+
+        // Usiamo toBeDefined() invece di toBeInTheDocument()
+        expect(getByText(/Gestisci Incontro|Modifica Match/i)).toBeDefined();
+
+        unmount(); // Pulizia manuale del DOM per non inquinare i test successivi
+    });
+
+    it('dovrebbe mostrare il tasto se l\'utente è USER ed è tra i giocatori in campo', () => {
+        const playingUser = { id: 1, role: 'user' } as any;
+        const match = { id: 'm2', team_a_left_id: 1, team_a_right_id: 2 } as any;
+
+        const { getByText, unmount } = render(<PendingMatchCard match={match} currentUserPlayer={playingUser} rawPlayers={mockRawPlayers} />);
+
+        expect(getByText(/Gestisci Incontro|Modifica Match/i)).toBeDefined();
+        unmount();
+    });
+
+    it('NON dovrebbe mostrare il tasto se l\'utente è USER e NON è tra i giocatori', () => {
+        const externalUser = { id: 5, role: 'user' } as any;
+        const match = { id: 'm3', team_a_left_id: 1, team_a_right_id: 2, team_b_left_id: 3, team_b_right_id: 4 } as any;
+
+        // Usiamo queryByText (non lancia errore se non lo trova) e verifichiamo che sia null
+        const { queryByText, unmount } = render(<PendingMatchCard match={match} currentUserPlayer={externalUser} rawPlayers={mockRawPlayers} />);
+
+        expect(queryByText(/Gestisci Incontro|Modifica Match/i)).toBeNull();
+        unmount();
+    });
+});

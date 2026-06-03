@@ -433,13 +433,21 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
 }) {
     const supabase = await createClient();
 
-    // 0. CONTROLLO DI SICUREZZA
+    // 0. CONTROLLO DI SICUREZZA AUTENTICAZIONE E PROFILO
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
         throw new Error("Accesso negato: devi effettuare il login per modificare una partita.");
     }
 
-    // 1. Recuperiamo il match attuale (per il confronto nel log)
+    const { data: currentPlayer } = await supabase
+        .from('players')
+        .select('id, role, first_name, last_name')
+        .eq('user_id', user.id)
+        .single();
+
+    if (!currentPlayer) throw new Error("Profilo giocatore non trovato");
+
+    // 1. Recuperiamo il match attuale (fondamentale per i permessi e per il log)
     const { data: oldMatch } = await supabase
         .from('matches')
         .select('*')
@@ -447,6 +455,27 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
         .single();
 
     if (!oldMatch) throw new Error("Match non trovato");
+
+    // ==========================================
+    // BLOCCO SICUREZZA SERVER-SIDE (AUTHORIZATION)
+    // ==========================================
+    const isUserInMatch = [
+        oldMatch.team_a_left_id,
+        oldMatch.team_a_right_id,
+        oldMatch.team_b_left_id,
+        oldMatch.team_b_right_id
+    ].includes(currentPlayer.id);
+
+    const isAdmin = currentPlayer.role === 'admin';
+    const isOrganizer = currentPlayer.id === oldMatch.organizer_id;
+
+    // Regola identica a quella del frontend
+    const canManage = isAdmin || isOrganizer || (!oldMatch.organizer_id && isUserInMatch);
+
+    if (!canManage) {
+        throw new Error("ACCESSO NEGATO: Non hai i permessi per gestire questa partita.");
+    }
+    // ==========================================
 
     // 2. Eseguiamo l'update
     const { error } = await supabase
@@ -456,9 +485,7 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
 
     if (error) throw new Error(error.message);
 
-    // 3. GENERIAMO IL LOG DI AUDIT
-    const { data: admin } = await supabase.from('players').select('first_name, last_name').eq('user_id', user.id).single();
-
+    // 3. GENERIAMO IL LOG DI AUDIT CORRETTO
     const modifiche: string[] = [];
 
     if (updatedFields.match_type !== undefined && updatedFields.match_type !== oldMatch.match_type) {
@@ -479,10 +506,13 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
     });
 
     if (modifiche.length > 0) {
+        const operatore = `${currentPlayer.first_name} ${currentPlayer.last_name}`;
+        const qualifica = isAdmin ? "L'Admin" : (isOrganizer ? "L'Organizzatore" : "Il Giocatore");
+
         await logAction(
             'MATCH_UPDATED',
             matchId,
-            `Admin ${admin?.first_name || 'Sconosciuto'} ${admin?.last_name || ''} ha modificato il match ${matchId.slice(0, 8)}: ${modifiche.join('; ')}`,
+            `${qualifica} ${operatore} ha modificato il match ${matchId.slice(0, 8)}: ${modifiche.join('; ')}`,
             {
                 previous_data: oldMatch,
                 new_data: updatedFields
