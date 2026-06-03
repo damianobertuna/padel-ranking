@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import PendingMatchCard from '@/components/PendingMatchCard';
+import SearchBar from '@/components/SearchBar'; // <-- IMPORT DELLA BARRA DI RICERCA
 import { Player } from "@/types";
 import { computeKingAndFanalino } from '@/lib/rankingCalc';
 
@@ -14,6 +15,7 @@ interface PageProps {
         sort?: string;
         gender?: string;
         tab?: string;
+        search?: string; // <-- PARAMETRO DI RICERCA ACCETTATO
     }>;
 }
 
@@ -32,6 +34,7 @@ export default async function Home({ searchParams }: PageProps) {
     const currentSort = resolvedParams.sort || 'ranking';
     const currentGender = resolvedParams.gender || 'all';
     const currentTab = resolvedParams.tab || 'ranking';
+    const currentSearch = resolvedParams.search || ''; // <-- RECUPERO STRINGA CERCATA
 
     const { data: { user } } = await supabase.auth.getUser();
     let currentUserPlayer = null;
@@ -59,7 +62,7 @@ export default async function Home({ searchParams }: PageProps) {
         lastPlaceBothIds
     } = computeKingAndFanalino(playersWithStats);
 
-    // --- OPTION A: Mappa dei Titoli per le Card (Hash Map O(1)) ---
+    // --- Mappa dei Titoli per le Card (Hash Map O(1)) ---
     const playerTitlesMap: Record<number, { type: 'KING' | 'FANALINO', label: string }> = {};
 
     kingLeftIds.forEach(id => playerTitlesMap[id] = { type: 'KING', label: 'KING SX' });
@@ -71,9 +74,17 @@ export default async function Home({ searchParams }: PageProps) {
     lastPlaceBothIds.forEach(id => playerTitlesMap[id] = { type: 'FANALINO', label: 'FAN MIX' });
     // --------------------------------------------------------------
 
+    // --- FILTRAGGIO COMPLETO: GENERE + BARRA DI RICERCA ---
     const filteredPlayers = playersWithStats.filter(player => {
-        if (currentGender === 'all') return true;
-        return player.gender === currentGender;
+        // Filtro Genere
+        const matchesGender = currentGender === 'all' || player.gender === currentGender;
+
+        // Filtro Ricerca (Nome o Cognome, Case-Insensitive)
+        const matchesSearch = !currentSearch ||
+            player.first_name.toLowerCase().includes(currentSearch.toLowerCase()) ||
+            player.last_name.toLowerCase().includes(currentSearch.toLowerCase());
+
+        return matchesGender && matchesSearch;
     });
 
     const sortedPlayers = [...filteredPlayers].sort((a, b) => {
@@ -108,10 +119,11 @@ export default async function Home({ searchParams }: PageProps) {
 
     const totalPages = totalCompletedCount ? Math.ceil(totalCompletedCount / MATCHES_PER_PAGE) : 1;
 
-    const urlState = `gender=${currentGender}&sort=${currentSort}&playerPage=${playerPage}&page=${currentPage}`;
+    // Preserviamo la query di ricerca anche nei cambi di TAB
+    const urlState = `gender=${currentGender}&sort=${currentSort}&playerPage=${playerPage}&page=${currentPage}&search=${encodeURIComponent(currentSearch)}`;
 
     return (
-        <main className="bg-slate-50 flex flex-col items-center text-slate-900">
+        <main className="bg-slate-50 flex flex-col items-center text-slate-900 mt-6">
             <div className="max-w-4xl w-full px-4 sm:px-8">
                 {/* NAVIGAZIONE TAB MINIMALE (Stile Navbar Sportiva) */}
                 <div className="flex w-full mb-6 border-b border-slate-300">
@@ -144,17 +156,22 @@ export default async function Home({ searchParams }: PageProps) {
                 {currentTab === 'ranking' && (
                     <div className="animate-in fade-in duration-300">
 
+                        {/* INPUT DI RICERCA (Debounced Client Component) */}
+                        <div className="w-full mb-4">
+                            <SearchBar placeholder="CERCA ATLETA PER NOME O COGNOME..." />
+                        </div>
+
                         {/* BARRA FILTRI */}
                         <div className="flex flex-col sm:flex-row justify-between bg-white border border-slate-200 p-2 mb-4 rounded-sm shadow-sm gap-2">
                             <div className="flex gap-1 bg-slate-100 p-1 rounded-sm text-xs font-bold uppercase tracking-wider">
-                                <Link href={`/?tab=ranking&gender=M&sort=${currentSort}&playerPage=1`} scroll={false} className={`px-4 py-1.5 rounded-sm transition-colors ${currentGender === 'M' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Maschile</Link>
-                                <Link href={`/?tab=ranking&gender=F&sort=${currentSort}&playerPage=1`} scroll={false} className={`px-4 py-1.5 rounded-sm transition-colors ${currentGender === 'F' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Femminile</Link>
-                                <Link href={`/?tab=ranking&gender=all&sort=${currentSort}&playerPage=1`} scroll={false} className={`px-4 py-1.5 rounded-sm transition-colors ${currentGender === 'all' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Tutti</Link>
+                                <Link href={`/?tab=ranking&gender=M&sort=${currentSort}&playerPage=1&search=${currentSearch}`} scroll={false} className={`px-4 py-1.5 rounded-sm transition-colors ${currentGender === 'M' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Maschile</Link>
+                                <Link href={`/?tab=ranking&gender=F&sort=${currentSort}&playerPage=1&search=${currentSearch}`} scroll={false} className={`px-4 py-1.5 rounded-sm transition-colors ${currentGender === 'F' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Femminile</Link>
+                                <Link href={`/?tab=ranking&gender=all&sort=${currentSort}&playerPage=1&search=${currentSearch}`} scroll={false} className={`px-4 py-1.5 rounded-sm transition-colors ${currentGender === 'all' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Tutti</Link>
                             </div>
                             <div className="flex gap-1 bg-slate-100 p-1 rounded-sm text-xs font-bold uppercase tracking-wider">
-                                <Link href={`/?tab=ranking&gender=${currentGender}&sort=ranking&playerPage=1`} scroll={false} className={`px-3 py-1.5 rounded-sm transition-colors ${currentSort === 'ranking' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Punti</Link>
-                                <Link href={`/?tab=ranking&gender=${currentGender}&sort=played&playerPage=1`} scroll={false} className={`px-3 py-1.5 rounded-sm transition-colors ${currentSort === 'played' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Match</Link>
-                                <Link href={`/?tab=ranking&gender=${currentGender}&sort=winrate&playerPage=1`} scroll={false} className={`px-3 py-1.5 rounded-sm transition-colors ${currentSort === 'winrate' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Win %</Link>
+                                <Link href={`/?tab=ranking&gender=${currentGender}&sort=ranking&playerPage=1&search=${currentSearch}`} scroll={false} className={`px-3 py-1.5 rounded-sm transition-colors ${currentSort === 'ranking' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Punti</Link>
+                                <Link href={`/?tab=ranking&gender=${currentGender}&sort=played&playerPage=1&search=${currentSearch}`} scroll={false} className={`px-3 py-1.5 rounded-sm transition-colors ${currentSort === 'played' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Match</Link>
+                                <Link href={`/?tab=ranking&gender=${currentGender}&sort=winrate&playerPage=1&search=${currentSearch}`} scroll={false} className={`px-3 py-1.5 rounded-sm transition-colors ${currentSort === 'winrate' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Win %</Link>
                             </div>
                         </div>
 
@@ -174,18 +191,15 @@ export default async function Home({ searchParams }: PageProps) {
                                     const rankIndex = startIndex + index + 1;
                                     const playerId = player.id;
 
-                                    // Calcolo dinamico dei lati per King e Fanalino
                                     const kingSide = kingLeftIds.includes(playerId) ? 'SX' : kingRightIds.includes(playerId) ? 'DX' : kingBothIds.includes(playerId) ? 'MIX' : null;
                                     const fanalinoSide = lastPlaceLeftIds.includes(playerId) ? 'SX' : lastPlaceRightIds.includes(playerId) ? 'DX' : lastPlaceBothIds.includes(playerId) ? 'MIX' : null;
 
                                     return (
                                         <Link key={player.id} href={`/player/${player.id}`} className="flex flex-row items-center px-4 py-3 border-b border-slate-100 hover:bg-slate-50 transition-colors group">
-                                            {/* Rank Number */}
                                             <div className={`w-8 sm:w-12 text-center font-black text-lg sm:text-xl ${rankIndex === 1 ? 'text-amber-500' : 'text-slate-400 group-hover:text-slate-900'}`}>
                                                 {rankIndex}
                                             </div>
 
-                                            {/* Info Giocatore */}
                                             <div className="flex-1 flex items-center gap-3 pl-2 sm:pl-4 min-w-0">
                                                 <div className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-full bg-slate-200 border border-slate-300 overflow-hidden flex items-center justify-center">
                                                     {player.avatar_url ? (
@@ -195,34 +209,31 @@ export default async function Home({ searchParams }: PageProps) {
                                                     )}
                                                 </div>
                                                 <div className="flex flex-col min-w-0">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-black text-slate-900 text-sm sm:text-base uppercase tracking-tight truncate">{player.first_name} {player.last_name}</span>
-
-                                                        {/* BADGE KING (Ora dinamico) */}
+                                                    <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                                                        <span className="font-black text-slate-900 text-sm sm:text-base uppercase tracking-tight truncate">
+                                                            {player.first_name} {player.last_name}
+                                                        </span>
                                                         {kingSide && (
-                                                            <span className="bg-amber-100 text-amber-800 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider hidden sm:inline-flex items-center shadow-sm" title="King">
-                                    👑 KING {kingSide}
-                                </span>
+                                                            <span className="bg-amber-100 text-amber-800 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider inline-flex items-center shadow-sm shrink-0" title="King">
+                                                                👑 {playerTitlesMap[playerId]?.label || `KING ${kingSide}`}
+                                                            </span>
                                                         )}
 
-                                                        {/* BADGE FANALINO (Aggiunto) */}
                                                         {fanalinoSide && (
-                                                            <span className="bg-slate-700 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider hidden sm:inline-flex items-center shadow-sm" title="Fanalino">
-                                    🐢 FAN {fanalinoSide}
-                                </span>
+                                                            <span className="bg-slate-700 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider inline-flex items-center shadow-sm shrink-0" title="Fanalino">
+                                                            🐢 {playerTitlesMap[playerId]?.label || `FAN ${fanalinoSide}`}
+                                                        </span>
                                                         )}
                                                     </div>
                                                     <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider sm:hidden block mt-0.5">
-                            {player.preferred_side} • {player.total_played} Match
-                        </span>
+                                                        {player.preferred_side} • {player.total_played} Match
+                                                    </span>
                                                 </div>
                                             </div>
 
-                                            {/* Dati Desktop */}
                                             <div className="hidden sm:block w-24 text-center text-xs font-bold text-slate-500 uppercase">{player.preferred_side}</div>
                                             <div className="hidden sm:block w-24 text-center text-xs font-bold text-slate-500">{player.total_played}</div>
 
-                                            {/* Punti Finali */}
                                             <div className="w-20 sm:w-24 text-right flex flex-col justify-center shrink-0">
                                                 <span className="text-base sm:text-lg font-black text-blue-600 leading-none">{currentSort === 'played' ? player.total_played : currentSort === 'winrate' ? `${player.win_rate.toFixed(1)}%` : player.ranking.toFixed(2)}</span>
                                                 <span className="text-[9px] font-bold text-slate-400 uppercase sm:hidden">{currentSort === 'played' ? 'Match' : currentSort === 'winrate' ? 'Rate' : 'Pts'}</span>
@@ -231,16 +242,16 @@ export default async function Home({ searchParams }: PageProps) {
                                     );
                                 })
                             ) : (
-                                <div className="p-8 text-center text-slate-500 text-sm font-bold uppercase">Nessun atleta in questa categoria</div>
+                                <div className="p-8 text-center text-slate-500 text-sm font-bold uppercase">Nessun atleta corrisponde alla ricerca</div>
                             )}
                         </div>
 
                         {/* PAGINAZIONE */}
                         {totalPlayerPages > 1 && (
                             <div className="flex justify-between items-center mt-6 px-2">
-                                <Link href={`/?tab=ranking&playerPage=${playerPage - 1}&page=${currentPage}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-900 rounded-sm hover:bg-slate-100 transition-colors ${playerPage <= 1 ? 'pointer-events-none opacity-40' : ''}`}>← Prev</Link>
+                                <Link href={`/?tab=ranking&playerPage=${playerPage - 1}&page=${currentPage}&sort=${currentSort}&gender=${currentGender}&search=${currentSearch}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-900 rounded-sm hover:bg-slate-100 transition-colors ${playerPage <= 1 ? 'pointer-events-none opacity-40' : ''}`}>← Prev</Link>
                                 <div className="text-xs font-bold text-slate-500">PAG {playerPage} / {totalPlayerPages}</div>
-                                <Link href={`/?tab=ranking&playerPage=${playerPage + 1}&page=${currentPage}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-900 rounded-sm hover:bg-slate-100 transition-colors ${playerPage >= totalPlayerPages ? 'pointer-events-none opacity-40' : ''}`}>Next →</Link>
+                                <Link href={`/?tab=ranking&playerPage=${playerPage + 1}&page=${currentPage}&sort=${currentSort}&gender=${currentGender}&search=${currentSearch}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-900 rounded-sm hover:bg-slate-100 transition-colors ${playerPage >= totalPlayerPages ? 'pointer-events-none opacity-40' : ''}`}>Next →</Link>
                             </div>
                         )}
                     </div>
@@ -283,15 +294,12 @@ export default async function Home({ searchParams }: PageProps) {
 
                                 return (
                                     <div key={match.id} className="bg-white border border-slate-200 rounded-sm shadow-sm overflow-hidden">
-                                        {/* Barra Superiore Dati Match */}
                                         <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                                             <span>{new Date(match.updated_at).toLocaleDateString('it-IT')}</span>
                                             <span>{matchClub ? matchClub.name : 'Location N/D'}</span>
                                         </div>
 
-                                        {/* Corpo del Risultato */}
                                         <div className="flex flex-col sm:flex-row items-center p-0 sm:p-2">
-
                                             {/* Team A */}
                                             <div className={`flex-1 w-full sm:w-auto p-4 flex flex-col justify-center ${winner === 'A' ? 'bg-emerald-50/50' : ''}`}>
                                                 <div className="flex items-center gap-2 mb-1.5">
@@ -332,9 +340,9 @@ export default async function Home({ searchParams }: PageProps) {
 
                         {totalPages > 1 && (
                             <div className="flex justify-between items-center mt-6">
-                                <Link href={`/?tab=completed&page=${currentPage - 1}&playerPage=${playerPage}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-900 rounded-sm hover:bg-slate-100 transition-colors ${currentPage <= 1 ? 'pointer-events-none opacity-40' : ''}`}>← Prev</Link>
+                                <Link href={`/?tab=completed&page=${currentPage - 1}&playerPage=${playerPage}&sort=${currentSort}&gender=${currentGender}&search=${currentSearch}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-900 rounded-sm hover:bg-slate-100 transition-colors ${currentPage <= 1 ? 'pointer-events-none opacity-40' : ''}`}>← Prev</Link>
                                 <div className="text-xs font-bold text-slate-500">PAG {currentPage} / {totalPages}</div>
-                                <Link href={`/?tab=completed&page=${currentPage + 1}&playerPage=${playerPage}&sort=${currentSort}&gender=${currentGender}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-900 rounded-sm hover:bg-slate-100 transition-colors ${currentPage >= totalPages ? 'pointer-events-none opacity-40' : ''}`}>Next →</Link>
+                                <Link href={`/?tab=completed&page=${currentPage + 1}&playerPage=${playerPage}&sort=${currentSort}&gender=${currentGender}&search=${currentSearch}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-900 rounded-sm hover:bg-slate-100 transition-colors ${currentPage >= totalPages ? 'pointer-events-none opacity-40' : ''}`}>Next →</Link>
                             </div>
                         )}
                     </div>
