@@ -61,9 +61,10 @@ export default async function RootLayout({
                   />
               </div>
               <div>
-                <h1 className="text-4xl sm:text-4xl font-black text-slate-900 uppercase tracking-tighter leading-none">
-                  RanKING<br/><span className="text-blue-600">Padel</span>
-                </h1>
+                  <h1 className="text-4xl sm:text-4xl font-black text-slate-900  tracking-tighter leading-none group-hover:opacity-80 transition-opacity">
+                      Ran<span className="text-blue-600">KING</span><br/>
+                      <span className="text-blue-600">Padel</span>
+                  </h1>
               </div>
             </Link>
           </div>
