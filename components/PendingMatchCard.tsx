@@ -23,7 +23,7 @@ export default function PendingMatchCard({
 
     const matchClub = clubs?.find(c => c.id === match.club_id);
 
-    // --- LOGICA LIVELLO ---
+    // --- LOGICA LIVELLO E RANGE CONSENTITO ---
     const activePlayerIds = [
         match.team_a_left_id, match.team_a_right_id,
         match.team_b_left_id, match.team_b_right_id
@@ -33,13 +33,26 @@ export default function PendingMatchCard({
         .map(id => rawPlayers.find(p => p.id === id)?.ranking)
         .filter((r): r is number => r !== undefined);
 
-    let levelText = 'DA DEFINIRE (NESSUN GIOCATORE)';
+    let levelLabel = 'LIVELLO:';
+    let levelText = 'DA DEFINIRE';
+
     if (activeRankings.length > 0) {
         const minLvl = Math.min(...activeRankings);
         const maxLvl = Math.max(...activeRankings);
-        levelText = minLvl === maxLvl
-            ? `${minLvl.toFixed(2)}`
-            : `${minLvl.toFixed(2)} - ${maxLvl.toFixed(2)}`;
+
+        const isMatchComplete = activeRankings.length === 4;
+
+        if (isMatchComplete) {
+            // Se la partita è piena, mostriamo il livello reale in campo
+            levelLabel = 'LIVELLO MATCH:';
+            levelText = minLvl === maxLvl ? `${minLvl.toFixed(2)}` : `${minLvl.toFixed(2)} - ${maxLvl.toFixed(2)}`;
+        } else {
+            // Se ci sono slot liberi, calcoliamo e mostriamo il range matematico consentito
+            levelLabel = 'RANGE CONSENTITO:';
+            const minAllowed = Math.max(0, maxLvl - 0.25); // Impedisce ranking negativi
+            const maxAllowed = minLvl + 0.25;
+            levelText = `${minAllowed.toFixed(2)} - ${maxAllowed.toFixed(2)}`;
+        }
     }
 
     // --- LOGICA DI DOMINIO E RUOLI ---
@@ -181,7 +194,7 @@ export default function PendingMatchCard({
                     </div>
                     <div className="flex items-center gap-2 mt-1 pt-1.5 border-t border-slate-200">
                         <span className="text-slate-400">📊</span>
-                        <span>RANK: <span className="text-slate-900 font-black">{levelText}</span></span>
+                        <span>{levelLabel} <span className="text-slate-900 font-black">{levelText}</span></span>
                     </div>
                 </div>
 
