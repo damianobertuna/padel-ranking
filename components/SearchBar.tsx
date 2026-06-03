@@ -8,13 +8,11 @@ export default function SearchBar({ placeholder = "Cerca..." }: { placeholder?: 
     const pathname = usePathname();
     const searchParams = useSearchParams();
 
-    // Inizializza lo stato leggendo l'URL attuale (utile se ricarichi la pagina)
     const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
 
     useEffect(() => {
-        // Imposta un timer (Debounce)
         const delayDebounceFn = setTimeout(() => {
-            const params = new URLSearchParams(searchParams);
+            const params = new URLSearchParams(searchParams.toString());
 
             if (searchTerm) {
                 params.set('search', searchTerm);
@@ -22,13 +20,17 @@ export default function SearchBar({ placeholder = "Cerca..." }: { placeholder?: 
                 params.delete('search');
             }
 
-            // Aggiorna l'URL usando replace (per non riempire la cronologia del tasto "Indietro")
-            // scroll: false impedisce alla pagina di saltare in cima ad ogni lettera digitata
-            router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+            const newQueryString = params.toString();
+            const currentQueryString = searchParams.toString();
 
-        }, 300); // Aspetta 300ms prima di aggiornare l'URL
+            // === LA GUARDIA CRUCIALE PER EVITARE IL LOOP INFINITO ===
+            // Aggiorna l'URL solo se la stringa dei parametri è effettivamente cambiata
+            if (newQueryString !== currentQueryString) {
+                router.replace(`${pathname}?${newQueryString}`, { scroll: false });
+            }
 
-        // Pulisce il timer se l'utente digita una nuova lettera prima dei 300ms
+        }, 300);
+
         return () => clearTimeout(delayDebounceFn);
     }, [searchTerm, pathname, router, searchParams]);
 
