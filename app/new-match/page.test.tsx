@@ -63,6 +63,7 @@ describe('CreateMatchForm Component', () => {
         render(<CreateMatchForm />);
         await screen.findAllByRole('option');
 
+        // L'indice 0 è il circolo, l'indice 1 è il Team A SX
         const leftSelect = screen.getAllByRole('combobox')[1];
         expect(leftSelect.innerHTML).toContain('UomoSX Marco');
 
@@ -82,6 +83,7 @@ describe('CreateMatchForm Component', () => {
         fireEvent.click(screen.getByRole('button', { name: /MISTO/i }));
         const selects = screen.getAllByRole('combobox');
 
+        // selezioni giocatori per il team (ignorando il circolo a indice 0)
         fireEvent.change(selects[1], { target: { value: '3' } });
         fireEvent.change(selects[2], { target: { value: '4' } });
 
@@ -97,6 +99,9 @@ describe('CreateMatchForm Component', () => {
         await screen.findAllByRole('option');
         const selects = screen.getAllByRole('combobox');
 
+        // Seleziona il circolo (indice 0)
+        fireEvent.change(selects[0], { target: { value: '1' } });
+        // Seleziona i giocatori (indici 1 e 2)
         fireEvent.change(selects[1], { target: { value: '1' } });
         fireEvent.change(selects[2], { target: { value: '2' } });
 
@@ -109,10 +114,13 @@ describe('CreateMatchForm Component', () => {
         fireEvent.click(submitBtn!);
 
         await waitFor(() => {
+            // Verifica il payload completo, assicurandoti che la data termini con la Z di UTC
             expect(createPendingMatch).toHaveBeenCalledWith(expect.objectContaining({
                 matchType: 'male',
                 teamALeft: 1,
-                teamARight: 2
+                teamARight: 2,
+                clubId: 1,
+                matchDate: expect.stringMatching(/Z$/)
             }));
             expect(mockPush).toHaveBeenCalledWith('/?tab=pending');
         });
