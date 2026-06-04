@@ -4,7 +4,7 @@ import WinRateWidget from '@/components/WinRateWidget';
 import StreakWidget from '@/components/StreakWidget';
 import PartnersAndNemesisWidget from '@/components/PartnersAndNemesisWidget';
 import GameAverageWidget from '@/components/GameAverageWidget';
-import AvatarUpload from '@/components/AvatarUpload';
+import EditAvatar from '@/components/EditAvatar'; // <--- IL NUOVO COMPONENTE
 import BackToHomeButton from "@/components/BackToHomeButton";
 
 export const revalidate = 0;
@@ -63,6 +63,9 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
     const paginatedMatches = enrichedMatches.slice((currentPage - 1) * MATCHES_PER_PAGE, currentPage * MATCHES_PER_PAGE);
     const totalPages = Math.ceil(enrichedMatches.length / MATCHES_PER_PAGE) || 1;
 
+    // Controllo Sicurezza: Il visitatore è il proprietario di questo profilo?
+    const isOwner = user?.id === player.user_id;
+
     return (
         <main className="min-h-screen bg-slate-50 p-4 sm:p-8 flex flex-col items-center">
             <div className="max-w-5xl w-full">
@@ -70,9 +73,26 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
 
                 {/* Header Profilo */}
                 <div className="bg-white p-6 border border-slate-200 shadow-sm mb-6 flex flex-col sm:flex-row items-center gap-6 rounded-sm">
-                    <div className="w-24 h-24 shrink-0 rounded-full border-2 border-slate-900 overflow-hidden">
-                        {player.avatar_url ? <img src={player.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-200 flex items-center justify-center font-black">{player.first_name[0]}</div>}
+
+                    {/* AVATAR LOGIC CORRETTA */}
+                    <div className="shrink-0 flex items-center justify-center">
+                        {isOwner ? (
+                            // Il contenitore genitore non ha più l'overflow-hidden. Il componente è libero!
+                            <EditAvatar playerId={player.id} currentAvatarUrl={player.avatar_url} />
+                        ) : (
+                            // Per gli altri utenti, manteniamo il cerchio grafico rigido
+                            <div className="w-24 h-24 rounded-full border-2 border-slate-900 overflow-hidden shadow-sm">
+                                {player.avatar_url ? (
+                                    <img src={player.avatar_url} className="w-full h-full object-cover" alt="Profile" />
+                                ) : (
+                                    <div className="w-full h-full bg-slate-200 flex items-center justify-center text-4xl font-black text-slate-500">
+                                        {player.first_name[0]}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
+
                     <div className="flex-1 text-center sm:text-left">
                         <h1 className="text-3xl font-black uppercase tracking-tighter text-slate-900">{player.first_name} {player.last_name}</h1>
                         <div className="flex gap-2 mt-2 justify-center sm:justify-start">

@@ -92,3 +92,46 @@ export async function updatePlayerByAdmin(formData: FormData) {
     revalidatePath('/admin/players');
     revalidatePath('/admin/logs');
 }
+
+// --- NUOVA AZIONE: Aggiornamento Avatar Utente ---
+export async function updatePlayerAvatar(playerId: number, newAvatarUrl: string) {
+    const supabase = await createClient();
+
+    // 1. Verifica che l'utente sia loggato
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Non autorizzato. Devi effettuare l'accesso.");
+
+    // 2. Recuperiamo il profilo dell'utente loggato per il log e per sicurezza
+    const { data: currentUserPlayer } = await supabase
+        .from('players')
+        .select('id, first_name, last_name')
+        .eq('user_id', user.id)
+        .single();
+
+    if (!currentUserPlayer || currentUserPlayer.id !== playerId) {
+        throw new Error("Non puoi modificare la foto profilo di un altro giocatore.");
+    }
+
+    // 3. Aggiorna il database (il controllo su user_id garantisce ulteriore sicurezza)
+    const { error } = await supabase
+        .from('players')
+        .update({ avatar_url: newAvatarUrl })
+        .eq('id', playerId)
+        .eq('user_id', user.id);
+
+    if (error) throw new Error(`Errore DB: ${error.message}`);
+
+    // 4. Logghiamo l'azione nel sistema di Audit
+    await logAction(
+        'UPDATE_AVATAR',
+        playerId,
+        `Il giocatore ${currentUserPlayer.first_name} ${currentUserPlayer.last_name} ha aggiornato la propria foto profilo.`
+    );
+
+    // 5. Pulisce la cache di Next.js per mostrare subito la nuova immagine
+    revalidatePath('/');
+    revalidatePath(`/player/${playerId}`);
+    revalidatePath('/admin/logs'); // Aggiorniamo anche i log admin
+
+    return { success: true };
+}
