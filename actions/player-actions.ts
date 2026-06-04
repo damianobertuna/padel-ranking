@@ -135,3 +135,109 @@ export async function updatePlayerAvatar(playerId: number, newAvatarUrl: string)
 
     return { success: true };
 }
+
+export async function deletePlayerByAdmin(playerId: number) {
+    const supabase = await createClient();
+
+    // 1. Verifica Sicurezza Admin
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Non autenticato');
+
+    const { data: currentUserPlayer } = await supabase
+        .from('players')
+        .select('first_name, last_name, role')
+        .eq('user_id', user.id)
+        .single();
+
+    if (!currentUserPlayer || currentUserPlayer.role !== 'admin') {
+        throw new Error('Azione non autorizzata. Serve il ruolo Admin.');
+    }
+
+    // 2. Recuperiamo i dati prima di eliminare (per il log)
+    const { data: targetPlayer } = await supabase
+        .from('players')
+        .select('first_name, last_name')
+        .eq('id', playerId)
+        .single();
+
+    // 3. Tentativo di eliminazione
+    const { error } = await supabase
+        .from('players')
+        .delete()
+        .eq('id', playerId);
+
+    if (error) {
+        // Se c'è un errore di foreign key (es. ha giocato partite)
+        if (error.code === '23503') {
+            throw new Error("Impossibile eliminare: questo giocatore ha già disputato delle partite. Se è un duplicato, contatta l'assistenza tecnica.");
+        }
+        throw new Error(`Errore durante l'eliminazione: ${error.message}`);
+    }
+
+    // 4. Scrittura del Log
+    const adminFullName = `${currentUserPlayer.first_name} ${currentUserPlayer.last_name}`;
+    const targetFullName = targetPlayer ? `${targetPlayer.first_name} ${targetPlayer.last_name}` : `ID ${playerId}`;
+
+    await logAction(
+        'DELETE_PLAYER',
+        playerId,
+        `Admin ${adminFullName} ha eliminato definitivamente il giocatore ${targetFullName}.`
+    );
+
+    revalidatePath('/');
+    revalidatePath('/admin/players');
+    revalidatePath('/admin/logs');
+}
+
+export async function updateOwnProfile(formData: FormData) {
+    const supabase = await createClient();
+
+    // 1. Verifica utente loggato
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Devi effettuare l'accesso per modificare il tuo profilo.");
+
+    const playerIdStr = formData.get('playerId');
+    if (!playerIdStr) throw new Error("ID mancante");
+    const playerId = parseInt(playerIdStr as string, 10);
+
+    // 2. Controllo di Proprietà: l'utente sta modificando SE STESSO?
+    const { data: targetPlayer } = await supabase
+        .from('players')
+        .select('user_id')
+        .eq('id', playerId)
+        .single();
+
+    if (!targetPlayer || targetPlayer.user_id !== user.id) {
+        throw new Error("Non sei autorizzato a modificare il profilo di un altro giocatore.");
+    }
+
+    // 3. Estrazione dei campi SICURI dal form
+    const firstName = (formData.get('firstName') as string).trim();
+    const lastName = (formData.get('lastName') as string).trim();
+    const preferredSide = formData.get('preferredSide') as string;
+    const dominantHand = formData.get('dominantHand') as string;
+
+    // 4. Update nel database
+    const { error } = await supabase
+        .from('players')
+        .update({
+            first_name: firstName,
+            last_name: lastName,
+            preferred_side: preferredSide,
+            dominant_hand: dominantHand,
+            // IL RANKING E IL RUOLO NON VENGONO TOCCATI!
+        })
+        .eq('id', playerId);
+
+    if (error) throw new Error(`Errore durante il salvataggio: ${error.message}`);
+
+    // 5. Log e Revalidate
+    await logAction(
+        'UPDATE_OWN_PROFILE',
+        playerId,
+        `Il giocatore ${firstName} ${lastName} ha aggiornato autonomamente i propri dati personali.`
+    );
+
+    revalidatePath(`/player/${playerId}`);
+    revalidatePath('/');
+}

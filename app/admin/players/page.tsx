@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { updatePlayerByAdmin } from '../../../actions/player-actions';
 import { SubmitButton } from './SubmitButton';
 import BackToHomeButton from "@/components/BackToHomeButton";
+import DeletePlayerButton from '@/components/DeletePlayerButton';
 
 export const revalidate = 0;
 
@@ -93,9 +94,13 @@ export default async function AdminPlayersManagement() {
                                 </div>
 
                                 {/* Azione */}
-                                <div className="md:col-span-1 flex justify-end">
+                                <div className="md:col-span-1 flex items-end justify-end gap-2">
                                     <SubmitButton />
                                 </div>
+                                <div><DeletePlayerButton
+                                    playerId={player.id}
+                                    playerName={`${player.first_name} ${player.last_name}`}
+                                /></div>
                             </form>
                         </div>
                     ))}
