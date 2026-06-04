@@ -93,49 +93,6 @@ export async function updatePlayerByAdmin(formData: FormData) {
     revalidatePath('/admin/logs');
 }
 
-// --- NUOVA AZIONE: Aggiornamento Avatar Utente ---
-export async function updatePlayerAvatar(playerId: number, newAvatarUrl: string) {
-    const supabase = await createClient();
-
-    // 1. Verifica che l'utente sia loggato
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Non autorizzato. Devi effettuare l'accesso.");
-
-    // 2. Recuperiamo il profilo dell'utente loggato per il log e per sicurezza
-    const { data: currentUserPlayer } = await supabase
-        .from('players')
-        .select('id, first_name, last_name')
-        .eq('user_id', user.id)
-        .single();
-
-    if (!currentUserPlayer || currentUserPlayer.id !== playerId) {
-        throw new Error("Non puoi modificare la foto profilo di un altro giocatore.");
-    }
-
-    // 3. Aggiorna il database (il controllo su user_id garantisce ulteriore sicurezza)
-    const { error } = await supabase
-        .from('players')
-        .update({ avatar_url: newAvatarUrl })
-        .eq('id', playerId)
-        .eq('user_id', user.id);
-
-    if (error) throw new Error(`Errore DB: ${error.message}`);
-
-    // 4. Logghiamo l'azione nel sistema di Audit
-    await logAction(
-        'UPDATE_AVATAR',
-        playerId,
-        `Il giocatore ${currentUserPlayer.first_name} ${currentUserPlayer.last_name} ha aggiornato la propria foto profilo.`
-    );
-
-    // 5. Pulisce la cache di Next.js per mostrare subito la nuova immagine
-    revalidatePath('/');
-    revalidatePath(`/player/${playerId}`);
-    revalidatePath('/admin/logs'); // Aggiorniamo anche i log admin
-
-    return { success: true };
-}
-
 export async function deletePlayerByAdmin(playerId: number) {
     const supabase = await createClient();
 
@@ -200,10 +157,10 @@ export async function updateOwnProfile(formData: FormData) {
     if (!playerIdStr) throw new Error("ID mancante");
     const playerId = parseInt(playerIdStr as string, 10);
 
-    // 2. Controllo di Proprietà: l'utente sta modificando SE STESSO?
+    // 2. Controllo di Proprietà e recupero dati attuali (incluso avatar_url)
     const { data: targetPlayer } = await supabase
         .from('players')
-        .select('user_id')
+        .select('user_id, avatar_url')
         .eq('id', playerId)
         .single();
 
@@ -217,7 +174,34 @@ export async function updateOwnProfile(formData: FormData) {
     const preferredSide = formData.get('preferredSide') as string;
     const dominantHand = formData.get('dominantHand') as string;
 
-    // 4. Update nel database
+    // 4. GESTIONE UPLOAD IMMAGINE
+    const avatarFile = formData.get('avatar') as File | null;
+    let finalAvatarUrl = targetPlayer.avatar_url; // Manteniamo il vecchio avatar se non c'è upload
+
+    // Se l'utente ha inserito un nuovo file
+    if (avatarFile && avatarFile.size > 0) {
+        const fileExt = avatarFile.name.split('.').pop();
+        // Generiamo un nome univoco (ID utente + timestamp) per far invalidare la cache ai browser
+        const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+
+        // Upload nel bucket "avatars"
+        const { error: uploadError } = await supabase.storage
+            .from('avatars')
+            .upload(fileName, avatarFile, { upsert: true });
+
+        if (uploadError) {
+            throw new Error(`Errore caricamento foto: ${uploadError.message}`);
+        }
+
+        // Recuperiamo l'URL pubblico definitivo
+        const { data: publicUrlData } = supabase.storage
+            .from('avatars')
+            .getPublicUrl(fileName);
+
+        finalAvatarUrl = publicUrlData.publicUrl;
+    }
+
+    // 5. Update nel database
     const { error } = await supabase
         .from('players')
         .update({
@@ -225,19 +209,65 @@ export async function updateOwnProfile(formData: FormData) {
             last_name: lastName,
             preferred_side: preferredSide,
             dominant_hand: dominantHand,
+            avatar_url: finalAvatarUrl
             // IL RANKING E IL RUOLO NON VENGONO TOCCATI!
         })
         .eq('id', playerId);
 
     if (error) throw new Error(`Errore durante il salvataggio: ${error.message}`);
 
-    // 5. Log e Revalidate
+    // 6. Log e Revalidate
     await logAction(
         'UPDATE_OWN_PROFILE',
         playerId,
         `Il giocatore ${firstName} ${lastName} ha aggiornato autonomamente i propri dati personali.`
     );
 
+    revalidatePath(`/profile`);
     revalidatePath(`/player/${playerId}`);
     revalidatePath('/');
+}
+
+// --- FUNZIONE RIPRISTINATA PER IL COMPONENTE EDIT AVATAR STANDALONE ---
+export async function updatePlayerAvatar(playerId: number, newAvatarUrl: string) {
+    const supabase = await createClient();
+
+    // 1. Verifica che l'utente sia loggato
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Non autorizzato. Devi effettuare l'accesso.");
+
+    // 2. Recuperiamo il profilo dell'utente loggato per il log e per sicurezza
+    const { data: currentUserPlayer } = await supabase
+        .from('players')
+        .select('id, first_name, last_name')
+        .eq('user_id', user.id)
+        .single();
+
+    if (!currentUserPlayer || currentUserPlayer.id !== playerId) {
+        throw new Error("Non puoi modificare la foto profilo di un altro giocatore.");
+    }
+
+    // 3. Aggiorna il database (il controllo su user_id garantisce ulteriore sicurezza)
+    const { error } = await supabase
+        .from('players')
+        .update({ avatar_url: newAvatarUrl })
+        .eq('id', playerId)
+        .eq('user_id', user.id);
+
+    if (error) throw new Error(`Errore DB: ${error.message}`);
+
+    // 4. Logghiamo l'azione nel sistema di Audit
+    await logAction(
+        'UPDATE_AVATAR',
+        playerId,
+        `Il giocatore ${currentUserPlayer.first_name} ${currentUserPlayer.last_name} ha aggiornato la propria foto profilo.`
+    );
+
+    // 5. Pulisce la cache di Next.js per mostrare subito la nuova immagine
+    revalidatePath('/');
+    revalidatePath(`/player/${playerId}`);
+    revalidatePath(`/profile`);
+    revalidatePath('/admin/logs');
+
+    return { success: true };
 }

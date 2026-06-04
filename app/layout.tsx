@@ -28,9 +28,36 @@ export default async function RootLayout({
 
         {/* 1. TOPBAR SCURA (Sottile e Sticky in alto) */}
         <div className="mb-3 sticky top-0 z-50 w-full bg-slate-900/95 backdrop-blur-sm text-white flex justify-between items-center py-2.5 px-4 sm:px-8 text-xs font-semibold uppercase tracking-wider shadow-sm">
-            <div className="truncate pr-2">
+            <div className="shrink-0 pr-2">
                 {user ? (
-                    <span className="opacity-90">Account: <span className="font-bold text-white">{currentUserPlayer?.first_name} {currentUserPlayer?.last_name}</span></span>
+                    <Link
+                        href="/profile"
+                        className="flex items-center gap-2 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-blue-500 transition-all rounded-full py-1 pr-3 pl-1 cursor-pointer group"
+                        title="Gestisci il tuo profilo"
+                    >
+                        {/* AVATAR O INIZIALI */}
+                        <div className="w-6 h-6 shrink-0 rounded-full bg-blue-600 text-white text-[9px] flex items-center justify-center font-black overflow-hidden border border-slate-900">
+                            {currentUserPlayer?.avatar_url ? (
+                                <img src={currentUserPlayer.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                            ) : (
+                                <span>{currentUserPlayer?.first_name?.charAt(0)}{currentUserPlayer?.last_name?.charAt(0)}</span>
+                            )}
+                        </div>
+
+                        {/* NOME (Nascosto su mobile piccolo, visibile da sm in su) */}
+                        <span className="hidden sm:inline font-bold text-white text-xs truncate max-w-[120px]">
+              {currentUserPlayer?.first_name} {currentUserPlayer?.last_name}
+          </span>
+                        {/* TESTO "PROFILO" per Mobile */}
+                        <span className="sm:hidden font-bold text-white text-[10px] uppercase tracking-widest">
+              Profilo
+          </span>
+
+                        {/* ICONA INGRANAGGIO (appare all'hover su desktop, fissa su mobile) */}
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-slate-400 group-hover:text-white transition-colors" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                        </svg>
+                    </Link>
                 ) : (
                     <span className="opacity-70">Lector Mode</span>
                 )}
