@@ -107,27 +107,35 @@ export default async function RootLayout({
                     Aggiungiamo pb-24 per evitare che il footer fisso si sovrapponga ai form o alle liste */}
       <div className="flex-1 pb-6">
         {children}
-        <div className="mt-8 mb-3 w-full bg-slate-900 text-white p-4 sm:p-5 mb-6 flex flex-col md:flex-row items-center justify-between gap-6 border-l-4 border-emerald-500">
-          <div className="flex items-center gap-4 text-center md:text-left flex-col md:flex-row">
-            <div className="bg-white p-2 flex items-center justify-center min-w-[140px] shrink-0">
-              <img src="https://www.bionutrimed.it/templates/rt_gemini/custom/images/loghi/bionutrimed_logo_small.png" alt="BioNutriMed Logo" className="h-10 w-auto object-contain select-none" />
-            </div>
-            <div>
-              <h3 className="text-sm font-black uppercase tracking-widest text-emerald-400">Vuoi scalare il Ranking? Cura la tua nutrizione!</h3>
-              <p className="text-[9px] sm:text-[10px] font-bold text-slate-300 mt-1.5 leading-relaxed uppercase tracking-wide">
-                Scopri come un'alimentazione strategica su misura può aumentare la tua resistenza nei match più lunghi e velocizzare il recovery muscolare.
-              </p>
-            </div>
+          <div className="mt-8 mb-6 w-full bg-slate-900 text-white p-4 sm:p-5 flex flex-col md:flex-row items-center justify-between gap-6 border-l-4 border-emerald-500">
+              <div className="flex items-center gap-4 text-center md:text-left flex-col md:flex-row">
+                  <div className="bg-white p-2 flex items-center justify-center min-w-[140px] shrink-0">
+                      <img src="https://www.bionutrimed.it/templates/rt_gemini/custom/images/loghi/bionutrimed_logo_small.png" alt="BioNutriMed Logo" className="h-10 w-auto object-contain select-none" />
+                  </div>
+                  <div>
+                      <h3 className="text-sm font-black uppercase tracking-widest text-emerald-400">Vuoi scalare il Ranking? Cura la tua nutrizione con Bionutrimed</h3>
+                      <p className="text-[9px] sm:text-[10px] font-bold text-slate-300 mt-1.5 leading-relaxed uppercase tracking-wide">
+                          Scopri come un'alimentazione strategica su misura può aumentare la tua resistenza nei match più lunghi e velocizzare il recovery muscolare. Affidati alla{' '}
+                          <a
+                              href="https://www.bionutrimed.it/prenota/prenota-visita-in-studio.html"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-emerald-400 hover:text-emerald-300 font-black underline underline-offset-[3px] decoration-emerald-500/40 hover:decoration-emerald-400 transition-colors"
+                          >
+                              Biologa nutrizionista Dott.ssa Teresa Licciardi
+                          </a>
+                      </p>
+                  </div>
+              </div>
+              <a
+                  href="https://www.bionutrimed.it/studio-nutrizione-a-catania/biologo-nutrizionista-catania.html"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-black text-[10px] uppercase tracking-widest py-3 px-5 transition-colors text-center w-full md:w-auto shrink-0"
+              >
+                  PRENOTA UNA VISITA
+              </a>
           </div>
-          <a
-              href="https://www.bionutrimed.it/prenota/prenota-visita-in-studio.html"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-black text-[10px] uppercase tracking-widest py-3 px-5 transition-colors text-center w-full md:w-auto shrink-0"
-          >
-            PRENOTA UNA VISITA
-          </a>
-        </div>
       </div>
 
       {/* 3. FOOTER LEGALE IUBENDA GLOBALE (Fixed & Sempre Visibile) */}
