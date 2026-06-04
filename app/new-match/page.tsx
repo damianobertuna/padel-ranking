@@ -20,10 +20,21 @@ export default function CreateMatchForm() {
     const [teamBRight, setTeamBRight] = useState<number | ''>('');
     const [matchType, setMatchType] = useState<'male' | 'female' | 'mixed'>('male');
     const [clubId, setClubId] = useState<number | ''>('');
-    const [matchDate, setMatchDate] = useState<string>(() => new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16));
+
+    // FIX FUSO ORARIO 1: Inizializza a stringa vuota per prevenire Hydration Errors in Next.js
+    const [matchDate, setMatchDate] = useState<string>('');
+
     const [levelError, setLevelError] = useState<boolean>(false);
     const [duplicateError, setDuplicateError] = useState<boolean>(false);
     const [loading, setLoading] = useState<boolean>(false);
+
+    // FIX FUSO ORARIO 2: Calcola l'ora locale solo sul client, appena la pagina viene montata
+    useEffect(() => {
+        const now = new Date();
+        const tzOffsetMs = now.getTimezoneOffset() * 60000;
+        const localFormatted = new Date(now.getTime() - tzOffsetMs).toISOString().slice(0, 16);
+        setMatchDate(localFormatted);
+    }, []);
 
     useEffect(() => {
         async function loadData() {
@@ -67,7 +78,6 @@ export default function CreateMatchForm() {
         return map;
     }, [players]);
 
-    // Helper per costruire la stringa della tendina dinamicamente
     const getPlayerDisplayString = (p: Player) => {
         let display = `${p.last_name} ${p.first_name} — ${p.ranking.toFixed(2)}`;
         const titleInfo = playerTitlesMap[p.id];
@@ -86,8 +96,11 @@ export default function CreateMatchForm() {
         e.preventDefault();
         setLoading(true);
         try {
+            // FIX FUSO ORARIO 3: Converte la stringa locale del form nel formato universale UTC prima di inviarla al server
+            const isoDateForDb = new Date(matchDate).toISOString();
+
             await createMatch({
-                matchDate,
+                matchDate: isoDateForDb, // <-- Viene passata la data convertita in UTC
                 matchType,
                 teamALeft: teamALeft || null,
                 teamARight: teamARight || null,
@@ -99,11 +112,12 @@ export default function CreateMatchForm() {
             router.refresh();
         } catch (err: any) {
             setLoading(false);
+            alert(`Errore durante la creazione: ${err.message}`);
         }
     };
 
     return (
-        <main className="w-full max-w-4xl mx-auto px-4 sm:px-8">
+        <main className="w-full max-w-4xl mx-auto px-4 sm:px-8 mt-6">
             <div className="w-full max-w-3xl bg-white border border-slate-200 shadow-sm p-6 rounded-sm">
                 <div className="mb-6"><BackToHomeButton tab={"pending"}/></div>
                 <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-8">Nuova Partita</h1>
@@ -121,7 +135,7 @@ export default function CreateMatchForm() {
                         {(['male', 'female', 'mixed'] as const).map(type => {
                             const labels = { male: 'MASCHILE', female: 'FEMMINILE', mixed: 'MISTO' };
                             return (
-                                <button key={type} type="button" onClick={() => { setMatchType(type); setTeamALeft(''); setTeamARight(''); setTeamBLeft(''); setTeamBRight(''); }} className={`flex-1 py-2 text-[9px] font-black uppercase tracking-widest ${matchType === type ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>
+                                <button key={type} type="button" onClick={() => { setMatchType(type); setTeamALeft(''); setTeamARight(''); setTeamBLeft(''); setTeamBRight(''); }} className={`flex-1 py-2 text-[9px] font-black uppercase tracking-widest ${matchType === type ? 'bg-slate-900 text-white shadow-sm rounded-sm' : 'text-slate-500 hover:text-slate-900'}`}>
                                     {labels[type]}
                                 </button>
                             );
@@ -151,8 +165,8 @@ export default function CreateMatchForm() {
                         ))}
                     </div>
 
-                    {(duplicateError || levelError) && <div className="p-3 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest">{duplicateError ? "ERRORE: GIOCATORE DUPLICATO." : "ERRORE: DIVARIO TECNICO > 0.25."}</div>}
-                    <button type="submit" disabled={levelError || duplicateError || loading} className="w-full bg-slate-900 text-white font-black text-xs uppercase py-4 rounded-sm hover:bg-black disabled:opacity-50">
+                    {(duplicateError || levelError) && <div className="p-3 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest rounded-sm">{duplicateError ? "ERRORE: GIOCATORE DUPLICATO." : "ERRORE: DIVARIO TECNICO > 0.25."}</div>}
+                    <button type="submit" disabled={levelError || duplicateError || loading} className="w-full bg-slate-900 text-white font-black text-xs uppercase py-4 rounded-sm hover:bg-black disabled:opacity-50 transition-colors">
                         {loading ? 'CREAZIONE...' : 'CONFERMA PARTITA'}
                     </button>
                 </form>

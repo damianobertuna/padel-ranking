@@ -393,7 +393,9 @@ export default async function Home({ searchParams }: PageProps) {
                                 return (
                                     <div key={match.id} className="bg-white border border-slate-200 rounded-sm shadow-sm overflow-hidden">
                                         <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                                            <span>{new Date(match.updated_at).toLocaleDateString('it-IT')}</span>
+                                            <span>
+                                                {new Date(match.updated_at).toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' })}
+                                            </span>
                                             <span>{matchClub ? matchClub.name : 'Location N/D'}</span>
                                         </div>
 
