@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { logUserLogin } from '@/actions/auth-actions';
+import { logUserLogin, logUserRegistration } from '@/actions/auth-actions';
 import AvatarUpload from '@/components/AvatarUpload';
 import BackToHomeButton from "@/components/BackToHomeButton";
 
@@ -39,6 +39,8 @@ export default function LoginForm() {
                         phone: phone, role: 'user'
                     }]);
                     if (playerError) throw playerError;
+
+                    await logUserRegistration(authData.user.id, `${firstName} ${lastName}`);
 
                     // FIX: Logghiamo il primo accesso e rimandiamo l'utente alla Home Page, non al ricaricamento del Login!
                     await logUserLogin(authData.user.id);

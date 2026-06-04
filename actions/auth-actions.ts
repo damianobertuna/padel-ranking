@@ -44,3 +44,15 @@ export async function logUserLogin(userId: string) {
         console.error("💥 Errore controllato nella action logUserLogin:", err);
     }
 }
+
+export async function logUserRegistration(userId: string, fullName: string) {
+    try {
+        await logAction(
+            'USER_REGISTERED',
+            userId,
+            `Nuovo giocatore registrato: ${fullName}`
+        );
+    } catch (error) {
+        console.error("Errore durante il log della registrazione:", error);
+    }
+}
