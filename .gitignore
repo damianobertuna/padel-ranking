@@ -49,3 +49,4 @@ node_modules/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+backup_ranking_padel.sql
