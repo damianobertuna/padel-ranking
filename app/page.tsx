@@ -181,7 +181,7 @@ export default async function Home({ searchParams }: PageProps) {
     const urlState = `gender=${currentGender}&sort=${currentSort}&playerPage=${playerPage}&page=${currentPage}&search=${encodeURIComponent(currentSearch)}&slots=${currentSlots}&level=${currentLevel}&completedClub=${currentCompletedClub}&completedScope=${currentCompletedScope}`;
 
     return (
-        <main className="bg-slate-50 flex flex-col items-center text-slate-900 mt-6">
+        <main className="bg-slate-50 flex flex-col items-center text-slate-900 mt-2">
             <div className="max-w-4xl w-full px-4 sm:px-8">
                 {/* NAVIGAZIONE TAB PRINCIPALI */}
                 <div className="flex w-full mb-6 border-b border-slate-300">
