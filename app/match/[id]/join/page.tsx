@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { updateMatchPlayers } from '@/actions/match-actions';
-import BackToHomeButton from "@/components/BackToHomeButton";
-import { Player, Match, Club } from '@/types';
+import BackToHomeButton from '@/components/BackToHomeButton';
+import { Player, Club } from '@/types';
+import { computeKingAndFanalino } from '@/lib/rankingCalc';
 
 export default function JoinMatchPage() {
     const supabase = createClient();
@@ -51,6 +52,10 @@ export default function JoinMatchPage() {
             } catch { setError('Errore caricamento dati.'); } finally { setLoadingPage(false); }
         }
         loadData();
+
+        if (typeof window !== 'undefined') {
+            (window as any).supabase = supabase;
+        }
     }, [matchId, supabase]);
 
     useEffect(() => {
@@ -73,28 +78,24 @@ export default function JoinMatchPage() {
     const isLeft = (p: Player) => (p.preferred_side === 'Left' || p.preferred_side === 'Both') && (matchType === 'mixed' || (matchType === 'male' ? p.gender === 'M' : p.gender === 'F'));
     const isRight = (p: Player) => (p.preferred_side === 'Right' || p.preferred_side === 'Both') && (matchType === 'mixed' || (matchType === 'male' ? p.gender === 'M' : p.gender === 'F'));
 
-    // --- CALCOLO TITOLI (KING / FANALINO PER LATO E GENERE) ---
+    const {
+        kingLeftIds,
+        kingRightIds,
+        kingBothIds,
+        lastPlaceLeftIds,
+        lastPlaceRightIds,
+        lastPlaceBothIds
+    } = computeKingAndFanalino(players);
+
     const playerTitlesMap: Record<number, { type: 'KING' | 'FANALINO', label: string }> = {};
-    const sidesConfig = [
-        { value: 'Left', suffix: 'SX' },
-        { value: 'Right', suffix: 'DX' },
-        { value: 'Both', suffix: 'MIX' }
-    ];
 
-    ['M', 'F'].forEach(gender => {
-        sidesConfig.forEach(side => {
-            const group = [...players]
-                .filter(p => p.gender === gender && p.preferred_side === side.value)
-                .sort((a, b) => b.ranking - a.ranking);
+    kingLeftIds.forEach(id => playerTitlesMap[id] = { type: 'KING', label: '👑 KING SX' });
+    kingRightIds.forEach(id => playerTitlesMap[id] = { type: 'KING', label: '👑 KING DX' });
+    kingBothIds.forEach(id => playerTitlesMap[id] = { type: 'KING', label: '👑 KING MIX' });
 
-            if (group.length > 0) {
-                playerTitlesMap[group[0].id] = { type: 'KING', label: `👑 KING ${side.suffix}` };
-                if (group.length > 1) {
-                    playerTitlesMap[group[group.length - 1].id] = { type: 'FANALINO', label: `🐢 FAN ${side.suffix}` };
-                }
-            }
-        });
-    });
+    lastPlaceLeftIds.forEach(id => playerTitlesMap[id] = { type: 'FANALINO', label: '🐢 FAN SX' });
+    lastPlaceRightIds.forEach(id => playerTitlesMap[id] = { type: 'FANALINO', label: '🐢 FAN DX' });
+    lastPlaceBothIds.forEach(id => playerTitlesMap[id] = { type: 'FANALINO', label: '🐢 FAN MIX' });
 
     if (loadingPage) return <main className="min-h-screen flex items-center justify-center text-[10px] font-black uppercase tracking-widest">Caricamento...</main>;
 
@@ -103,6 +104,8 @@ export default function JoinMatchPage() {
             <div className="bg-white border border-slate-200 shadow-sm p-6 sm:p-8 rounded-sm">
                 <div className="mb-6"><BackToHomeButton tab="pending" /></div>
                 <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-8">Modifica Partita</h1>
+
+                {error && <div className="mb-4 p-3 bg-red-100 text-red-700 text-xs font-bold uppercase rounded-sm">{error}</div>}
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -4,7 +4,7 @@ import PendingMatchCard from '@/components/PendingMatchCard';
 import SearchBar from '@/components/SearchBar';
 import { Player } from "@/types";
 import { computeKingAndFanalino } from '@/lib/rankingCalc';
-import ClubSelectFilter from '@/components/ClubSelectFilter'; // <-- Import confermato
+import ClubSelectFilter from '@/components/ClubSelectFilter';
 
 const MATCHES_PER_PAGE = 5;
 const PLAYERS_PER_PAGE = 10;

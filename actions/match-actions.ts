@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { logAction } from "@/lib/audit";
 import { computeKingAndFanalino } from "@/lib/rankingCalc";
@@ -214,12 +214,16 @@ export async function resolveMatchWithRanking(data: {
     matchId: string;
     score: SetScore[];
 }) {
+    // 1. Client Standard (legge i cookie, rispetta le RLS)
     const supabase = await createClient();
+
+    // 2. Client Admin (usa la service_role_key, scavalca le RLS)
+    const supabaseAdmin = createAdminClient();
 
     try {
         console.log("🚀 Server Action avviata per Risoluzione Match ID:", data.matchId);
 
-        // Controllo Autenticazione ed Identità
+        // Controllo Autenticazione ed Identità (Fatto con il client standard!)
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("Utente non autenticato");
 
@@ -281,8 +285,6 @@ export async function resolveMatchWithRanking(data: {
             throw new Error("Impossibile risolvere: la partita non ha 4 giocatori validi.");
         }
 
-        // Troviamo i massimi (King) e minimi (Fanalino) globali
-        // Troviamo i massimi (King) e minimi (Fanalino) globali usando la funzione ufficiale
         const { data: allPlayers } = await supabase.from('players').select('*');
 
         const {
@@ -300,9 +302,7 @@ export async function resolveMatchWithRanking(data: {
         const winners = finalWinningTeam === 'A' ? teamA : teamB;
         const losers = finalWinningTeam === 'A' ? teamB : teamA;
 
-        // --- APPLICAZIONE REGOLE 7 E 8 (Con Neutralizzazioni) ---
-        // Prevenzione Paradosso: Se un giocatore è l'unico della sua categoria (es. unico MIX),
-        // il sistema potrebbe segnarlo sia King che Fanalino. La regola King ha la priorità assoluta.
+        // --- APPLICAZIONE REGOLE 7 E 8 ---
         const isStrictKing = (p: any) => isKing(p);
         const isStrictFanalino = (p: any) => isFanalino(p) && !isKing(p);
 
@@ -317,8 +317,7 @@ export async function resolveMatchWithRanking(data: {
         let winnerDelta = 0.05;
         let loserDelta = -0.05;
 
-        // Neutralizzazione Assoluta: Se c'è uno scontro tra King o tra Fanalini,
-        // TUTTI i moltiplicatori si annullano, bloccando l'analisi successiva. [cite: 160, 163]
+        // Neutralizzazione Assoluta
         if (bothTeamsHaveKing || bothTeamsHaveFanalino) {
             winnerDelta = 0.05;
             loserDelta = -0.05;
@@ -339,12 +338,15 @@ export async function resolveMatchWithRanking(data: {
 
         const teamADelta = finalWinningTeam === 'A' ? winnerDelta : loserDelta;
         const teamBDelta = finalWinningTeam === 'B' ? winnerDelta : loserDelta;
-        // ---------------------------------------------------------
 
         const safeAdd = (rank: number, delta: number) => parseFloat((rank + delta).toFixed(2));
 
-        // AGGIORNAMENTO RECORD DEL MATCH (Con salvataggio dei delta)
-        const { error: matchError } = await supabase
+        // ========================================================
+        // SCRITTURA SUL DATABASE: USIAMO L'ADMIN CLIENT (Bypassa RLS)
+        // ========================================================
+
+        // AGGIORNAMENTO RECORD DEL MATCH
+        const { error: matchError } = await supabaseAdmin // <-- ADMIN CLIENT
             .from('matches')
             .update({
                 status: 'completed',
@@ -358,12 +360,12 @@ export async function resolveMatchWithRanking(data: {
 
         if (matchError) throw new Error(`Errore chiusura partita: ${matchError.message}`);
 
-        // AGGIORNAMENTO DEL RANKING GIOCATORI SUL DATABASE
+        // AGGIORNAMENTO DEL RANKING GIOCATORI
         const playerUpdates = [
-            supabase.from('players').update({ ranking: safeAdd(teamA[0].ranking, teamADelta) }).eq('id', teamA[0].id),
-            supabase.from('players').update({ ranking: safeAdd(teamA[1].ranking, teamADelta) }).eq('id', teamA[1].id),
-            supabase.from('players').update({ ranking: safeAdd(teamB[0].ranking, teamBDelta) }).eq('id', teamB[0].id),
-            supabase.from('players').update({ ranking: safeAdd(teamB[1].ranking, teamBDelta) }).eq('id', teamB[1].id)
+            supabaseAdmin.from('players').update({ ranking: safeAdd(teamA[0].ranking, teamADelta) }).eq('id', teamA[0].id), // <-- ADMIN CLIENT
+            supabaseAdmin.from('players').update({ ranking: safeAdd(teamA[1].ranking, teamADelta) }).eq('id', teamA[1].id), // <-- ADMIN CLIENT
+            supabaseAdmin.from('players').update({ ranking: safeAdd(teamB[0].ranking, teamBDelta) }).eq('id', teamB[0].id), // <-- ADMIN CLIENT
+            supabaseAdmin.from('players').update({ ranking: safeAdd(teamB[1].ranking, teamBDelta) }).eq('id', teamB[1].id)  // <-- ADMIN CLIENT
         ];
         await Promise.all(playerUpdates);
 
@@ -384,7 +386,6 @@ export async function resolveMatchWithRanking(data: {
 
         const operatore = `${currentUserPlayer.first_name} ${currentUserPlayer.last_name}`;
 
-        // Stringa Log arricchita con i Delta
         const logDetails = `L'operatore ${operatore} ha registrato il risultato: ${esitoDescrizione} [${stringaPunteggio}]. Delta Rank: Team A (${teamADelta > 0 ? '+':''}${teamADelta}) - Team B (${teamBDelta > 0 ? '+':''}${teamBDelta})`;
 
         const { error: logError } = await logAction(

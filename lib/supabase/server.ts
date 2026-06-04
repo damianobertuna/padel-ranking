@@ -31,3 +31,30 @@ export async function createClient() {
         }
     );
 }
+
+// Assicurati di avere questo import in alto nel file, se non c'è già:
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+
+// ... (il tuo codice esistente per createClient rimane intatto) ...
+
+/**
+ * Client Admin: Scavalca le RLS.
+ * DA USARE SOLO NELLE SERVER ACTIONS PER OPERAZIONI DI SISTEMA (es. calcolo ranking).
+ * Non esporre mai questo client al browser.
+ */
+export function createAdminClient() {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        throw new Error("Variabili d'ambiente Supabase mancanti per l'Admin Client.");
+    }
+
+    return createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY,
+        {
+            auth: {
+                autoRefreshToken: false,
+                persistSession: false // Il server non deve mantenere sessioni admin persistenti
+            }
+        }
+    );
+}

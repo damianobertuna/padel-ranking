@@ -1,12 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { leaveMatchAction, joinMatchAction, resolveMatchWithRanking } from './match-actions';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { logAction } from '@/lib/audit';
 
 // 1. MOCK DELLE DIPENDENZE
-vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
+vi.mock('@/lib/supabase/server', () => ({
+    createClient: vi.fn(),
+    createAdminClient: vi.fn() // <-- AGGIUNTA FONDAMENTALE PER VITEST
+}));
 vi.mock('@/lib/audit', () => ({ logAction: vi.fn().mockResolvedValue({ error: null }) }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
+
 
 describe('Match Server Actions', () => {
     let mockSupabase: any;
@@ -55,6 +59,7 @@ describe('Match Server Actions', () => {
         };
 
         (createClient as any).mockResolvedValue(mockSupabase);
+        (createAdminClient as any).mockReturnValue(mockSupabase); // Fai usare lo stesso mock anche all'admin
     });
 
     describe('joinMatchAction', () => {
@@ -159,7 +164,7 @@ describe('resolveMatchWithRanking (Logica Punteggi e Regole)', () => {
             team_b_left_id: teamB[0], team_b_right_id: teamB[1]
         };
 
-        (createClient as any).mockResolvedValueOnce({
+        const mockSupabaseWithRules = {
             auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
             from: vi.fn((table) => {
                 const mockAll = [
@@ -189,7 +194,11 @@ describe('resolveMatchWithRanking (Logica Punteggi e Regole)', () => {
                     }
                 };
             })
-        });
+        };
+
+        // Assicurati che ENTRAMBI i client mockati restituiscano la stessa istanza fittizia!
+        (createClient as any).mockResolvedValueOnce(mockSupabaseWithRules);
+        (createAdminClient as any).mockReturnValueOnce(mockSupabaseWithRules);
 
         const score = winningTeam === 'A' ? [{team_a: 6, team_b: 4}, {team_a: 6, team_b: 4}] : [{team_a: 4, team_b: 6}, {team_a: 4, team_b: 6}];
         await resolveMatchWithRanking({ matchId: 'm1', score });
