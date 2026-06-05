@@ -45,6 +45,11 @@ export default async function Home({ searchParams }: PageProps) {
     const currentLevel = resolvedParams.level || 'all';
     const currentCompletedClub = resolvedParams.completedClub || 'all';
     const currentCompletedScope = resolvedParams.completedScope || 'all';
+    const translateSide: Record<string, string> = {
+        Right: 'Destro',
+        Left: 'Sinistro',
+        Both: 'Mix'
+    };
 
     const { data: { user } } = await supabase.auth.getUser();
     let currentUserPlayer = null;
@@ -234,10 +239,10 @@ export default async function Home({ searchParams }: PageProps) {
                         <div className="bg-white border border-slate-200 shadow-sm rounded-sm overflow-hidden">
                             <div className="hidden sm:flex items-center px-4 py-3 bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-widest">
                                 <div className="w-12 text-center">Rank</div>
-                                <div className="flex-1 pl-4">Player</div>
-                                <div className="w-24 text-center">Side</div>
-                                <div className="w-24 text-center">Matches</div>
-                                <div className="w-24 text-right pr-2">Points</div>
+                                <div className="flex-1 pl-4">Giocatore</div>
+                                <div className="w-24 text-center">Lato / Mano</div>
+                                <div className="w-24 text-center">Partite</div>
+                                <div className="w-24 text-right pr-2">Punti</div>
                             </div>
 
                             {paginatedPlayers.length > 0 ? (
@@ -284,7 +289,9 @@ export default async function Home({ searchParams }: PageProps) {
                                                 </div>
                                             </div>
 
-                                            <div className="hidden sm:block w-24 text-center text-xs font-bold text-slate-500 uppercase">{player.preferred_side}</div>
+                                            <div className="hidden sm:block w-24 text-center text-xs font-bold text-slate-500 uppercase">
+                                                {translateSide[player.preferred_side] || player.preferred_side}
+                                            </div>
                                             <span
                                                 className={`flex items-center gap-0.5 text-[9px] font-black px-1.5 py-1 rounded-sm border shrink-0 ${
                                                     player.dominant_hand === 'Mancino'
