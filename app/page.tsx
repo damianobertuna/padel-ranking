@@ -5,6 +5,7 @@ import SearchBar from '@/components/SearchBar';
 import { Player } from "@/types";
 import { computeKingAndFanalino } from '@/lib/rankingCalc';
 import ClubSelectFilter from '@/components/ClubSelectFilter';
+import { Hand } from 'lucide-react';
 
 const MATCHES_PER_PAGE = 5;
 const PLAYERS_PER_PAGE = 10;
@@ -284,6 +285,17 @@ export default async function Home({ searchParams }: PageProps) {
                                             </div>
 
                                             <div className="hidden sm:block w-24 text-center text-xs font-bold text-slate-500 uppercase">{player.preferred_side}</div>
+                                            <span
+                                                className={`flex items-center gap-0.5 text-[9px] font-black px-1.5 py-1 rounded-sm border shrink-0 ${
+                                                    player.dominant_hand === 'Mancino'
+                                                        ? 'bg-amber-100 text-amber-700 border-amber-300 shadow-sm'
+                                                        : 'bg-slate-100 text-slate-500 border-slate-200'
+                                                }`}
+                                                title={player.dominant_hand === 'Mancino' ? 'Mancino' : 'Destro'}
+                                            >
+                                                <Hand className="w-3 h-3 shrink-0" />
+                                                <span>{player.dominant_hand === 'Mancino' ? 'L' : 'R'}</span>
+                                            </span>
                                             <div className="hidden sm:block w-24 text-center text-xs font-bold text-slate-500">{player.total_played}</div>
 
                                             <div className="w-20 sm:w-24 text-right flex flex-col justify-center shrink-0">
