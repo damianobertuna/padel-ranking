@@ -46,8 +46,8 @@ export default async function Home({ searchParams }: PageProps) {
     const currentCompletedClub = resolvedParams.completedClub || 'all';
     const currentCompletedScope = resolvedParams.completedScope || 'all';
     const translateSide: Record<string, string> = {
-        Right: 'Destro',
-        Left: 'Sinistro',
+        Right: 'Dx',
+        Left: 'Sx',
         Both: 'Mix'
     };
 
@@ -284,7 +284,7 @@ export default async function Home({ searchParams }: PageProps) {
                                                         )}
                                                     </div>
                                                     <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider sm:hidden block mt-0.5">
-                                                        {player.preferred_side} • {player.total_played} Match
+                                                        {translateSide[player.preferred_side] || player.preferred_side} • {player.total_played} Partite
                                                     </span>
                                                 </div>
                                             </div>
