@@ -112,11 +112,22 @@ export default async function Home({ searchParams }: PageProps) {
     const paginatedPlayers = sortedPlayers.slice(startIndex, startIndex + PLAYERS_PER_PAGE);
 
     // --- QUERY PENDING MATCHES ---
-    const { data: pendingMatches } = await supabase
+    const isAdmin = currentUserPlayer?.role === 'admin';
+    const nowIsoString = new Date().toISOString();
+
+    let pendingQuery = supabase
         .from('matches')
         .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
+        .eq('status', 'pending');
+
+    // SE NON È ADMIN: Nascondiamo i match passati
+    if (!isAdmin) {
+        pendingQuery = pendingQuery.gte('match_date', nowIsoString);
+    }
+
+    // Ordiniamo per data di gioco più vicina (invece che per creazione), utile per l'esperienza utente
+    const { data: pendingMatches } = await pendingQuery
+        .order('match_date', { ascending: true, nullsFirst: false });
 
     const filteredPendingMatches = (pendingMatches || []).filter(match => {
         const playerIds = [match.team_a_left_id, match.team_a_right_id, match.team_b_left_id, match.team_b_right_id];
@@ -329,40 +340,40 @@ export default async function Home({ searchParams }: PageProps) {
                 )}
 
                 {/* =========================================
-                    TAB 2: MATCH IN PROGRAMMA
-                ========================================= */}
+    TAB 2: MATCH IN PROGRAMMA
+========================================= */}
                 {currentTab === 'pending' && (
                     <div className="animate-in fade-in duration-300">
-                        <div className="flex flex-col sm:flex-row justify-between bg-white border border-slate-200 p-2 mb-4 rounded-sm shadow-sm gap-2 text-xs font-bold uppercase tracking-wider">
-                            <div className="flex gap-1 bg-slate-100 p-1 rounded-sm flex-1 sm:flex-initial">
-                                <Link href={`/?tab=pending&slots=all&level=${currentLevel}&gender=${currentGender}&sort=${currentSort}&search=${currentSearch}&completedClub=${currentCompletedClub}&completedScope=${currentCompletedScope}`} scroll={false} className={`flex-1 sm:flex-initial text-center px-4 py-1.5 rounded-sm transition-colors ${currentSlots === 'all' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Tutti i Match</Link>
-                                <Link href={`/?tab=pending&slots=free&level=${currentLevel}&gender=${currentGender}&sort=${currentSort}&search=${currentSearch}&completedClub=${currentCompletedClub}&completedScope=${currentCompletedScope}`} scroll={false} className={`flex-1 sm:flex-initial text-center px-4 py-1.5 rounded-sm transition-colors ${currentSlots === 'free' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Slot Liberi</Link>
-                            </div>
-
-                            {currentUserPlayer ? (
-                                <div className="flex gap-1 bg-slate-100 p-1 rounded-sm flex-1 sm:flex-initial">
-                                    <Link href={`/?tab=pending&slots=${currentSlots}&level=all&gender=${currentGender}&sort=${currentSort}&search=${currentSearch}&completedClub=${currentCompletedClub}&completedScope=${currentCompletedScope}`} scroll={false} className={`flex-1 sm:flex-initial text-center px-4 py-1.5 rounded-sm transition-colors ${currentLevel === 'all' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Qualsiasi Livello</Link>
-                                    <Link href={`/?tab=pending&slots=${currentSlots}&level=compatible&gender=${currentGender}&sort=${currentSort}&search=${currentSearch}&completedClub=${currentCompletedClub}&completedScope=${currentCompletedScope}`} scroll={false} className={`flex-1 sm:flex-initial text-center px-4 py-1.5 rounded-sm transition-colors ${currentLevel === 'compatible' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Adatti a Me ({currentUserPlayer.ranking.toFixed(2)})</Link>
-                                </div>
-                            ) : (
-                                <div className="text-[10px] text-slate-400 flex items-center justify-center px-2 font-medium tracking-normal">
-                                    Effettua il login per filtrare i match adatti al tuo livello.
-                                </div>
-                            )}
-                        </div>
+                        {/* ... (tieni i tuoi filtri invariati) ... */}
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {filteredPendingMatches.length > 0 ? (
-                                filteredPendingMatches.map((match) => (
-                                    <PendingMatchCard
-                                        key={match.id}
-                                        match={match}
-                                        rawPlayers={playersWithStats || []}
-                                        currentUserPlayer={currentUserPlayer}
-                                        clubs={clubsList}
-                                        playerTitles={playerTitlesMap}
-                                    />
-                                ))
+                                filteredPendingMatches.map((match) => {
+                                    // Controlliamo se la data del match è precedente a "ora"
+                                    const isExpired = match.match_date ? new Date(match.match_date) < new Date() : false;
+
+                                    return (
+                                        <div key={match.id} className="relative group">
+                                            {/* Se il match è scaduto, mostriamo il badge di avviso */}
+                                            {isExpired && (
+                                                <div className="absolute -top-2 -right-2 z-10 bg-rose-600 text-white text-[9px] font-black px-2.5 py-1 rounded-sm shadow-md uppercase tracking-widest animate-pulse border border-rose-700">
+                                                    SCADUTO ⚠️
+                                                </div>
+                                            )}
+
+                                            {/* Se è scaduto, evidenziamo la card con un bordo rosso e una leggera opacità */}
+                                            <div className={isExpired ? "border-2 border-rose-500 rounded-sm overflow-hidden opacity-85 hover:opacity-100 transition-all shadow-sm" : ""}>
+                                                <PendingMatchCard
+                                                    match={match}
+                                                    rawPlayers={playersWithStats || []}
+                                                    currentUserPlayer={currentUserPlayer}
+                                                    clubs={clubsList}
+                                                    playerTitles={playerTitlesMap}
+                                                />
+                                            </div>
+                                        </div>
+                                    );
+                                })
                             ) : (
                                 <div className="col-span-2 p-10 bg-white border border-slate-200 text-center text-slate-500 font-bold uppercase text-sm rounded-sm">
                                     Nessun match corrisponde ai filtri selezionati
