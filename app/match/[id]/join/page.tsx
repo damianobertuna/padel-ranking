@@ -20,6 +20,8 @@ export default function JoinMatchPage() {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
 
+    const [matchDate, setMatchDate] = useState<string>('');
+    const [matchTime, setMatchTime] = useState<string>('');
     const [teamALeft, setTeamALeft] = useState<number | ''>('');
     const [teamARight, setTeamARight] = useState<number | ''>('');
     const [teamBLeft, setTeamBLeft] = useState<number | ''>('');
@@ -40,6 +42,18 @@ export default function JoinMatchPage() {
                 ]);
 
                 if (matchRes.data) {
+                    // Popolamento Date e Time
+                    if (matchRes.data.match_date) {
+                        const d = new Date(matchRes.data.match_date);
+                        const yyyy = d.getFullYear();
+                        const mm = String(d.getMonth() + 1).padStart(2, '0');
+                        const dd = String(d.getDate()).padStart(2, '0');
+                        const hh = String(d.getHours()).padStart(2, '0');
+                        const min = String(d.getMinutes()).padStart(2, '0');
+                        setMatchDate(`${yyyy}-${mm}-${dd}`);
+                        setMatchTime(`${hh}:${min}`);
+                    }
+
                     setTeamALeft(matchRes.data.team_a_left_id || '');
                     setTeamARight(matchRes.data.team_a_right_id || '');
                     setTeamBLeft(matchRes.data.team_b_left_id || '');
@@ -70,7 +84,21 @@ export default function JoinMatchPage() {
         e.preventDefault();
         setSubmitting(true);
         try {
-            await updateMatchPlayers(matchId, { match_type: matchType, club_id: selectedClub || null, team_a_left_id: teamALeft || null, team_a_right_id: teamARight || null, team_b_left_id: teamBLeft || null, team_b_right_id: teamBRight || null });
+            // Ricombina data e ora in formato ISO (o null se non inseriti)
+            let combinedMatchDate = null;
+            if (matchDate && matchTime) {
+                combinedMatchDate = new Date(`${matchDate}T${matchTime}:00`).toISOString();
+            }
+
+            await updateMatchPlayers(matchId, {
+                match_date: combinedMatchDate,
+                match_type: matchType,
+                club_id: selectedClub || null,
+                team_a_left_id: teamALeft || null,
+                team_a_right_id: teamARight || null,
+                team_b_left_id: teamBLeft || null,
+                team_b_right_id: teamBRight || null
+            });
             router.push('/?tab=pending');
         } catch (err: any) { setError(err.message); setSubmitting(false); }
     };
@@ -108,20 +136,50 @@ export default function JoinMatchPage() {
                 {error && <div className="mb-4 p-3 bg-red-100 text-red-700 text-xs font-bold uppercase rounded-sm">{error}</div>}
 
                 <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* RIGA DATA E ORA */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <select value={selectedClub} onChange={e => setSelectedClub(e.target.value ? parseInt(e.target.value) : '')} className="w-full p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm cursor-pointer">
-                            <option value="">NESSUN CIRCOLO DEFINITO</option>
-                            {clubs.map(c => <option key={c.id} value={c.id}>{c.name} {c.address ? `| ${c.address}` : ''} {c.city ? `(${c.city})` : ''}</option>)}
-                        </select>
-                        <div className="flex bg-slate-100 p-1 rounded-sm gap-1">
-                            {(['male', 'female', 'mixed'] as const).map(type => {
-                                const labels = { male: 'MASCHILE', female: 'FEMMINILE', mixed: 'MISTO' };
-                                return (
-                                    <button key={type} type="button" onClick={() => { setMatchType(type); setTeamALeft(''); setTeamARight(''); setTeamBLeft(''); setTeamBRight(''); }} className={`flex-1 py-2 text-[9px] font-black uppercase tracking-widest transition-colors ${matchType === type ? 'bg-slate-900 text-white rounded-sm shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}>
-                                        {labels[type]}
-                                    </button>
-                                );
-                            })}
+                        <div>
+                            <label className="block text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1.5">Data Match</label>
+                            <input
+                                type="date"
+                                value={matchDate}
+                                onChange={e => setMatchDate(e.target.value)}
+                                className="w-full p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm cursor-pointer focus:ring-1 focus:ring-blue-500 outline-none"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1.5">Orario</label>
+                            <input
+                                type="time"
+                                value={matchTime}
+                                onChange={e => setMatchTime(e.target.value)}
+                                className="w-full p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm cursor-pointer focus:ring-1 focus:ring-blue-500 outline-none"
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1.5">Circolo</label>
+                            <select value={selectedClub} onChange={e => setSelectedClub(e.target.value ? parseInt(e.target.value) : '')} className="w-full p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm cursor-pointer focus:ring-1 focus:ring-blue-500 outline-none">
+                                <option value="">NESSUN CIRCOLO DEFINITO</option>
+                                {clubs.map(c => <option key={c.id} value={c.id}>{c.name} {c.address ? `| ${c.address}` : ''} {c.city ? `(${c.city})` : ''}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1.5">Tipo Partita</label>
+                            <div className="flex bg-slate-100 p-1 rounded-sm gap-1 h-[34px]">
+                                {(['male', 'female', 'mixed'] as const).map(type => {
+                                    const labels = { male: 'MASCHILE', female: 'FEMMINILE', mixed: 'MISTO' };
+                                    return (
+                                        <button key={type} type="button" onClick={() => { setMatchType(type); setTeamALeft(''); setTeamARight(''); setTeamBLeft(''); setTeamBRight(''); }} className={`flex-1 text-[9px] font-black uppercase tracking-widest transition-colors flex items-center justify-center ${matchType === type ? 'bg-slate-900 text-white rounded-sm shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}>
+                                            {labels[type]}
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
 
@@ -132,7 +190,7 @@ export default function JoinMatchPage() {
                         ].map((t, i) => (
                             <div key={i} className={`p-4 border-t-4 ${t.border} bg-slate-50 rounded-sm`}>
                                 <h2 className="text-[9px] font-black uppercase tracking-widest mb-3">{t.label}</h2>
-                                <select value={t.team[0]} onChange={e => t.setters[0](e.target.value ? parseInt(e.target.value) : '')} className="w-full p-2 mb-2 text-[10px] font-bold border border-slate-300 rounded-sm cursor-pointer">
+                                <select value={t.team[0]} onChange={e => t.setters[0](e.target.value ? parseInt(e.target.value) : '')} className="w-full p-2 mb-2 text-[10px] font-bold border border-slate-300 rounded-sm cursor-pointer outline-none focus:ring-1 focus:ring-blue-500">
                                     <option value="">GIOCATORE SX</option>
                                     {players.filter(p => isLeft(p) && (p.id === t.team[0] || ![teamALeft, teamARight, teamBLeft, teamBRight].includes(p.id))).map(p => {
                                         const title = playerTitlesMap[p.id];
@@ -143,7 +201,7 @@ export default function JoinMatchPage() {
                                         );
                                     })}
                                 </select>
-                                <select value={t.team[1]} onChange={e => t.setters[1](e.target.value ? parseInt(e.target.value) : '')} className="w-full p-2 text-[10px] font-bold border border-slate-300 rounded-sm cursor-pointer">
+                                <select value={t.team[1]} onChange={e => t.setters[1](e.target.value ? parseInt(e.target.value) : '')} className="w-full p-2 text-[10px] font-bold border border-slate-300 rounded-sm cursor-pointer outline-none focus:ring-1 focus:ring-blue-500">
                                     <option value="">GIOCATORE DX</option>
                                     {players.filter(p => isRight(p) && (p.id === t.team[1] || ![teamALeft, teamARight, teamBLeft, teamBRight].includes(p.id))).map(p => {
                                         const title = playerTitlesMap[p.id];
