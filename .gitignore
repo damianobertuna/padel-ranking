@@ -50,3 +50,4 @@ node_modules/
 /playwright/.cache/
 /playwright/.auth/
 backup_ranking_padel.sql
+schema.sql
