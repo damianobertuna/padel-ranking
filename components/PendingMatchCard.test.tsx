@@ -42,24 +42,29 @@ const mockPlayers = [
     { id: 4, first_name: 'Gino', last_name: 'Bramieri', ranking: 4.5 },
     baseUser,
     adminUser,
-    leftSideUser // <-- ECCO IL GIOCATORE MANCANTE CHE CAUSAVA L'ERRORE
+    leftSideUser
 ] as Player[];
 
 const mockClubs = [
     { id: 100, name: 'Padel Club Catania', city: 'Catania' }
 ] as Club[];
 
+// FIX: DATE DINAMICHE PER PREVENIRE IL FALLIMENTO NEL TEMPO
+const futureDate = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString(); // Tra 7 giorni
+const pastDate = new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString();   // 7 giorni fa
+
 const openMatch = {
     id: 'match-123',
     status: 'pending',
-    created_at: '2026-05-23T18:00:00Z',
-    match_date: '2026-05-25T18:00:00Z',
+    created_at: new Date().toISOString(),
+    match_date: futureDate, // Impostiamo SEMPRE nel futuro per i test standard
     team_a_left_id: 1,
     team_a_right_id: null,
     team_b_left_id: null,
     team_b_right_id: null,
     club_id: 100,
-    organizer_id: 1 // Mario Rossi è l'organizzatore
+    organizer_id: 1,
+    is_friendly: false
 } as Match;
 
 const completeMatch = {
@@ -167,8 +172,7 @@ describe('PendingMatchCard Component', () => {
 });
 
 describe('Controllo Autorizzazioni: Tasto Gestisci Incontro', () => {
-
-    // Array fittizio minimo per non far crashare i metodi .find() del componente
+    // Array fittizio minimo
     const mockRawPlayers = [
         { id: 99, ranking: 4.50, first_name: 'Admin', last_name: 'User', preferred_side: 'Both' },
         { id: 1, ranking: 4.00, first_name: 'Mario', last_name: 'Rossi', preferred_side: 'Left' },
@@ -179,36 +183,57 @@ describe('Controllo Autorizzazioni: Tasto Gestisci Incontro', () => {
     ] as any;
 
     it('dovrebbe mostrare il tasto se l\'utente è ADMIN (anche se non gioca)', () => {
-        const adminUser = { id: 99, role: 'admin' } as any;
-        const match = { id: 'm1', team_a_left_id: 1, team_a_right_id: 2 } as any;
+        const adminPlayer = { id: 99, role: 'admin' } as any;
+        const match = { id: 'm1', team_a_left_id: 1, team_a_right_id: 2, match_date: futureDate } as any;
 
-        // Estraiamo getByText e unmount per isolare questo singolo test
-        const { getByText, unmount } = render(<PendingMatchCard match={match} currentUserPlayer={adminUser} rawPlayers={mockRawPlayers} />);
-
-        // Usiamo toBeDefined() invece di toBeInTheDocument()
+        const { getByText, unmount } = render(<PendingMatchCard match={match} currentUserPlayer={adminPlayer} rawPlayers={mockRawPlayers} />);
         expect(getByText(/Gestisci Incontro|Modifica Match/i)).toBeDefined();
-
-        unmount(); // Pulizia manuale del DOM per non inquinare i test successivi
+        unmount();
     });
 
     it('dovrebbe mostrare il tasto se l\'utente è USER ed è tra i giocatori in campo', () => {
         const playingUser = { id: 1, role: 'user' } as any;
-        const match = { id: 'm2', team_a_left_id: 1, team_a_right_id: 2 } as any;
+        const match = { id: 'm2', team_a_left_id: 1, team_a_right_id: 2, match_date: futureDate } as any;
 
         const { getByText, unmount } = render(<PendingMatchCard match={match} currentUserPlayer={playingUser} rawPlayers={mockRawPlayers} />);
-
         expect(getByText(/Gestisci Incontro|Modifica Match/i)).toBeDefined();
         unmount();
     });
 
     it('NON dovrebbe mostrare il tasto se l\'utente è USER e NON è tra i giocatori', () => {
         const externalUser = { id: 5, role: 'user' } as any;
-        const match = { id: 'm3', team_a_left_id: 1, team_a_right_id: 2, team_b_left_id: 3, team_b_right_id: 4 } as any;
+        const match = { id: 'm3', team_a_left_id: 1, team_a_right_id: 2, team_b_left_id: 3, team_b_right_id: 4, match_date: futureDate } as any;
 
-        // Usiamo queryByText (non lancia errore se non lo trova) e verifichiamo che sia null
         const { queryByText, unmount } = render(<PendingMatchCard match={match} currentUserPlayer={externalUser} rawPlayers={mockRawPlayers} />);
-
         expect(queryByText(/Gestisci Incontro|Modifica Match/i)).toBeNull();
         unmount();
+    });
+});
+
+describe('Logica Match Scaduti', () => {
+    // Array fittizio minimo
+    const mockRawPlayers = [
+        { id: 99, ranking: 4.50, first_name: 'Admin', last_name: 'User', preferred_side: 'Both' },
+        { id: 10, ranking: 3.00, first_name: 'Base', last_name: 'User', preferred_side: 'Both' }
+    ] as any;
+
+    it('NON dovrebbe mostrare i bottoni d\'azione se il match è scaduto per un utente standard', () => {
+        const expiredMatch = { ...openMatch, match_date: pastDate };
+
+        render(<PendingMatchCard match={expiredMatch} rawPlayers={mockRawPlayers} currentUserPlayer={baseUser} />);
+
+        // Cerca un tasto generico di azione (Unisciti, Lascia, Modifica, Dettagli)
+        const actionBtn = screen.queryByRole('button', { name: /UNISCITI ORA|LASCIA PARTITA|MODIFICA MATCH|VEDI DETTAGLI/i });
+        expect(actionBtn).toBeNull(); // Deve essere rimosso per l'utente normale
+    });
+
+    it('dovrebbe CONTINUARE a mostrare il bottone MODIFICA MATCH se l\'utente è ADMIN, anche per match scaduti', () => {
+        const expiredMatch = { ...openMatch, match_date: pastDate };
+
+        render(<PendingMatchCard match={expiredMatch} rawPlayers={mockRawPlayers} currentUserPlayer={adminUser} />);
+
+        // L'admin scavalca le regole temporali e mantiene l'accesso al match
+        const actionBtn = screen.getByRole('button', { name: /MODIFICA MATCH/i });
+        expect(actionBtn).toBeDefined();
     });
 });

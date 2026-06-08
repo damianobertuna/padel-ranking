@@ -21,6 +21,9 @@ export default function CreateMatchForm() {
     const [matchType, setMatchType] = useState<'male' | 'female' | 'mixed'>('male');
     const [clubId, setClubId] = useState<number | ''>('');
 
+    // NUOVO STATO: Gestione match amichevole vs competitivo
+    const [isFriendly, setIsFriendly] = useState<boolean>(false);
+
     // FIX FUSO ORARIO 1: Inizializza a stringa vuota per prevenire Hydration Errors in Next.js
     const [matchDate, setMatchDate] = useState<string>('');
 
@@ -51,10 +54,16 @@ export default function CreateMatchForm() {
     useEffect(() => {
         const selectedIds = [teamALeft, teamARight, teamBLeft, teamBRight].filter((v): v is number => typeof v === 'number');
         setDuplicateError(new Set(selectedIds).size !== selectedIds.length);
-        if (selectedIds.length < 2) { setLevelError(false); return; }
+
+        // OTTIMIZZAZIONE: Se è un'amichevole, azzeriamo il blocco sul livello (> 0.25)
+        if (selectedIds.length < 2 || isFriendly) {
+            setLevelError(false);
+            return;
+        }
+
         const rks = selectedIds.map(id => players.find(p => p.id === id)?.ranking).filter((r): r is number => r !== undefined);
         setLevelError(Math.max(...rks) - Math.min(...rks) > 0.25);
-    }, [teamALeft, teamARight, teamBLeft, teamBRight, players]);
+    }, [teamALeft, teamARight, teamBLeft, teamBRight, players, isFriendly]);
 
     // --- CALCOLO TITOLI GLOBALE (Memoizzato per performance) ---
     const playerTitlesMap = useMemo(() => {
@@ -100,13 +109,14 @@ export default function CreateMatchForm() {
             const isoDateForDb = new Date(matchDate).toISOString();
 
             await createMatch({
-                matchDate: isoDateForDb, // <-- Viene passata la data convertita in UTC
+                matchDate: isoDateForDb,
                 matchType,
                 teamALeft: teamALeft || null,
                 teamARight: teamARight || null,
                 teamBLeft: teamBLeft || null,
                 teamBRight: teamBRight || null,
-                clubId: clubId || null
+                clubId: clubId || null,
+                isFriendly // <-- Passiamo il nuovo valore booleano alla Server Action
             });
             router.push('/?tab=pending');
             router.refresh();
@@ -123,6 +133,7 @@ export default function CreateMatchForm() {
                 <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-8">Nuova Partita</h1>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* DATA E LOCATION */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <input type="datetime-local" required value={matchDate} onChange={e => setMatchDate(e.target.value)} className="w-full p-2 border border-slate-300 text-sm font-bold bg-slate-50 rounded-sm" />
                         <select value={clubId} onChange={e => setClubId(e.target.value ? parseInt(e.target.value) : '')} className="w-full p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm">
@@ -131,6 +142,7 @@ export default function CreateMatchForm() {
                         </select>
                     </div>
 
+                    {/* CATEGORIA MATCH */}
                     <div className="flex bg-slate-100 p-1 rounded-sm gap-1">
                         {(['male', 'female', 'mixed'] as const).map(type => {
                             const labels = { male: 'MASCHILE', female: 'FEMMINILE', mixed: 'MISTO' };
@@ -142,6 +154,45 @@ export default function CreateMatchForm() {
                         })}
                     </div>
 
+                    {/* INTERRUTTORE DI MODALITÀ: COMPETITIVA VS AMICHEVOLE */}
+                    <div className="bg-slate-50 border border-slate-200 p-3 rounded-sm space-y-2">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">
+                            Regolamento di Gioco
+                        </label>
+                        <div className="grid grid-cols-2 gap-2 text-[10px] font-black uppercase tracking-wider">
+                            <button
+                                type="button"
+                                onClick={() => setIsFriendly(false)}
+                                className={`py-2.5 rounded-sm border transition-all flex flex-col items-center justify-center gap-0.5 ${
+                                    !isFriendly
+                                        ? 'bg-blue-600 border-blue-700 text-white shadow-sm'
+                                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-100'
+                                }`}
+                            >
+                                <span>🔥 Classificata</span>
+                                <span className={`text-[8px] font-medium normal-case tracking-normal ${!isFriendly ? 'text-blue-100' : 'text-slate-400'}`}>
+                                    Incide sull'Elo e sulle statistiche
+                                </span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setIsFriendly(true)}
+                                className={`py-2.5 rounded-sm border transition-all flex flex-col items-center justify-center gap-0.5 ${
+                                    isFriendly
+                                        ? 'bg-purple-600 border-purple-700 text-white shadow-sm'
+                                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-100'
+                                }`}
+                            >
+                                <span>🤝 Amichevole</span>
+                                <span className={`text-[8px] font-medium normal-case tracking-normal ${isFriendly ? 'text-purple-100' : 'text-slate-400'}`}>
+                                    Nessun vincolo di livello o punti
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* BLOCCO SQUADRE */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {[
                             { label: 'TEAM A', setters: [setTeamALeft, setTeamARight], vals: [teamALeft, teamARight], border: 'border-blue-600' },
@@ -165,7 +216,10 @@ export default function CreateMatchForm() {
                         ))}
                     </div>
 
+                    {/* ALERT ERRORI */}
                     {(duplicateError || levelError) && <div className="p-3 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest rounded-sm">{duplicateError ? "ERRORE: GIOCATORE DUPLICATO." : "ERRORE: DIVARIO TECNICO > 0.25."}</div>}
+
+                    {/* CONFERMA SUBMIT */}
                     <button type="submit" disabled={levelError || duplicateError || loading} className="w-full bg-slate-900 text-white font-black text-xs uppercase py-4 rounded-sm hover:bg-black disabled:opacity-50 transition-colors">
                         {loading ? 'CREAZIONE...' : 'CONFERMA PARTITA'}
                     </button>
