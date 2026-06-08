@@ -442,6 +442,7 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
     team_b_left_id?: number | null;
     team_b_right_id?: number | null;
     match_type?: 'male' | 'female' | 'mixed';
+    match_date?: string | null;
 }) {
     const supabase = await createClient();
 
