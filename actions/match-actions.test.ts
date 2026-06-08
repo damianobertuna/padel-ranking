@@ -157,11 +157,13 @@ describe('resolveMatchWithRanking (Logica Punteggi e Regole)', () => {
         updateSpy = vi.fn().mockReturnThis();
     });
 
-    const executeResolve = async (teamA: number[], teamB: number[], winningTeam: 'A'|'B') => {
+    // MODIFICA: Aggiunto parametro isFriendly (default false) per iniettare la proprietà nel matchData mockato
+    const executeResolve = async (teamA: number[], teamB: number[], winningTeam: 'A'|'B', isFriendly = false) => {
         const matchData = {
             id: 'm1', status: 'pending',
             team_a_left_id: teamA[0], team_a_right_id: teamA[1],
-            team_b_left_id: teamB[0], team_b_right_id: teamB[1]
+            team_b_left_id: teamB[0], team_b_right_id: teamB[1],
+            is_friendly: isFriendly // <-- Iniettato nel record di test
         };
 
         const mockSupabaseWithRules = {
@@ -177,7 +179,7 @@ describe('resolveMatchWithRanking (Logica Punteggi e Regole)', () => {
                     {id:7, preferred_side:'Left', ranking: 3.1}, // Normale SX (2)
                     {id:8, preferred_side:'Right', ranking: 3.1},// Normale DX (2)
                     {id:9, preferred_side:'Both', ranking: 5.0}, // KING MIX
-                    {id:10, preferred_side:'Both', ranking: 3.0} // Normale MIX (Sblocca il titolo King per ID 9)
+                    {id:10, preferred_side:'Both', ranking: 3.0} // Normale MIX
                 ];
 
                 return {
@@ -187,7 +189,7 @@ describe('resolveMatchWithRanking (Logica Punteggi e Regole)', () => {
                         return Promise.resolve({ data: mockAll.filter(p => ids.includes(p.id)), error: null });
                     }),
                     update: updateSpy,
-                    single: vi.fn().mockImplementation(() => table === 'matches' ? Promise.resolve({ data: matchData, error: null }) : Promise.resolve({ data: { id: 99 }, error: null })),
+                    single: vi.fn().mockImplementation(() => table === 'matches' ? Promise.resolve({ data: matchData, error: null }) : Promise.resolve({ data: { id: 99, first_name: 'Op', last_name: 'Test' }, error: null })),
                     then: function(res: any) {
                         if (table === 'players') res({ data: mockAll, error: null });
                         else res({ data: null, error: null });
@@ -196,7 +198,6 @@ describe('resolveMatchWithRanking (Logica Punteggi e Regole)', () => {
             })
         };
 
-        // Assicurati che ENTRAMBI i client mockati restituiscano la stessa istanza fittizia!
         (createClient as any).mockResolvedValueOnce(mockSupabaseWithRules);
         (createAdminClient as any).mockReturnValueOnce(mockSupabaseWithRules);
 
@@ -235,17 +236,42 @@ describe('resolveMatchWithRanking (Logica Punteggi e Regole)', () => {
     });
 
     it('Regola 7 (Neutralizzazione Incrociata): King SX batte King MIX (1,5 battono 9,7) -> +0.05 / -0.05', async () => {
-        // ID 1 (King SX) sfida ID 9 (King MIX). Anche se sono categorie diverse,
-        // il sistema deve riconoscerli entrambi come King e annullare i bonus.
         await executeResolve([1, 5], [9, 7], 'A');
         expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ team_a_delta: 0.05, team_b_delta: -0.05 }));
     });
 
     it('Regola 7 (Bugfix Neutralizzazione Totale): 2 King vs 1 King (1,4 perdono contro 9,7) -> +0.05 / -0.05', async () => {
-        // Team A ha due King (ID 1 e 4). Team B ha un King (ID 9). Team B vince.
-        // La presenza di King in entrambe le squadre attiva la Neutralizzazione Assoluta.
-        // Qualsiasi altro bonus (anche derivante da Fanalini o paradossi) deve essere bloccato.
         await executeResolve([1, 4], [9, 7], 'B');
         expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ team_a_delta: -0.05, team_b_delta: 0.05 }));
+    });
+
+    // ========================================================
+    // NUOVI TEST: VERIFICA AMICHEVOLI (BYPASS ELO & AUDIT LOG)
+    // ========================================================
+    it('Feature Amichevoli: Partita Amichevole -> delta impostati a 0 indipendentemente dai titoli (Bypass ELO)', async () => {
+        // ID 3 è un Fanalino, ID 5 è Normale, ID 7 e 8 sono Normali. Se fosse competitiva, scatterebbe il bonus +0.10 della Regola 8.
+        // Essendo amichevole (`true`), i delta devono essere blindati a 0.
+        await executeResolve([3, 5], [7, 8], 'A', true);
+
+        expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({
+            status: 'completed',
+            winning_team: 'A',
+            team_a_delta: 0,
+            team_b_delta: 0
+        }));
+    });
+
+    it('Feature Amichevoli: Partita Amichevole -> deve scrivere l audit log personalizzato con flag is_friendly', async () => {
+        await executeResolve([2, 5], [7, 8], 'A', true);
+
+        expect(logAction).toHaveBeenCalledWith(
+            'MATCH_RESOLVED',
+            'm1',
+            expect.stringContaining("risultato dell'AMICHEVOLE"),
+            expect.objectContaining({
+                is_friendly: true,
+                deltas: { team_a: 0, team_b: 0 }
+            })
+        );
     });
 });

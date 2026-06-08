@@ -29,6 +29,9 @@ export default function JoinMatchPage() {
     const [matchType, setMatchType] = useState<'male' | 'female' | 'mixed'>('male');
     const [selectedClub, setSelectedClub] = useState<number | ''>('');
 
+    // 1. NUOVO STATO: Recuperato dal database per disattivare i controlli Elo
+    const [isFriendly, setIsFriendly] = useState<boolean>(false);
+
     const [levelError, setLevelError] = useState(false);
     const [duplicateError, setDuplicateError] = useState(false);
 
@@ -60,6 +63,9 @@ export default function JoinMatchPage() {
                     setTeamBRight(matchRes.data.team_b_right_id || '');
                     setMatchType(matchRes.data.match_type);
                     setSelectedClub(matchRes.data.club_id || '');
+
+                    // Impostiamo lo stato amichevole recuperato da DB
+                    setIsFriendly(matchRes.data.is_friendly ?? false);
                 }
                 if (playersRes.data) setPlayers(playersRes.data);
                 if (clubsRes.data) setClubs(clubsRes.data);
@@ -75,16 +81,21 @@ export default function JoinMatchPage() {
     useEffect(() => {
         const ids = [teamALeft, teamARight, teamBLeft, teamBRight].filter((v): v is number => typeof v === 'number');
         setDuplicateError(new Set(ids).size !== ids.length);
-        if (ids.length < 2) { setLevelError(false); return; }
+
+        // 2. BYPASS AMICHEVOLE: Se la partita è amichevole o ci sono meno di 2 player, nessun errore bloccante
+        if (ids.length < 2 || isFriendly) {
+            setLevelError(false);
+            return;
+        }
+
         const rks = ids.map(id => players.find(p => p.id === id)?.ranking).filter((r): r is number => r !== undefined);
         setLevelError(Math.max(...rks) - Math.min(...rks) > 0.25);
-    }, [teamALeft, teamARight, teamBLeft, teamBRight, players]);
+    }, [teamALeft, teamARight, teamBLeft, teamBRight, players, isFriendly]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSubmitting(true);
         try {
-            // Ricombina data e ora in formato ISO (o null se non inseriti)
             let combinedMatchDate = null;
             if (matchDate && matchTime) {
                 combinedMatchDate = new Date(`${matchDate}T${matchTime}:00`).toISOString();
@@ -131,7 +142,21 @@ export default function JoinMatchPage() {
         <main className="w-full max-w-4xl mx-auto px-4 sm:px-8 mt-6">
             <div className="bg-white border border-slate-200 shadow-sm p-6 sm:p-8 rounded-sm">
                 <div className="mb-6"><BackToHomeButton tab="pending" /></div>
-                <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-8">Modifica Partita</h1>
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-8">
+                    <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Modifica Partita</h1>
+
+                    {/* 3. INDICATORE VISIVO: Badge informativo per l'admin sullo stato delle regole del match */}
+                    {isFriendly ? (
+                        <span className="self-start sm:self-center bg-purple-100 text-purple-800 text-[9px] font-black px-3 py-1 rounded-sm uppercase tracking-wider border border-purple-200 shadow-sm">
+                            🤝 Regolamento Amichevole (No Blocchi Livello)
+                        </span>
+                    ) : (
+                        <span className="self-start sm:self-center bg-blue-100 text-blue-800 text-[9px] font-black px-3 py-1 rounded-sm uppercase tracking-wider border border-blue-200 shadow-sm">
+                            🔥 Regolamento Classificato
+                        </span>
+                    )}
+                </div>
 
                 {error && <div className="mb-4 p-3 bg-red-100 text-red-700 text-xs font-bold uppercase rounded-sm">{error}</div>}
 

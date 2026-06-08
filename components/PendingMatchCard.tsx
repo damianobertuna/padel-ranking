@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import Link from 'next/link';
 import { canUserResolveMatch } from '@/lib/matchRules';
 import DeleteMatchButton from '@/components/DeleteMatchButton';
 import ResolveMatchButton from '@/components/ResolveMatchButton';
@@ -17,6 +16,7 @@ export default function PendingMatchCard({
                                              playerTitles
                                          }: PendingMatchCardProps & { clubs?: Club[] }) {
 
+    const isExpired = match.match_date ? new Date(match.match_date) < new Date() : false;
     const [isManaging, setIsManaging] = useState(false);
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
@@ -219,33 +219,35 @@ export default function PendingMatchCard({
                     </a>
 
                     <div className="flex gap-2 w-full">
-                        <button
-                            onClick={() => {
-                                if (actionType === 'leave') {
-                                    startTransition(async () => {
-                                        try { await leaveMatchAction(match.id); }
-                                        catch (error: any) { alert(`Errore: ${error.message}`); }
-                                    });
-                                } else if (actionType === 'join') {
-                                    startTransition(async () => {
-                                        try { await joinMatchAction(match.id); }
-                                        catch (error: any) { alert(`Errore: ${error.message}`); }
-                                    });
-                                } else if (actionType === 'manage') {
-                                    setIsManaging(true);
-                                    router.push(`/match/${match.id}/join`);
+                        {(!isExpired || currentUserPlayer?.role === 'admin') && (
+                            <button
+                                onClick={() => {
+                                    if (actionType === 'leave') {
+                                        startTransition(async () => {
+                                            try { await leaveMatchAction(match.id); }
+                                            catch (error: any) { alert(`Errore: ${error.message}`); }
+                                        });
+                                    } else if (actionType === 'join') {
+                                        startTransition(async () => {
+                                            try { await joinMatchAction(match.id); }
+                                            catch (error: any) { alert(`Errore: ${error.message}`); }
+                                        });
+                                    } else if (actionType === 'manage') {
+                                        setIsManaging(true);
+                                        router.push(`/match/${match.id}/join`);
+                                    }
+                                }}
+                                disabled={isManaging || isPending || actionType === 'view'}
+                                className={`flex-[2] text-center text-white text-[10px] font-black uppercase tracking-wider py-3 rounded-sm transition-all duration-150 ease-out flex items-center justify-center gap-2 [-webkit-tap-highlight-color:transparent]
+                                    ${actionType === 'view'
+                                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-80'
+                                    : 'bg-slate-900 hover:bg-slate-800 active:scale-[0.96]'
                                 }
-                            }}
-                            disabled={isManaging || isPending || actionType === 'view'}
-                            className={`flex-[2] text-center text-white text-[10px] font-black uppercase tracking-wider py-3 rounded-sm transition-all duration-150 ease-out flex items-center justify-center gap-2 [-webkit-tap-highlight-color:transparent]
-                                ${actionType === 'view'
-                                ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-80'
-                                : 'bg-slate-900 hover:bg-slate-800 active:scale-[0.96]'
-                            }
-                            `}
-                        >
-                            {(isManaging || isPending) ? 'ATTENDI...' : primaryActionLabel}
-                        </button>
+                                `}
+                            >
+                                {(isManaging || isPending) ? 'ATTENDI...' : primaryActionLabel}
+                            </button>
+                        )}
 
                         {canResolve && <ResolveMatchButton matchId={match.id} />}
                         {(currentUserPlayer?.role === 'admin' || canResolve) && <DeleteMatchButton matchId={match.id} />}

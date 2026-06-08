@@ -111,22 +111,13 @@ export default async function Home({ searchParams }: PageProps) {
     const startIndex = (playerPage - 1) * PLAYERS_PER_PAGE;
     const paginatedPlayers = sortedPlayers.slice(startIndex, startIndex + PLAYERS_PER_PAGE);
 
-    // --- QUERY PENDING MATCHES ---
+    // --- QUERY PENDING MATCHES (Ristrutturata con Filtro Logico) ---
+    // Esraiamo tutti i match in stato pending ordinati per data, senza tagliare la query a database.
     const isAdmin = currentUserPlayer?.role === 'admin';
-    const nowIsoString = new Date().toISOString();
-
-    let pendingQuery = supabase
+    const { data: pendingMatches } = await supabase
         .from('matches')
         .select('*')
-        .eq('status', 'pending');
-
-    // SE NON È ADMIN: Nascondiamo i match passati
-    if (!isAdmin) {
-        pendingQuery = pendingQuery.gte('match_date', nowIsoString);
-    }
-
-    // Ordiniamo per data di gioco più vicina (invece che per creazione), utile per l'esperienza utente
-    const { data: pendingMatches } = await pendingQuery
+        .eq('status', 'pending')
         .order('match_date', { ascending: true, nullsFirst: false });
 
     const filteredPendingMatches = (pendingMatches || []).filter(match => {
@@ -134,10 +125,23 @@ export default async function Home({ searchParams }: PageProps) {
         const activeCount = playerIds.filter(Boolean).length;
         const isMatchComplete = activeCount === 4;
 
+        // Verifica coinvolgimento dell'utente e scadenza
+        const isUserInMatch = currentUserPlayer ? playerIds.includes(currentUserPlayer.id) : false;
+        const isExpired = match.match_date ? new Date(match.match_date) < new Date() : false;
+
+        // ❌ BLOCCO MATCH SCADUTI
+        if (isExpired) {
+            // Caso A: Scaduto ma incompleto -> Lo vede SOLO l'admin (per cestinarlo)
+            if (!isMatchComplete && !isAdmin) return false;
+
+            // Caso B: Scaduto e completo -> Lo vedono SOLO l'admin e i 4 giocatori coinvolti
+            if (isMatchComplete && !isAdmin && !isUserInMatch) return false;
+        }
+
+        // Resto dei filtri invariato...
         if (currentSlots === 'free' && isMatchComplete) return false;
 
         if (currentLevel === 'compatible' && currentUserPlayer) {
-            const isUserInMatch = playerIds.includes(currentUserPlayer.id);
             if (!isUserInMatch) {
                 if (isMatchComplete) return false;
                 const activeRankings = playerIds
@@ -161,17 +165,14 @@ export default async function Home({ searchParams }: PageProps) {
         .select('*', { count: 'exact' })
         .eq('status', 'completed');
 
-    // 1. Filtro Club Storico
     if (currentCompletedClub !== 'all') {
         completedQuery = completedQuery.eq('club_id', parseInt(currentCompletedClub, 10));
     }
 
-    // 2. Filtro Personale Storico ("I miei match")
     if (currentCompletedScope === 'mine' && currentUserPlayer) {
         completedQuery = completedQuery.or(`team_a_left_id.eq.${currentUserPlayer.id},team_a_right_id.eq.${currentUserPlayer.id},team_b_left_id.eq.${currentUserPlayer.id},team_b_right_id.eq.${currentUserPlayer.id}`);
     }
 
-    // 3. Filtro di Ricerca Testuale Giocatore Storico
     if (currentTab === 'completed' && currentSearch) {
         const searchedPlayerIds = playersWithStats
             .filter(p => p.first_name.toLowerCase().includes(currentSearch.toLowerCase()) ||
@@ -214,7 +215,7 @@ export default async function Home({ searchParams }: PageProps) {
                         scroll={false}
                         className={`flex-1 text-center py-3 text-sm font-black uppercase tracking-wider transition-colors ${currentTab === 'pending' ? 'border-b-4 border-blue-600 text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}
                     >
-                        Match <span className="ml-1 opacity-70">({pendingMatches?.length || 0})</span>
+                        Match <span className="ml-1 opacity-70">({filteredPendingMatches.length})</span>
                     </Link>
                     <Link
                         href={`/?tab=completed&${urlState}`}
@@ -340,29 +341,37 @@ export default async function Home({ searchParams }: PageProps) {
                 )}
 
                 {/* =========================================
-    TAB 2: MATCH IN PROGRAMMA
-========================================= */}
+                    TAB 2: MATCH IN PROGRAMMA
+                ========================================= */}
                 {currentTab === 'pending' && (
                     <div className="animate-in fade-in duration-300">
-                        {/* ... (tieni i tuoi filtri invariati) ... */}
-
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {filteredPendingMatches.length > 0 ? (
                                 filteredPendingMatches.map((match) => {
-                                    // Controlliamo se la data del match è precedente a "ora"
                                     const isExpired = match.match_date ? new Date(match.match_date) < new Date() : false;
 
                                     return (
                                         <div key={match.id} className="relative group">
-                                            {/* Se il match è scaduto, mostriamo il badge di avviso */}
-                                            {isExpired && (
-                                                <div className="absolute -top-2 -right-2 z-10 bg-rose-600 text-white text-[9px] font-black px-2.5 py-1 rounded-sm shadow-md uppercase tracking-widest animate-pulse border border-rose-700">
-                                                    SCADUTO ⚠️
-                                                </div>
-                                            )}
+                                            {/* SEZIONE BADGE DINAMICI IN ALTO A DESTRA */}
+                                            <div className="absolute -top-2 right-2 z-10 flex gap-1">
+                                                {match.is_friendly && (
+                                                    <span className="bg-purple-600 text-white text-[8px] font-black px-2 py-0.5 rounded-sm shadow-md uppercase tracking-widest border border-purple-700">
+                                                        🤝 AMICHEVOLE
+                                                    </span>
+                                                )}
+                                                {isExpired && (
+                                                    <span className="bg-rose-600 text-white text-[8px] font-black px-2 py-0.5 rounded-sm shadow-md uppercase tracking-widest animate-pulse border border-rose-700">
+                                                        SCADUTO ⚠️
+                                                    </span>
+                                                )}
+                                            </div>
 
-                                            {/* Se è scaduto, evidenziamo la card con un bordo rosso e una leggera opacità */}
-                                            <div className={isExpired ? "border-2 border-rose-500 rounded-sm overflow-hidden opacity-85 hover:opacity-100 transition-all shadow-sm" : ""}>
+                                            {/* Container Card condizionato dallo stato temporale */}
+                                            <div className={
+                                                isExpired
+                                                    ? "border-2 border-rose-500 rounded-sm overflow-hidden opacity-90 hover:opacity-100 transition-all shadow-sm"
+                                                    : (match.is_friendly ? "border border-purple-300 rounded-sm overflow-hidden shadow-sm" : "")
+                                            }>
                                                 <PendingMatchCard
                                                     match={match}
                                                     rawPlayers={playersWithStats || []}
@@ -376,7 +385,7 @@ export default async function Home({ searchParams }: PageProps) {
                                 })
                             ) : (
                                 <div className="col-span-2 p-10 bg-white border border-slate-200 text-center text-slate-500 font-bold uppercase text-sm rounded-sm">
-                                    Nessun match corrisponde ai filtri selezionati
+                                    Nessun match in bacheca
                                 </div>
                             )}
                         </div>
@@ -388,16 +397,11 @@ export default async function Home({ searchParams }: PageProps) {
                 ========================================= */}
                 {currentTab === 'completed' && (
                     <div className="animate-in fade-in duration-300 space-y-4">
-
-                        {/* BARRA RICERCA STORICO */}
                         <div className="w-full">
                             <SearchBar placeholder="FILTRA STORICO PER NOME GIOCATORE..." />
                         </div>
 
-                        {/* FILTRI OPERATIVI RISULTATI */}
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white border border-slate-200 p-2 rounded-sm shadow-sm gap-3 text-xs font-bold uppercase tracking-wider">
-
-                            {/* Selettore Scope: Tutti vs I Miei */}
                             {currentUserPlayer ? (
                                 <div className="flex gap-1 bg-slate-100 p-1 rounded-sm shrink-0 w-full md:w-auto">
                                     <Link href={`/?tab=completed&completedScope=all&completedClub=${currentCompletedClub}&gender=${currentGender}&sort=${currentSort}&search=${currentSearch}&slots=${currentSlots}&level=${currentLevel}`} scroll={false} className={`px-4 py-1.5 rounded-sm transition-colors text-center flex-1 md:flex-initial ${currentCompletedScope === 'all' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Tutti i Risultati</Link>
@@ -409,7 +413,6 @@ export default async function Home({ searchParams }: PageProps) {
                                 </div>
                             )}
 
-                            {/* DROPDOWN COMPATTA PER I CLUB (Sostituita la lista estesa di bottoni) */}
                             <ClubSelectFilter clubs={clubsList} currentClub={currentCompletedClub} />
                         </div>
 
@@ -421,11 +424,26 @@ export default async function Home({ searchParams }: PageProps) {
                                 const matchClub = clubsList.find(c => c.id === match.club_id);
 
                                 return (
-                                    <div key={match.id} className="bg-white border border-slate-200 rounded-sm shadow-sm overflow-hidden">
+                                    <div key={match.id} className={`bg-white border rounded-sm shadow-sm overflow-hidden transition-all ${
+                                        match.is_friendly
+                                            ? 'border-purple-300 border-l-4 border-l-purple-500 bg-purple-50/20'
+                                            : 'border-slate-200'
+                                    }`}>
                                         <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                                            <span>
-                                                {new Date(match.updated_at).toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' })}
-                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <span>
+                                                    {new Date(match.updated_at).toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' })}
+                                                </span>
+                                                {match.is_friendly ? (
+                                                    <span className="bg-purple-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded-sm shadow-sm tracking-wider uppercase">
+                                                        🤝 Amichevole
+                                                    </span>
+                                                ) : (
+                                                    <span className="bg-blue-100 text-blue-800 text-[8px] font-black px-1.5 py-0.5 rounded-sm shadow-sm tracking-normal normal-case">
+                                                        🔥 Classificata
+                                                    </span>
+                                                )}
+                                            </div>
                                             <span>{matchClub ? matchClub.name : 'Location N/D'}</span>
                                         </div>
 
