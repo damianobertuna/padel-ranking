@@ -101,7 +101,7 @@ export async function deletePendingMatch(matchId: string) {
 }
 
 /**
- * 2. CREAZIONE DI UN NUOVO MATCH IN PROGRAMMA (Aggiornato con isFriendly)
+ * 2. CREAZIONE DI UN NUOVO MATCH IN PROGRAMMA
  */
 export async function createPendingMatch(data: {
     matchDate: string | null;
@@ -111,7 +111,7 @@ export async function createPendingMatch(data: {
     teamBLeft: number | null;
     teamBRight: number | null;
     clubId?: number | null;
-    isFriendly?: boolean; // Nuovo campo opzionale
+    isFriendly?: boolean;
 }) {
     const supabase = await createClient();
 
@@ -134,10 +134,8 @@ export async function createPendingMatch(data: {
     let matchOrganizerId = null;
 
     if (isCreatorInMatch) {
-        // Regola A: Se chi crea gioca, è lui il dominus.
         matchOrganizerId = currentUserPlayer.id;
     } else if (currentUserPlayer.role === 'admin') {
-        // Regola B: L'admin sta creando un match per terzi.
         matchOrganizerId = selectedPlayerIds.length > 0 ? selectedPlayerIds[0] : null;
     } else {
         throw new Error("OPERAZIONE NEGATA: Devi occupare almeno uno slot per creare una partita.");
@@ -157,7 +155,7 @@ export async function createPendingMatch(data: {
                 club_id: data.clubId || null,
                 status: 'pending',
                 organizer_id: matchOrganizerId,
-                is_friendly: data.isFriendly ?? false // Mappatura a DB
+                is_friendly: data.isFriendly ?? false
             }
         ])
         .select('id')
@@ -209,7 +207,7 @@ export async function createPendingMatch(data: {
 }
 
 /**
- * 3. RISOLUZIONE DI UN MATCH (Ottimizzato con bypass Ranking per Amichevoli)
+ * 3. RISOLUZIONE DI UN MATCH CON CALCOLO RANKING, SET OBBLIGATORI E AUDIT LOG
  */
 export async function resolveMatchWithRanking(data: {
     matchId: string;
@@ -221,57 +219,22 @@ export async function resolveMatchWithRanking(data: {
     try {
         console.log("🚀 Server Action avviata per Risoluzione Match ID:", data.matchId);
 
-        // Controllo Autenticazione ed Identità
+        // 1. Controllo Autenticazione ed Identità
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("Utente non autenticato");
 
-        const { data: currentUserPlayer } = await supabase
-            .from('players')
-            .select('*')
-            .eq('user_id', user.id)
-            .single();
+        const { data: currentUserPlayer } = await supabase.from('players').select('*').eq('user_id', user.id).single();
         if (!currentUserPlayer) throw new Error("Profilo giocatore non trovato");
 
-        // Recupero info della partita da chiudere (ci serve is_friendly)
-        const { data: match } = await supabase
-            .from('matches')
-            .select('*')
-            .eq('id', data.matchId)
-            .single();
-
+        // 2. Recupero Match
+        const { data: match } = await supabase.from('matches').select('*').eq('id', data.matchId).single();
         if (!match) throw new Error("Partita non trovata nel database");
         if (match.status !== 'pending') throw new Error("Questa partita è già stata risolta");
 
-        // VALIDAZIONE SET E VINCITORE
-        if (!data.score || data.score.length < 2) {
-            throw new Error("I dati dei set sono incompleti. Almeno i primi 2 set sono obbligatori.");
-        }
+        // 3. Validazione Score e Calcolo Vincitore (Helper)
+        const { finalWinningTeam, stringaPunteggio } = evaluateMatchScore(data.score);
 
-        let setsWonA = 0;
-        let setsWonB = 0;
-
-        data.score.forEach((set, index) => {
-            if (!isSetValid(set.team_a, set.team_b, index)) {
-                throw new Error(
-                    `Punteggio non valido al Set ${index + 1}: [${set.team_a}-${set.team_b}]. ` +
-                    (index < 2
-                        ? `I set normali finiscono a 6 (con 2 di scarto) o a 7 (7-5, 7-6).`
-                        : `Il terzo set deve finire a 6, 7 oppure essere un Super Tie-Break a 10 (con 2 di scarto).`)
-                );
-            }
-
-            if (set.team_a > set.team_b) setsWonA++;
-            else if (set.team_b > set.team_a) setsWonB++;
-        });
-
-        if (setsWonA === setsWonB) {
-            throw new Error("Pareggio nei set impossibile. Inserisci il terzo set per decretare il vincitore.");
-        }
-
-        const finalWinningTeam = setsWonA > setsWonB ? 'A' : 'B';
-        const stringaPunteggio = data.score.map(s => `${s.team_a}-${s.team_b}`).join(" / ");
-
-        // Recupero atleti per la strutturazione dei team
+        // 4. Recupero e strutturazione Atleti
         const playerIds = [match.team_a_left_id, match.team_a_right_id, match.team_b_left_id, match.team_b_right_id];
         const { data: playersInMatch } = await supabase.from('players').select('*').in('id', playerIds);
 
@@ -282,64 +245,37 @@ export async function resolveMatchWithRanking(data: {
         const teamA = playersInMatch.filter(p => p.id === match.team_a_left_id || p.id === match.team_a_right_id);
         const teamB = playersInMatch.filter(p => p.id === match.team_b_left_id || p.id === match.team_b_right_id);
 
+        // 5. Calcolo Delta ELO (Helper)
         let teamADelta = 0;
         let teamBDelta = 0;
 
-        // ========================================================
-        // GESTIONE DEL RANKING: INTERRUTTORE DI FLUSSO
-        // ========================================================
         if (match.is_friendly) {
-            // Se il match è un'amichevole, i delta restano a zero assoluto.
-            teamADelta = 0;
-            teamBDelta = 0;
             console.log("🤝 Match Amichevole rilevato: Calcolo ELO e variazioni di punti ignorati.");
         } else {
-            // Eseguiamo i calcoli complessi solo per i match competitivi
-            const { data: allPlayers } = await supabase.from('players').select('*');
-
-            const {
-                kingLeftIds, kingRightIds, kingBothIds,
-                lastPlaceLeftIds, lastPlaceRightIds, lastPlaceBothIds
-            } = computeKingAndFanalino(allPlayers || []);
-
-            const isKing = (p: any) => kingLeftIds.includes(p.id) || kingRightIds.includes(p.id) || kingBothIds.includes(p.id);
-            const isFanalino = (p: any) => lastPlaceLeftIds.includes(p.id) || lastPlaceRightIds.includes(p.id) || lastPlaceBothIds.includes(p.id);
-
-            const winners = finalWinningTeam === 'A' ? teamA : teamB;
-            const losers = finalWinningTeam === 'A' ? teamB : teamA;
-
-            const isStrictKing = (p: any) => isKing(p);
-            const isStrictFanalino = (p: any) => isFanalino(p) && !isKing(p);
-
-            const winnersHaveKing = winners.some(isStrictKing);
-            const losersHaveKing = losers.some(isStrictKing);
-            const bothTeamsHaveKing = winnersHaveKing && losersHaveKing;
-
-            const winnersHaveFanalino = winners.some(isStrictFanalino);
-            const losersHaveFanalino = losers.some(isStrictFanalino);
-            const bothTeamsHaveFanalino = winnersHaveFanalino && losersHaveFanalino;
-
-            let winnerDelta = 0.05;
-            let loserDelta = -0.05;
-
-            if (bothTeamsHaveKing || bothTeamsHaveFanalino) {
-                winnerDelta = 0.05;
-                loserDelta = -0.05;
-            } else {
-                if (losersHaveKing && !winnersHaveKing) winnerDelta = 0.10;
-                if (losers.every(isStrictKing) && !winnersHaveKing) loserDelta = -0.10;
-                if (winnersHaveFanalino) winnerDelta = 0.10;
-            }
-
-            teamADelta = finalWinningTeam === 'A' ? winnerDelta : loserDelta;
-            teamBDelta = finalWinningTeam === 'B' ? winnerDelta : loserDelta;
+            const deltas = await calculateCompetitiveDeltas(supabase, teamA, teamB, finalWinningTeam);
+            teamADelta = deltas.teamADelta;
+            teamBDelta = deltas.teamBDelta;
         }
 
         // ========================================================
-        // INSERIMENTO COMPRENSIVO SU DB (ADMIN CLIENT)
+        // 6. PREPARAZIONE SNAPSHOT RANKING PER AUDIT LOG
         // ========================================================
+        const safeAdd = (rank: number, delta: number) => parseFloat((rank + delta).toFixed(2));
 
-        // 1. CHIUDIAMO LA CARD DEL MATCH
+        const playerRankingDetails = [
+            { id: teamA[0].id, name: `${teamA[0].first_name} ${teamA[0].last_name}`, old_ranking: teamA[0].ranking, new_ranking: safeAdd(teamA[0].ranking, teamADelta), delta: teamADelta },
+            { id: teamA[1].id, name: `${teamA[1].first_name} ${teamA[1].last_name}`, old_ranking: teamA[1].ranking, new_ranking: safeAdd(teamA[1].ranking, teamADelta), delta: teamADelta },
+            { id: teamB[0].id, name: `${teamB[0].first_name} ${teamB[0].last_name}`, old_ranking: teamB[0].ranking, new_ranking: safeAdd(teamB[0].ranking, teamBDelta), delta: teamBDelta },
+            { id: teamB[1].id, name: `${teamB[1].first_name} ${teamB[1].last_name}`, old_ranking: teamB[1].ranking, new_ranking: safeAdd(teamB[1].ranking, teamBDelta), delta: teamBDelta }
+        ];
+
+        const rankingLogText = playerRankingDetails
+            .map(p => `${p.name} (${p.old_ranking.toFixed(2)} ➡️ ${p.new_ranking.toFixed(2)})`)
+            .join(' | ');
+
+        // ========================================================
+        // 7. AGGIORNAMENTO DATABASE (ADMIN CLIENT)
+        // ========================================================
         const { error: matchError } = await supabaseAdmin
             .from('matches')
             .update({
@@ -354,28 +290,18 @@ export async function resolveMatchWithRanking(data: {
 
         if (matchError) throw new Error(`Errore chiusura partita: ${matchError.message}`);
 
-        // 2. AGGIORNIAMO LE CLASSIFICHE REALI (Solo se NON amichevole)
         if (!match.is_friendly) {
-            const safeAdd = (rank: number, delta: number) => parseFloat((rank + delta).toFixed(2));
-            const playerUpdates = [
-                supabaseAdmin.from('players').update({ ranking: safeAdd(teamA[0].ranking, teamADelta) }).eq('id', teamA[0].id),
-                supabaseAdmin.from('players').update({ ranking: safeAdd(teamA[1].ranking, teamADelta) }).eq('id', teamA[1].id),
-                supabaseAdmin.from('players').update({ ranking: safeAdd(teamB[0].ranking, teamBDelta) }).eq('id', teamB[0].id),
-                supabaseAdmin.from('players').update({ ranking: safeAdd(teamB[1].ranking, teamBDelta) }).eq('id', teamB[1].id)
-            ];
+            const playerUpdates = playerRankingDetails.map(p =>
+                supabaseAdmin.from('players').update({ ranking: p.new_ranking }).eq('id', p.id)
+            );
             await Promise.all(playerUpdates);
         }
 
         // ========================================================
-        // AUDIT LOG CALIBRATO
+        // 8. AUDIT LOG
         // ========================================================
-        const getName = (id: number) => {
-            const p = playersInMatch?.find(pl => pl.id === id);
-            return p ? `${p.first_name} ${p.last_name}` : 'Sconosciuto';
-        };
-
-        const nomeTeamA = `${getName(match.team_a_left_id)} / ${getName(match.team_a_right_id)}`;
-        const nomeTeamB = `${getName(match.team_b_left_id)} / ${getName(match.team_b_right_id)}`;
+        const nomeTeamA = `${teamA[0].first_name} ${teamA[0].last_name} / ${teamA[1].first_name} ${teamA[1].last_name}`;
+        const nomeTeamB = `${teamB[0].first_name} ${teamB[0].last_name} / ${teamB[1].first_name} ${teamB[1].last_name}`;
 
         const esitoDescrizione = finalWinningTeam === 'A'
             ? `Vince il Team A (${nomeTeamA}) contro il Team B (${nomeTeamB})`
@@ -384,41 +310,29 @@ export async function resolveMatchWithRanking(data: {
         const operatore = `${currentUserPlayer.first_name} ${currentUserPlayer.last_name}`;
 
         const logDetails = match.is_friendly
-            ? `L'operatore ${operatore} ha registrato il risultato dell'AMICHEVOLE: ${esitoDescrizione} [${stringaPunteggio}]. Nessuna variazione di punti applicata.`
-            : `L'operatore ${operatore} ha registrato il risultato: ${esitoDescrizione} [${stringaPunteggio}]. Delta Rank: Team A (${teamADelta > 0 ? '+':''}${teamADelta}) - Team B (${teamBDelta > 0 ? '+':''}${teamBDelta})`;
+            ? `L'operatore ${operatore} ha registrato l'AMICHEVOLE: ${esitoDescrizione} [${stringaPunteggio}]. Nessuna variazione.`
+            : `L'operatore ${operatore} ha chiuso il match: ${esitoDescrizione} [${stringaPunteggio}]. Elo: ${rankingLogText}`;
 
-        const { error: logError } = await logAction(
-            'MATCH_RESOLVED',
-            data.matchId,
-            logDetails,
-            {
-                winning_team: finalWinningTeam,
-                score: stringaPunteggio,
-                is_completed: true,
-                is_friendly: match.is_friendly,
-                deltas: {
-                    team_a: teamADelta,
-                    team_b: teamBDelta
-                },
-                teams: {
-                    team_a: { left_player_id: match.team_a_left_id, right_player_id: match.team_a_right_id },
-                    team_b: { left_player_id: match.team_b_left_id, right_player_id: match.team_b_right_id }
-                },
-                resolved_at: new Date().toISOString()
-            }
-        );
+        const { error: logError } = await logAction('MATCH_RESOLVED', data.matchId, logDetails, {
+            winning_team: finalWinningTeam,
+            score: stringaPunteggio,
+            is_completed: true,
+            is_friendly: match.is_friendly,
+            deltas: { team_a: teamADelta, team_b: teamBDelta },
+            player_rankings: playerRankingDetails,
+            resolved_at: new Date().toISOString()
+        });
 
         if (logError) console.error("❌ ERRORE SCRITTURA LOG RISOLUZIONE MATCH:", logError.message);
 
         console.log("✅ Server Action completata con successo!");
 
-        // Pulizia Cache e Refresh Interfaccia
+        // 9. Pulizia Cache
         revalidatePath('/');
         revalidatePath('/admin/logs');
-        revalidatePath(`/player/${teamA[0].id}`);
-        revalidatePath(`/player/${teamA[1].id}`);
-        revalidatePath(`/player/${teamB[0].id}`);
-        revalidatePath(`/player/${teamB[1].id}`);
+        playerIds.forEach((id) => {
+            if (id) revalidatePath(`/player/${id}`);
+        });
 
     } catch (globalError: any) {
         console.error("💥 ERRORE SERVER ACTION:", globalError.message);
@@ -650,6 +564,97 @@ export async function joinMatchAction(matchId: string) {
     );
 
     revalidatePath('/');
+}
+
+// ============================================================================
+// HELPER FUNCTIONS (Logica di Business Estratta)
+// ============================================================================
+
+/**
+ * Valida i punteggi e determina il team vincente
+ */
+function evaluateMatchScore(score: SetScore[]): { finalWinningTeam: 'A' | 'B', stringaPunteggio: string } {
+    if (!score || score.length < 2) {
+        throw new Error("I dati dei set sono incompleti. Almeno i primi 2 set sono obbligatori.");
+    }
+
+    let setsWonA = 0;
+    let setsWonB = 0;
+
+    score.forEach((set, index) => {
+        if (!isSetValid(set.team_a, set.team_b, index)) {
+            throw new Error(
+                `Punteggio non valido al Set ${index + 1}: [${set.team_a}-${set.team_b}]. ` +
+                (index < 2
+                    ? `I set normali finiscono a 6 (con 2 di scarto) o a 7 (7-5, 7-6).`
+                    : `Il terzo set deve finire a 6, 7 oppure essere un Super Tie-Break a 10 (con 2 di scarto).`)
+            );
+        }
+
+        if (set.team_a > set.team_b) setsWonA++;
+        else if (set.team_b > set.team_a) setsWonB++;
+    });
+
+    if (setsWonA === setsWonB) {
+        throw new Error("Pareggio nei set impossibile. Inserisci il terzo set per decretare il vincitore.");
+    }
+
+    return {
+        finalWinningTeam: setsWonA > setsWonB ? 'A' : 'B',
+        stringaPunteggio: score.map(s => `${s.team_a}-${s.team_b}`).join(" / ")
+    };
+}
+
+/**
+ * Calcola i delta applicando le regole complesse per King e Fanalino
+ */
+async function calculateCompetitiveDeltas(
+    supabase: any,
+    teamA: any[],
+    teamB: any[],
+    finalWinningTeam: 'A' | 'B'
+): Promise<{ teamADelta: number, teamBDelta: number }> {
+
+    const { data: allPlayers } = await supabase.from('players').select('*');
+
+    const {
+        kingLeftIds, kingRightIds, kingBothIds,
+        lastPlaceLeftIds, lastPlaceRightIds, lastPlaceBothIds
+    } = computeKingAndFanalino(allPlayers || []);
+
+    const isKing = (p: any) => kingLeftIds.includes(p.id) || kingRightIds.includes(p.id) || kingBothIds.includes(p.id);
+    const isFanalino = (p: any) => lastPlaceLeftIds.includes(p.id) || lastPlaceRightIds.includes(p.id) || lastPlaceBothIds.includes(p.id);
+
+    const winners = finalWinningTeam === 'A' ? teamA : teamB;
+    const losers = finalWinningTeam === 'A' ? teamB : teamA;
+
+    const isStrictKing = (p: any) => isKing(p);
+    const isStrictFanalino = (p: any) => isFanalino(p) && !isKing(p);
+
+    const winnersHaveKing = winners.some(isStrictKing);
+    const losersHaveKing = losers.some(isStrictKing);
+    const bothTeamsHaveKing = winnersHaveKing && losersHaveKing;
+
+    const winnersHaveFanalino = winners.some(isStrictFanalino);
+    const losersHaveFanalino = losers.some(isStrictFanalino);
+    const bothTeamsHaveFanalino = winnersHaveFanalino && losersHaveFanalino;
+
+    let winnerDelta = 0.05;
+    let loserDelta = -0.05;
+
+    if (bothTeamsHaveKing || bothTeamsHaveFanalino) {
+        winnerDelta = 0.05;
+        loserDelta = -0.05;
+    } else {
+        if (losersHaveKing && !winnersHaveKing) winnerDelta = 0.10;
+        if (losers.every(isStrictKing) && !winnersHaveKing) loserDelta = -0.10;
+        if (winnersHaveFanalino) winnerDelta = 0.10;
+    }
+
+    return {
+        teamADelta: finalWinningTeam === 'A' ? winnerDelta : loserDelta,
+        teamBDelta: finalWinningTeam === 'B' ? winnerDelta : loserDelta
+    };
 }
 
 // Funzione helper per validare un singolo set di Padel/Tennis
