@@ -137,7 +137,11 @@ export default function PendingMatchCard({
         // GEOLOCALIZZAZIONE DINAMICA CIRCOLO
         // ========================================================
         const dataFormattata = new Date(m.match_date || m.created_at).toLocaleString('it-IT', {
-            day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+            weekday: 'short', // <-- AGGIUNTA: Include il giorno della settimana (es. "lun", "mar"...)
+            day: '2-digit',
+            month: 'short',
+            hour: '2-digit',
+            minute: '2-digit'
         });
 
         const clubText = matchClub ? `${matchClub.name}${matchClub.city ? ` (${matchClub.city})` : ''}` : 'Da definire';
