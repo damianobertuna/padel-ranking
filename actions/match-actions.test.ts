@@ -6,7 +6,7 @@ import { logAction } from '@/lib/audit';
 // 1. MOCK DELLE DIPENDENZE
 vi.mock('@/lib/supabase/server', () => ({
     createClient: vi.fn(),
-    createAdminClient: vi.fn() // <-- AGGIUNTA FONDAMENTALE PER VITEST
+    createAdminClient: vi.fn()
 }));
 vi.mock('@/lib/audit', () => ({ logAction: vi.fn().mockResolvedValue({ error: null }) }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
@@ -76,7 +76,6 @@ describe('Match Server Actions', () => {
 
             await expect(joinMatchAction('match-123')).resolves.not.toThrow();
 
-            // Ora l'updateSpy è correttamente monitorato!
             expect(updateSpy).toHaveBeenCalledWith({ team_a_right_id: 10 });
         });
 
@@ -157,29 +156,29 @@ describe('resolveMatchWithRanking (Logica Punteggi e Regole)', () => {
         updateSpy = vi.fn().mockReturnThis();
     });
 
-    // MODIFICA: Aggiunto parametro isFriendly (default false) per iniettare la proprietà nel matchData mockato
     const executeResolve = async (teamA: number[], teamB: number[], winningTeam: 'A'|'B', isFriendly = false) => {
         const matchData = {
             id: 'm1', status: 'pending',
             team_a_left_id: teamA[0], team_a_right_id: teamA[1],
             team_b_left_id: teamB[0], team_b_right_id: teamB[1],
-            is_friendly: isFriendly // <-- Iniettato nel record di test
+            is_friendly: isFriendly
         };
 
         const mockSupabaseWithRules = {
             auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
             from: vi.fn((table) => {
+                // MODIFICA: Aggiunti first_name e last_name ai mock per lo snapshot dell'audit log
                 const mockAll = [
-                    {id:1, preferred_side:'Left', ranking: 5.0}, // KING SX
-                    {id:2, preferred_side:'Left', ranking: 3.0}, // Normale SX (1)
-                    {id:3, preferred_side:'Left', ranking: 1.0}, // FANALINO SX
-                    {id:4, preferred_side:'Right', ranking: 5.0},// KING DX
-                    {id:5, preferred_side:'Right', ranking: 3.0},// Normale DX (1)
-                    {id:6, preferred_side:'Right', ranking: 1.0},// FANALINO DX
-                    {id:7, preferred_side:'Left', ranking: 3.1}, // Normale SX (2)
-                    {id:8, preferred_side:'Right', ranking: 3.1},// Normale DX (2)
-                    {id:9, preferred_side:'Both', ranking: 5.0}, // KING MIX
-                    {id:10, preferred_side:'Both', ranking: 3.0} // Normale MIX
+                    {id:1, first_name: 'A', last_name: 'Player', preferred_side:'Left', ranking: 5.0}, // KING SX
+                    {id:2, first_name: 'B', last_name: 'Player', preferred_side:'Left', ranking: 3.0}, // Normale SX (1)
+                    {id:3, first_name: 'C', last_name: 'Player', preferred_side:'Left', ranking: 1.0}, // FANALINO SX
+                    {id:4, first_name: 'D', last_name: 'Player', preferred_side:'Right', ranking: 5.0},// KING DX
+                    {id:5, first_name: 'E', last_name: 'Player', preferred_side:'Right', ranking: 3.0},// Normale DX (1)
+                    {id:6, first_name: 'F', last_name: 'Player', preferred_side:'Right', ranking: 1.0},// FANALINO DX
+                    {id:7, first_name: 'G', last_name: 'Player', preferred_side:'Left', ranking: 3.1}, // Normale SX (2)
+                    {id:8, first_name: 'H', last_name: 'Player', preferred_side:'Right', ranking: 3.1},// Normale DX (2)
+                    {id:9, first_name: 'I', last_name: 'Player', preferred_side:'Both', ranking: 5.0}, // KING MIX
+                    {id:10, first_name: 'J', last_name: 'Player', preferred_side:'Both', ranking: 3.0} // Normale MIX
                 ];
 
                 return {
@@ -246,11 +245,9 @@ describe('resolveMatchWithRanking (Logica Punteggi e Regole)', () => {
     });
 
     // ========================================================
-    // NUOVI TEST: VERIFICA AMICHEVOLI (BYPASS ELO & AUDIT LOG)
+    // NUOVI TEST: VERIFICA AMICHEVOLI E AUDIT LOG
     // ========================================================
     it('Feature Amichevoli: Partita Amichevole -> delta impostati a 0 indipendentemente dai titoli (Bypass ELO)', async () => {
-        // ID 3 è un Fanalino, ID 5 è Normale, ID 7 e 8 sono Normali. Se fosse competitiva, scatterebbe il bonus +0.10 della Regola 8.
-        // Essendo amichevole (`true`), i delta devono essere blindati a 0.
         await executeResolve([3, 5], [7, 8], 'A', true);
 
         expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({
@@ -264,10 +261,11 @@ describe('resolveMatchWithRanking (Logica Punteggi e Regole)', () => {
     it('Feature Amichevoli: Partita Amichevole -> deve scrivere l audit log personalizzato con flag is_friendly', async () => {
         await executeResolve([2, 5], [7, 8], 'A', true);
 
+        // MODIFICA: La stringa attesa ora è perfettamente allineata al nuovo refactoring!
         expect(logAction).toHaveBeenCalledWith(
             'MATCH_RESOLVED',
             'm1',
-            expect.stringContaining("risultato dell'AMICHEVOLE"),
+            expect.stringContaining("ha registrato l'AMICHEVOLE"),
             expect.objectContaining({
                 is_friendly: true,
                 deltas: { team_a: 0, team_b: 0 }
