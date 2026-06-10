@@ -53,6 +53,74 @@ export default async function AdminLogsPage({ searchParams }: PageProps) {
         return `/admin/logs?${params.toString()}`;
     };
 
+    // --- WRAPPER PER LA PAGINAZIONE LATO SERVER ---
+    const renderPagination = (total: number, current: number) => {
+        if (total <= 1) return null;
+
+        // Calcola la finestra di 5 pagine
+        const maxVisible = 5;
+        let start = Math.max(1, current - Math.floor(maxVisible / 2));
+        let end = Math.min(total, start + maxVisible - 1);
+
+        if (end - start + 1 < maxVisible) {
+            start = Math.max(1, end - maxVisible + 1);
+        }
+
+        const visiblePages = [];
+        for (let i = start; i <= end; i++) {
+            visiblePages.push(i);
+        }
+
+        // Helper interno per renderizzare il singolo bottone o Link
+        const renderButton = (page: number, label: string | number, title: string, disabled: boolean, isActive: boolean = false) => {
+            const buttonClass = `w-8 h-8 flex items-center justify-center border rounded-sm text-[10px] font-black uppercase tracking-wider transition-colors ${
+                isActive
+                    ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
+                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white cursor-pointer'
+            }`;
+
+            // Se il bottone è disabilitato o è la pagina corrente, non è cliccabile
+            if (disabled || isActive) {
+                return (
+                    <button
+                        key={`log-page-${label}`}
+                        type="button"
+                        disabled={true}
+                        title={title}
+                        className={buttonClass}
+                    >
+                        {label}
+                    </button>
+                );
+            }
+
+            // Altrimenti generiamo un link che aggiorna l'URL preservando i filtri (senza far scrollare in alto la pagina)
+            return (
+                <Link
+                    key={`log-page-${label}`}
+                    href={buildPaginationUrl(page)}
+                    scroll={false}
+                    title={title}
+                    className={buttonClass}
+                >
+                    {label}
+                </Link>
+            );
+        };
+
+        return (
+            <div className="flex items-center justify-center gap-1 mt-6">
+                {renderButton(1, '«', 'Prima Pagina', current === 1)}
+                {renderButton(Math.max(1, current - 1), '‹', 'Precedente', current === 1)}
+
+                {visiblePages.map(p => renderButton(p, p, `Pagina ${p}`, false, p === current))}
+
+                {renderButton(Math.min(total, current + 1), '›', 'Successiva', current === total)}
+                {renderButton(total, '»', 'Ultima Pagina', current === total)}
+            </div>
+        );
+    };
+
     return (
         <main className="w-full max-w-4xl mx-auto px-4 sm:px-8">
             <div className="max-w-4xl w-full">
@@ -68,7 +136,7 @@ export default async function AdminLogsPage({ searchParams }: PageProps) {
                 {/* COMPONENTE FILTRI */}
                 <LogFilters />
 
-                {/* Tabella Log (Mantenuta identica al tuo design) */}
+                {/* Tabella Log */}
                 <div className="bg-white border border-slate-200 rounded-sm shadow-sm overflow-hidden">
                     <div className="hidden sm:grid grid-cols-12 gap-4 px-4 py-3 bg-slate-50 border-b border-slate-200 text-[9px] font-black text-slate-500 uppercase tracking-widest">
                         <div className="col-span-2">Data</div>
@@ -105,28 +173,9 @@ export default async function AdminLogsPage({ searchParams }: PageProps) {
                     )}
                 </div>
 
-                {/* Paginazione Aggiornata (Mantiene i filtri nell'URL) */}
-                {totalPages > 1 && (
-                    <div className="flex justify-between items-center mt-6 px-1">
-                        <Link
-                            href={buildPaginationUrl(currentPage - 1)}
-                            scroll={false}
-                            className={`px-4 py-2 bg-white border border-slate-200 text-[10px] font-black uppercase tracking-widest ${currentPage <= 1 ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}
-                        >
-                            ← Indietro
-                        </Link>
-                        <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                            Pagina {currentPage} / {totalPages}
-                        </div>
-                        <Link
-                            href={buildPaginationUrl(currentPage + 1)}
-                            scroll={false}
-                            className={`px-4 py-2 bg-white border border-slate-200 text-[10px] font-black uppercase tracking-widest ${currentPage >= totalPages ? 'pointer-events-none opacity-40' : 'hover:bg-slate-50'}`}
-                        >
-                            Avanti →
-                        </Link>
-                    </div>
-                )}
+                {/* Paginazione Aggiornata */}
+                {renderPagination(totalPages, currentPage)}
+
             </div>
         </main>
     );

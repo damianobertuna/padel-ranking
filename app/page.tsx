@@ -6,6 +6,8 @@ import { Player } from "@/types";
 import { computeKingAndFanalino } from '@/lib/rankingCalc';
 import ClubSelectFilter from '@/components/ClubSelectFilter';
 import { Hand } from 'lucide-react';
+import Pagination from '@/components/Pagination'; // Assicurati di aver creato questo componente!
+import { redirect } from 'next/navigation';
 
 const MATCHES_PER_PAGE = 5;
 const PLAYERS_PER_PAGE = 10;
@@ -77,7 +79,6 @@ export default async function Home({ searchParams }: PageProps) {
         lastPlaceBothIds
     } = computeKingAndFanalino(playersWithStats);
 
-    // --- Mappa dei Titoli per le Card ---
     const playerTitlesMap: Record<number, { type: 'KING' | 'FANALINO', label: string }> = {};
 
     kingLeftIds.forEach(id => playerTitlesMap[id] = { type: 'KING', label: 'KING SX' });
@@ -88,7 +89,7 @@ export default async function Home({ searchParams }: PageProps) {
     lastPlaceRightIds.forEach(id => playerTitlesMap[id] = { type: 'FANALINO', label: 'FAN DX' });
     lastPlaceBothIds.forEach(id => playerTitlesMap[id] = { type: 'FANALINO', label: 'FAN MIX' });
 
-    // --- FILTRAGGIO ATLETI (Valido solo per Tab Ranking) ---
+    // --- FILTRAGGIO ATLETI ---
     const filteredPlayers = playersWithStats.filter(player => {
         const matchesGender = currentGender === 'all' || player.gender === currentGender;
         const matchesSearch = currentTab !== 'ranking' || !currentSearch ||
@@ -98,12 +99,8 @@ export default async function Home({ searchParams }: PageProps) {
     });
 
     const sortedPlayers = [...filteredPlayers].sort((a, b) => {
-        if (currentSort === 'played') {
-            return b.total_played - a.total_played || b.ranking - a.ranking;
-        }
-        if (currentSort === 'winrate') {
-            return b.win_rate - a.win_rate || b.total_played - a.total_played;
-        }
+        if (currentSort === 'played') return b.total_played - a.total_played || b.ranking - a.ranking;
+        if (currentSort === 'winrate') return b.win_rate - a.win_rate || b.total_played - a.total_played;
         return b.ranking - a.ranking;
     });
 
@@ -111,8 +108,7 @@ export default async function Home({ searchParams }: PageProps) {
     const startIndex = (playerPage - 1) * PLAYERS_PER_PAGE;
     const paginatedPlayers = sortedPlayers.slice(startIndex, startIndex + PLAYERS_PER_PAGE);
 
-    // --- QUERY PENDING MATCHES (Ristrutturata con Filtro Logico) ---
-    // Esraiamo tutti i match in stato pending ordinati per data, senza tagliare la query a database.
+    // --- PENDING MATCHES ---
     const isAdmin = currentUserPlayer?.role === 'admin';
     const { data: pendingMatches } = await supabase
         .from('matches')
@@ -124,42 +120,32 @@ export default async function Home({ searchParams }: PageProps) {
         const playerIds = [match.team_a_left_id, match.team_a_right_id, match.team_b_left_id, match.team_b_right_id];
         const activeCount = playerIds.filter(Boolean).length;
         const isMatchComplete = activeCount === 4;
-
-        // Verifica coinvolgimento dell'utente e scadenza
         const isUserInMatch = currentUserPlayer ? playerIds.includes(currentUserPlayer.id) : false;
         const isExpired = match.match_date ? new Date(match.match_date) < new Date() : false;
 
-        // ❌ BLOCCO MATCH SCADUTI
         if (isExpired) {
-            // Caso A: Scaduto ma incompleto -> Lo vede SOLO l'admin (per cestinarlo)
             if (!isMatchComplete && !isAdmin) return false;
-
-            // Caso B: Scaduto e completo -> Lo vedono SOLO l'admin e i 4 giocatori coinvolti
             if (isMatchComplete && !isAdmin && !isUserInMatch) return false;
         }
 
-        // Resto dei filtri invariato...
         if (currentSlots === 'free' && isMatchComplete) return false;
 
-        if (currentLevel === 'compatible' && currentUserPlayer) {
-            if (!isUserInMatch) {
-                if (isMatchComplete) return false;
-                const activeRankings = playerIds
-                    .map(id => playersWithStats.find(p => p.id === id)?.ranking)
-                    .filter((r): r is number => r !== undefined);
+        if (currentLevel === 'compatible' && currentUserPlayer && !isUserInMatch && !isMatchComplete) {
+            const activeRankings = playerIds
+                .map(id => playersWithStats.find(p => p.id === id)?.ranking)
+                .filter((r): r is number => r !== undefined);
 
-                if (activeRankings.length > 0) {
-                    const minLvl = Math.min(...activeRankings);
-                    const maxLvl = Math.max(...activeRankings);
-                    const isCompatible = currentUserPlayer.ranking >= (maxLvl - 0.25) && currentUserPlayer.ranking <= (minLvl + 0.25);
-                    if (!isCompatible) return false;
-                }
+            if (activeRankings.length > 0) {
+                const minLvl = Math.min(...activeRankings);
+                const maxLvl = Math.max(...activeRankings);
+                const isCompatible = currentUserPlayer.ranking >= (maxLvl - 0.25) && currentUserPlayer.ranking <= (minLvl + 0.25);
+                if (!isCompatible) return false;
             }
         }
         return true;
     });
 
-    // --- LOGICA E COSTRUZIONE DINAMICA DELLA QUERY RISULTATI COMPLETATI ---
+    // --- RISULTATI COMPLETATI ---
     let completedQuery = supabase
         .from('matches')
         .select('*', { count: 'exact' })
@@ -197,6 +183,82 @@ export default async function Home({ searchParams }: PageProps) {
     const totalPages = totalCompletedCount ? Math.ceil(totalCompletedCount / MATCHES_PER_PAGE) : 1;
 
     const urlState = `gender=${currentGender}&sort=${currentSort}&playerPage=${playerPage}&page=${currentPage}&search=${encodeURIComponent(currentSearch)}&slots=${currentSlots}&level=${currentLevel}&completedClub=${currentCompletedClub}&completedScope=${currentCompletedScope}`;
+
+    // --- WRAPPER PER LA PAGINAZIONE LATO SERVER (SERVER COMPONENT) ---
+    const renderPagination = (type: 'players' | 'matches', total: number, current: number) => {
+        if (total <= 1) return null;
+
+        // Calcola la finestra di 5 pagine (es: 1 2 3 4 5 oppure 4 5 6 7 8)
+        const maxVisible = 5;
+        let start = Math.max(1, current - Math.floor(maxVisible / 2));
+        let end = Math.min(total, start + maxVisible - 1);
+
+        if (end - start + 1 < maxVisible) {
+            start = Math.max(1, end - maxVisible + 1);
+        }
+
+        const visiblePages = [];
+        for (let i = start; i <= end; i++) {
+            visiblePages.push(i);
+        }
+
+        // Helper per renderizzare il singolo bottone o Link
+        const renderButton = (page: number, label: string | number, title: string, disabled: boolean, isActive: boolean = false) => {
+            const buttonClass = `w-8 h-8 flex items-center justify-center border rounded-sm text-[10px] font-black uppercase tracking-wider transition-colors ${
+                isActive
+                    ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
+                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white cursor-pointer'
+            }`;
+
+            // Se il bottone è disabilitato o è la pagina corrente, non è cliccabile (niente navigazione)
+            if (disabled || isActive) {
+                return (
+                    <button
+                        key={`${type}-${label}`}
+                        type="button"
+                        disabled={true}
+                        title={title}
+                        className={buttonClass}
+                    >
+                        {label}
+                    </button>
+                );
+            }
+
+            // Altrimenti, generiamo un vero Link di Next.js che non scrolla la pagina
+            const targetPlayerPage = type === 'players' ? page : playerPage;
+            const targetMatchPage = type === 'matches' ? page : currentPage;
+
+            const href = `/?tab=${currentTab}&gender=${currentGender}&sort=${currentSort}&search=${encodeURIComponent(currentSearch)}&slots=${currentSlots}&level=${currentLevel}&completedClub=${currentCompletedClub}&completedScope=${currentCompletedScope}&playerPage=${targetPlayerPage}&page=${targetMatchPage}`;
+
+            return (
+                <Link
+                    key={`${type}-${label}`}
+                    href={href}
+                    scroll={false}
+                    title={title}
+                    className={buttonClass}
+                >
+                    {label}
+                </Link>
+            );
+        };
+
+        return (
+            <div className="flex items-center justify-center gap-1 mt-6">
+                {/* Tasti Iniziali */}
+                {renderButton(1, '«', 'Prima Pagina', current === 1)}
+                {renderButton(Math.max(1, current - 1), '‹', 'Precedente', current === 1)}
+
+                {/* Pagine Numeriche */}
+                {visiblePages.map(p => renderButton(p, p, `Pagina ${p}`, false, p === current))}
+
+                {/* Tasti Finali */}
+                {renderButton(Math.min(total, current + 1), '›', 'Successiva', current === total)}
+                {renderButton(total, '»', 'Ultima Pagina', current === total)}
+            </div>
+        );
+    };
 
     return (
         <main className="bg-slate-50 flex flex-col items-center text-slate-900 mt-2">
@@ -261,7 +323,6 @@ export default async function Home({ searchParams }: PageProps) {
                                 paginatedPlayers.map((player, index) => {
                                     const rankIndex = startIndex + index + 1;
                                     const playerId = player.id;
-
                                     const kingSide = kingLeftIds.includes(playerId) ? 'SX' : kingRightIds.includes(playerId) ? 'DX' : kingBothIds.includes(playerId) ? 'MIX' : null;
                                     const fanalinoSide = lastPlaceLeftIds.includes(playerId) ? 'SX' : lastPlaceRightIds.includes(playerId) ? 'DX' : lastPlaceBothIds.includes(playerId) ? 'MIX' : null;
 
@@ -329,14 +390,7 @@ export default async function Home({ searchParams }: PageProps) {
                             )}
                         </div>
 
-                        {/* PAGINAZIONE GIOCATORI */}
-                        {totalPlayerPages > 1 && (
-                            <div className="flex justify-between items-center mt-6 px-2">
-                                <Link href={`/?tab=ranking&playerPage=${playerPage - 1}&page=${currentPage}&sort=${currentSort}&gender=${currentGender}&search=${currentSearch}&slots=${currentSlots}&level=${currentLevel}&completedClub=${currentCompletedClub}&completedScope=${currentCompletedScope}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-900 rounded-sm hover:bg-slate-100 transition-colors ${playerPage <= 1 ? 'pointer-events-none opacity-40' : ''}`}>← Prev</Link>
-                                <div className="text-xs font-bold text-slate-500">PAG {playerPage} / {totalPlayerPages}</div>
-                                <Link href={`/?tab=ranking&playerPage=${playerPage + 1}&page=${currentPage}&sort=${currentSort}&gender=${currentGender}&search=${currentSearch}&slots=${currentSlots}&level=${currentLevel}&completedClub=${currentCompletedClub}&completedScope=${currentCompletedScope}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-900 rounded-sm hover:bg-slate-100 transition-colors ${playerPage >= totalPlayerPages ? 'pointer-events-none opacity-40' : ''}`}>Next →</Link>
-                            </div>
-                        )}
+                        {renderPagination('players', totalPlayerPages, playerPage)}
                     </div>
                 )}
 
@@ -352,7 +406,6 @@ export default async function Home({ searchParams }: PageProps) {
 
                                     return (
                                         <div key={match.id} className="relative group">
-                                            {/* SEZIONE BADGE DINAMICI IN ALTO A DESTRA */}
                                             <div className="absolute -top-2 right-2 z-10 flex gap-1">
                                                 {match.is_friendly && (
                                                     <span className="bg-purple-600 text-white text-[8px] font-black px-2 py-0.5 rounded-sm shadow-md uppercase tracking-widest border border-purple-700">
@@ -366,7 +419,6 @@ export default async function Home({ searchParams }: PageProps) {
                                                 )}
                                             </div>
 
-                                            {/* Container Card condizionato dallo stato temporale */}
                                             <div className={
                                                 isExpired
                                                     ? "border-2 border-rose-500 rounded-sm overflow-hidden opacity-90 hover:opacity-100 transition-all shadow-sm"
@@ -393,7 +445,7 @@ export default async function Home({ searchParams }: PageProps) {
                 )}
 
                 {/* =========================================
-                    TAB 3: RISULTATI COMPLETATI (With Filters)
+                    TAB 3: RISULTATI COMPLETATI
                 ========================================= */}
                 {currentTab === 'completed' && (
                     <div className="animate-in fade-in duration-300 space-y-4">
@@ -416,7 +468,6 @@ export default async function Home({ searchParams }: PageProps) {
                             <ClubSelectFilter clubs={clubsList} currentClub={currentCompletedClub} />
                         </div>
 
-                        {/* LISTA RISULTATI FILTRATI */}
                         {completedMatches && completedMatches.length > 0 ? (
                             completedMatches.map((match) => {
                                 const winner = match.winning_team;
@@ -448,7 +499,6 @@ export default async function Home({ searchParams }: PageProps) {
                                         </div>
 
                                         <div className="flex flex-col sm:flex-row items-center p-0 sm:p-2">
-                                            {/* Team A */}
                                             <div className={`flex-1 w-full sm:w-auto p-4 flex flex-col justify-center ${winner === 'A' ? 'bg-emerald-50/50' : ''}`}>
                                                 <div className="flex items-center gap-2 mb-1.5">
                                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">TEAM A</span>
@@ -458,7 +508,6 @@ export default async function Home({ searchParams }: PageProps) {
                                                 <div className="text-sm font-black text-slate-900 uppercase">{getPlayerNameWithRanking(match.team_a_right_id, playersWithStats)}</div>
                                             </div>
 
-                                            {/* Punteggio Centrale */}
                                             <div className="px-6 py-4 flex items-center justify-center border-y sm:border-y-0 sm:border-x border-slate-100 bg-slate-50 w-full sm:w-auto">
                                                 <div className="flex gap-2">
                                                     {sets.length > 0 ? sets.map((set, sIdx) => (
@@ -469,7 +518,6 @@ export default async function Home({ searchParams }: PageProps) {
                                                 </div>
                                             </div>
 
-                                            {/* Team B */}
                                             <div className={`flex-1 w-full sm:w-auto p-4 flex flex-col justify-center sm:text-right ${winner === 'B' ? 'bg-emerald-50/50' : ''}`}>
                                                 <div className="flex items-center sm:justify-end gap-2 mb-1.5">
                                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">TEAM B</span>
@@ -488,14 +536,7 @@ export default async function Home({ searchParams }: PageProps) {
                             </div>
                         )}
 
-                        {/* PAGINAZIONE STORICO */}
-                        {totalPages > 1 && (
-                            <div className="flex justify-between items-center mt-6">
-                                <Link href={`/?tab=completed&page=${currentPage - 1}&playerPage=${playerPage}&sort=${currentSort}&gender=${currentGender}&search=${currentSearch}&slots=${currentSlots}&level=${currentLevel}&completedClub=${currentCompletedClub}&completedScope=${currentCompletedScope}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-900 rounded-sm hover:bg-slate-100 transition-colors ${currentPage <= 1 ? 'pointer-events-none opacity-40' : ''}`}>← Prev</Link>
-                                <div className="text-xs font-bold text-slate-500">PAG {currentPage} / {totalPages}</div>
-                                <Link href={`/?tab=completed&page=${currentPage + 1}&playerPage=${playerPage}&sort=${currentSort}&gender=${currentGender}&search=${currentSearch}&slots=${currentSlots}&level=${currentLevel}&completedClub=${currentCompletedClub}&completedScope=${currentCompletedScope}`} scroll={false} className={`px-4 py-2 bg-white border border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-900 rounded-sm hover:bg-slate-100 transition-colors ${currentPage >= totalPages ? 'pointer-events-none opacity-40' : ''}`}>Next →</Link>
-                            </div>
-                        )}
+                        {renderPagination('matches', totalPages, currentPage)}
                     </div>
                 )}
             </div>
