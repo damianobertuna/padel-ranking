@@ -4,8 +4,7 @@ import BackToHomeButton from "@/components/BackToHomeButton";
 
 export default function GuidePage() {
     return (
-        // Aggiunto mt-6 per l'allineamento perfetto con il nuovo Header globale
-        <main className="w-full max-w-4xl mx-auto px-4 sm:px-8 mt-6">
+        <main className="w-full max-w-4xl mx-auto px-4 sm:px-8 mt-6 pb-12">
             <div className="bg-white p-6 sm:p-10 border border-slate-200 shadow-sm rounded-sm">
 
                 {/* Header Istituzionale */}
@@ -20,37 +19,37 @@ export default function GuidePage() {
                     {[
                         {
                             n: "01",
-                            t: "Creazione e Strategia",
-                            d: "Quando crei una 'Nuova Partita', i menu a tendina ti mostrano subito chi detiene i titoli di 👑 KING e 🐢 FANALINO. Sfrutta questa informazione per pianificare alleanze tattiche o per organizzare imboscate mirate al punteggio bonus.",
+                            t: "Creazione, Ricerca e Logica MIX",
+                            d: "Usa la barra di ricerca integrata nelle tendine per trovare velocemente i giocatori. L'algoritmo tattico è intelligente: se posizioni un atleta con preferenza MIX in uno slot, il sistema sbloccherà automaticamente il compagno, permettendoti di schierare giocatori SX, DX o altri MIX senza restrizioni.",
                             img: "/guide/guida_1.png"
                         },
                         {
                             n: "02",
-                            t: "Gestione Slot: Entra & Esci",
-                            d: "Sulle card dei match aperti puoi occupare uno slot libero o aggiungere un amico. Se hai un imprevisto, puoi liberare il tuo posto istantaneamente tramite il tasto di rimozione. Fai attenzione: la flessibilità finisce quando il match viene refertato.",
+                            t: "Gestione Slot e Convocazioni",
+                            d: "Puoi occupare uno slot libero o invitare amici condividendo il match su WhatsApp. Il sistema genererà un messaggio smart con il link Google Maps del circolo e l'indicazione dinamica [SX/DX] per indicare le posizioni ancora vacanti in campo.",
                             img: "/guide/guida_2.png"
                         },
                         {
                             n: "03",
-                            t: "Il Ruolo dell'Organizzatore (👑 ORG)",
-                            d: "Colui che crea il match riceve il badge 👑 ORG sulla card. L'organizzatore ha i 'superpoteri': gestisce le defezioni dell'ultimo minuto, può rimuovere qualsiasi giocatore e ha la responsabilità esclusiva di inserire il risultato finale (azione irreversibile).",
+                            t: "Privacy e Referto Inviolabile",
+                            d: "Per garantire la massima sicurezza e integrità dei dati, le card dei match sono protette. Solo i 4 giocatori scesi in campo (o l'organizzatore originale della partita) vedranno i pulsanti per modificare i partecipanti o per registrare il risultato finale (azione irreversibile). Gli esterni potranno solo visualizzare.",
                             img: "/guide/guida_3.png"
                         },
                         {
                             n: "04",
-                            t: "Dinamiche di Neutralizzazione",
-                            d: "Il sistema di punteggio risolve i paradossi in automatico. Se un King gioca contro un altro King (o un Fanalino contro un Fanalino), le forze speciali si annullano ('Neutralizzazione') e la partita assegnerà i normali punti base a tutti i giocatori.",
+                            t: "Fair Play, Divari e Amichevoli",
+                            d: "Nelle partite Classificate, il sistema blocca la registrazione se la differenza tecnica tra i giocatori supera i ±0.25 punti. Vuoi giocare con un principiante o organizzare una partita fuori dai parametri? Seleziona il regolamento '🤝 Amichevole': il blocco sparirà e potrete giocare liberamente senza intaccare l'Elo personale.",
+                            img: "/guide/guida_5.png"
                         },
                         {
                             n: "05",
-                            t: "Fair Play e Divario Tecnico",
-                            d: "Per garantire partite equilibrate, il sistema impedisce la creazione di match dove la differenza di Ranking tra il giocatore più forte e quello più debole in campo supera la soglia di 0.25 punti. Se compare l'avviso rosso di divario eccessivo, dovrete rimescolare i giocatori selezionati.",
-                            img: "/guide/guida_5.png"
+                            t: "Dinamiche di Neutralizzazione",
+                            d: "Nelle partite Classificate, il sistema di punteggio risolve i paradossi in automatico. Se un King gioca contro un altro King (o un Fanalino contro un Fanalino), le forze speciali si annullano ('Neutralizzazione') e la partita assegnerà i normali punti base a tutti i giocatori.",
                         },
                         {
                             n: "06",
                             t: "Analisi e Statistiche Profilo",
-                            d: "Ogni atleta ha una dashboard personale pubblica. Cliccando sul nome o sull'avatar di un giocatore in qualsiasi schermata, potrai studiare il suo Win Rate storico, scoprire con quale compagno rende di più ('Partner Ideale') e contro chi perde più spesso ('Nemesi').",
+                            d: "Ogni atleta ha una dashboard personale pubblica. Cliccando sul nome o sull'avatar di un giocatore, potrai studiare il suo Win Rate storico, scoprire con quale compagno rende di più ('Partner Ideale') e contro chi perde più spesso ('Nemesi'). I match amichevoli non alterano queste statistiche.",
                             img: "/guide/guida_6.png"
                         }
                     ].map((step) => (
@@ -77,7 +76,7 @@ export default function GuidePage() {
                         </section>
                     ))}
 
-                    {/* Tabella Punteggio (Arricchita con la regola malus) */}
+                    {/* Tabella Punteggio */}
                     <section className="bg-slate-900 p-6 text-white rounded-sm shadow-md">
                         <h2 className="text-[10px] font-black uppercase tracking-widest mb-6 border-b border-slate-700 pb-2">Sistema Punteggio RanKING</h2>
                         <div className="space-y-3 text-[10px] font-black uppercase tracking-widest">
@@ -85,7 +84,8 @@ export default function GuidePage() {
                             <div className="flex justify-between border-b border-slate-800 pb-2"><span>SCONFITTA STANDARD</span> <span className="text-red-400">-0.05</span></div>
                             <div className="flex justify-between border-b border-slate-800 pb-2"><span>VITTORIA VS KING (Cacciatore)</span> <span className="text-emerald-400">+0.10</span></div>
                             <div className="flex justify-between border-b border-slate-800 pb-2"><span>SCONFITTA DELLA COPPIA REAL</span> <span className="text-red-400">-0.10</span></div>
-                            <div className="flex justify-between border-b border-slate-800 pb-2 border-b-transparent"><span>RISCATTO FANALINO (Vittoria)</span> <span className="text-emerald-400">+0.10</span></div>
+                            <div className="flex justify-between border-b border-slate-800 pb-2"><span>RISCATTO FANALINO (Vittoria)</span> <span className="text-emerald-400">+0.10</span></div>
+                            <div className="flex justify-between border-b border-slate-800 pb-2 border-b-transparent"><span>MATCH AMICHEVOLE (Qualsiasi Esito)</span> <span className="text-slate-400">0.00</span></div>
                         </div>
                     </section>
 

@@ -2,7 +2,7 @@ name: RanKING Padel CI
 
 on:
   push:
-    branches: [ main ] # Fai partire la pipeline ogni volta che pushi su main
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
@@ -17,11 +17,33 @@ jobs:
       - name: Configura Node.js
         uses: actions/setup-node@v4
         with:
-          node-size: 20
+          node-version: 20 # Corretto il refuso 'node-size'
           cache: 'npm'
 
       - name: Installa le dipendenze
         run: npm ci
 
+      # 1. BARRIERA TYPESCRIPT: Blocca il deploy se ci sono errori di tipo (es. null passati dove serve number)
+      - name: Controllo statico dei Tipi (TypeScript)
+        run: npx tsc --noEmit
+
+      # 2. BARRIERA LINTER: Controlla errori di sintassi Next.js/React
+      - name: Controllo qualità del codice (Linter)
+        run: npm run lint
+
+      # 3. BARRIERA DATABASE: Verifica che le migrazioni SQL siano valide e non manchino colonne in produzione
+      - name: Configura Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Avvia Supabase Locale ed esegui Migrazioni
+        run: supabase start
+
+      # 4. ESECUZIONE TEST: Lancia Vitest come facevi già
       - name: Esegui la suite di test
-        run: npm run test:run # Presuppone che tu abbia "test:run": "vitest run" nel package.json
+        run: npm run test:run
+        env:
+          # Inietta le variabili d'ambiente locali per permettere ai test (se necessario in futuro) di parlare col DB finto
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY || 'chiave_anonima_di_test_generica' }}
