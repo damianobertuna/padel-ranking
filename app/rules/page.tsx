@@ -4,7 +4,7 @@ import BackToHomeButton from "@/components/BackToHomeButton";
 
 export default function RegulationsPage() {
     return (
-        <main className="w-full max-w-4xl mx-auto px-4 sm:px-8">
+        <main className="w-full max-w-4xl mx-auto px-4 sm:px-8 pb-12">
             <div className="max-w-4xl w-full bg-white p-6 sm:p-10 border border-slate-200 shadow-sm rounded-sm">
 
                 <div className="mb-8"><BackToHomeButton /></div>
@@ -16,12 +16,11 @@ export default function RegulationsPage() {
 
                 <div className="space-y-8">
                     {/* ARTICOLI 1-10 */}
-                    {/* ARTICOLI 1-10 */}
                     {[
                         {
                             n: "01",
                             t: "Registrazione e Livello Iniziale",
-                            d: <>L'iscrizione alla piattaforma è totalmente gratuita. In fase di registrazione ti verranno richiesti i dati di base, il tuo lato di preferenza e una <strong>autovalutazione del tuo livello</strong> di partenza. Puoi stimarlo tramite la <a href="https://www.padelnuestro.com/it/blog/livelli-del-padel" target="_blank" rel="noopener noreferrer" className="text-blue-600 font-black hover:underline">GUIDA UFFICIALE DEI LIVELLI PADEL</a> o chiedendo supporto al tuo Maestro. Sarà poi il campo a delineare il tuo valore reale.<br/><br/><strong>Nota sul Valore RanKING:</strong> A differenza delle classifiche statiche (es. NTRP) che servono solo a stabilire l'esperienza iniziale, il Valore RanKING (frazionato di 0.05 in 0.05) è un indicatore dinamico che si aggiorna costantemente in base ai tuoi risultati e al confronto diretto con il resto della Community.</>
+                            d: <>L'iscrizione alla piattaforma è totalmente gratuita. In fase di registrazione ti verranno richiesti i dati di base, il tuo lato di preferenza e una <strong>autovalutazione del tuo livello</strong> di partenza. Puoi stimarlo tramite la <a href="https://www.padelnuestro.com/it/blog/livelli-del-padel" target="_blank" rel="noopener noreferrer" className="text-blue-600 font-black hover:underline">GUIDA UFFICIALE DEI LIVELLI PADEL</a> o chiedendo supporto al tuo Maestro. Sarà poi il campo a delineare il tuo valore reale.<br/><br/><strong>Nota sul Valore RanKING:</strong> A differenza delle classifiche statiche (es. NTRP) che servono solo a stabilire l'esperienza iniziale, il Valore RanKING (frazionato di 0.05 in 0.05) è un indicatore dinamico che si aggiorna costantemente in base ai tuoi risultati e al confronto directo con il resto della Community.</>
                         },
                         {
                             n: "02",
@@ -31,17 +30,20 @@ export default function RegulationsPage() {
                         {
                             n: "03",
                             t: "Equilibrio in Campo (Regola del ±0.25)",
-                            d: <>Per garantire match competitivi e renderli validi per il circuito, è obbligatorio che il livello dei 4 partecipanti rientri in un <strong>range di valore complessivo di ±0.25</strong>. La WebApp effettua un controllo in tempo reale: se il dislivello tra i giocatori supera questa soglia, il sistema bloccherà la creazione del match (siete liberi di giocare un'amichevole, ma non assegnerà punti RanKING).</>
+                            d: <>Per garantire match competitivi nelle partite Classificate, è obbligatorio che il livello dei 4 partecipanti rientri in un <strong>range di valore complessivo di ±0.25</strong>. La WebApp effettua un controllo in tempo reale: se il dislivello tra i giocatori supera questa soglia, il sistema bloccherà la creazione del match.<br/><br/><span className="text-purple-600 font-bold">Bypass Amichevole:</span> Se desideri giocare con amici di livello molto diverso, puoi impostare il match come <strong>Amichevole</strong>. In questo modo il blocco del ±0.25 viene completamente disattivato.</>
                         },
                         {
                             n: "04",
-                            t: "Registrazione dei Risultati",
-                            d: <>Al termine dell'incontro, l’organizzatore del match (o uno dei partecipanti) dovrà inserire tempestivamente il risultato nella WebApp, specificando il punteggio esatto di Game e Set. La vittoria viene assegnata alla squadra che si aggiudica la partita <strong>al meglio dei 3 set</strong>.</>
+                            t: "Registrazione dei Risultati e Sicurezza",
+                            d: <>Al termine dell'incontro, il punteggio deve essere inserito tempestivamente nella WebApp, specificando il punteggio esatto di Game e Set (al meglio dei 3 set).<br/><br/><span className="text-red-600 font-bold">Restrizione Permessi:</span> Per garantire l'integrità dei dati ed evitare manomissioni esterne, la schermata di inserimento del risultato e la modifica dei dati del match <strong>sono visibili e accessibili esclusivamente ai 4 partecipanti scesi in campo</strong> (oltre all'Amministratore della piattaforma).</>
                         },
                         {
                             n: "05",
-                            t: "Punteggio Base (Vittorie e Sconfitte)",
-                            d: <>Al salvataggio del risultato, il sistema interviene automaticamente sui profili: aggiungerà <strong>+0.05</strong> al punteggio della coppia vincitrice e sottrarrà <strong>-0.05</strong> agli sconfitti, aggiornando la classifica generale e le statistiche personali in tempo reale.</>
+                            t: "Punteggio Base (Classificate vs Amichevoli)",
+                            d: <>
+                                <strong>• Match Classificato:</strong> Al salvataggio del risultato, il sistema aggiunge automaticamente <strong>+0.05</strong> al punteggio della coppia vincitrice e sottrae <strong>-0.05</strong> agli sconfitti, aggiornando le classifiche in tempo reale.<br/>
+                                <strong>• Match Amichevole:</strong> Lo scontro non ha alcun impatto sul ranking. Al momento della chiusura, la variazione di punti è blindata a <strong>0.00 assoluto</strong> per tutti i giocatori, indipendentemente da chi abbia vinto l'incontro.
+                            </>
                         },
                         {
                             n: "06",
@@ -52,7 +54,7 @@ export default function RegulationsPage() {
                             n: "07",
                             t: "Sconfiggere un KING (Bonus e Malus)",
                             d: <>
-                                <strong>• Bonus Vittoria (+0.10):</strong> Se una coppia sconfigge una squadra in cui milita un KING, ottiene il doppio dei punti. <br/>
+                                <strong>• Bonus Vittoria (+0.10):</strong> Se in un match competitivo una coppia sconfigge una squadra in cui milita un KING, ottiene il doppio dei punti. <br/>
                                 <strong>• Malus Sconfitta:</strong> Agli sconfitti si applica il normale -0.05. Tuttavia, se due KING giocano in coppia e vengono battuti da due giocatori "normali", subiranno un malus raddoppiato di <strong>-0.10</strong>.<br/>
                                 <span className="text-amber-600 font-bold">Eccezione di Neutralizzazione:</span> Se è presente almeno un KING in <em>entrambe</em> le squadre, tutti i moltiplicatori si annullano e la partita assegna il classico ±0.05.
                             </>
@@ -61,14 +63,14 @@ export default function RegulationsPage() {
                             n: "08",
                             t: "Il Riscatto del FANALINO (Bonus Vittoria)",
                             d: <>
-                                Se un FANALINO vince una partita, garantisce a sé stesso e al proprio compagno di squadra un <strong>punteggio raddoppiato (+0.10)</strong>, a prescindere dal livello del compagno. Alla coppia sconfitta verrà regolarmente sottratto -0.05.<br/>
+                                Se in un match competitivo un FANALINO vince una partita, garantisce a sé stesso e al proprio compagno di squadra un <strong>punteggio raddoppiato (+0.10)</strong>, a prescindere dal livello del compagno. Alla coppia sconfitta verrà regolarmente sottratto -0.05.<br/>
                                 <span className="text-amber-600 font-bold">Eccezione di Neutralizzazione:</span> Anche in questo caso, se è presente un FANALINO in <em>entrambe</em> le squadre avversarie, il bonus si annulla e la partita assegna il classico ±0.05.
                             </>
                         },
                         {
                             n: "09",
                             t: "Partite Consecutive e Tetto Punti",
-                            d: <>È consentito giocare più partite ufficiali nella stessa giornata, sia mantenendo le coppie che mischiandole. <strong>I Bonus e i Malus non sono mai cumulabili</strong> tra loro: la variazione massima consentita dal sistema per una singola partita è fissata a ±0.10. Le partite consecutive vanno registrate singolarmente sulla piattaforma.</>
+                            d: <>È consentito giocare più partite ufficiali nella stessa giornata, sia mantenendo le coppie che mischiandole. <strong>I Bonus e i Malus non sono mai cumulabili</strong> tra loro: la variazione massima consentita dal sistema per una singola partita classificata è fissata a ±0.10. Le partite consecutive vanno registrate singolarmente sulla piattaforma.</>
                         },
                         {
                             n: "10",
@@ -92,10 +94,12 @@ export default function RegulationsPage() {
                         <h3 className="text-[10px] font-black uppercase tracking-widest mb-6 border-b border-slate-700 pb-2">🛡️ Vincoli di Architettura e Organizzazione Match nell'App</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {[
-                                { t: "Validazione Dinamica", d: "È possibile salvare una partita lasciando alcuni slot vuoti. La barriera di sbilanciamento (±0.25) si attiva non appena sono presenti almeno 2 giocatori." },
-                                { t: "Controllo Anti-Clonazione", d: "Il sistema impedisce l'inserimento dello stesso giocatore in più posizioni contemporaneamente, sia in creazione che durante la partecipazione autonoma." },
-                                { t: "Filtro Tattico", d: "I menu a tendina escludono i giocatori fuori ruolo. SX o DX compaiono solo negli slot corretti; i giocatori MIX sono sempre selezionabili." },
-                                { t: "Registro Audit Log", d: "Per garantire trasparenza, ogni operazione di registrazione, creazione match o cancellazione viene tracciata nel sistema per l'amministratore." }
+                                { t: "Validazione Dinamica", d: "È possibile salvare una partita lasciando alcuni slot vuoti per la raccolta adesioni. La barriera di sbilanciamento (±0.25) si attiva solo per i match Classificati non appena sono presenti almeno 2 giocatori." },
+                                { t: "Controllo Anti-Clonazione", d: "Il sistema impedisce l'inserimento dello stesso giocatore in più posizioni contemporaneamente, sia in fase di creazione che durante la prenotazione autonoma degli slot." },
+                                { t: "Filtro Tattico Flessibile (MIX)", d: "Le dropdown integrano un motore di ricerca per nome/cognome e indicano il lato preferito. L'algoritmo è intelligente: se in una coppia inserisci un giocatore MIX (Both), l'altro slot si svincola accettando partner DX, SX o altri MIX." },
+                                { t: "Privacy e Gestione Ruoli", d: "I match in programma non sono modificabili da utenti esterni. Solo i giocatori iscritti all'incontro, l'organizzatore originale o l'admin possono alterare la formazione o caricare i set." },
+                                { t: "Registro Audit Log Pro", d: "Ogni azione (creazione, cambio giocatore, cancellazione manuale o automatica) viene tracciata. Alla risoluzione, il sistema effettua uno snapshot storico blindato del punteggio Elo pre e post partita." },
+                                { t: "Cancellazione Automatica", d: "Se un giocatore abbandona un match in programma lasciandolo completamente vuoto, la WebApp provvede all'eliminazione automatica della card per mantenere pulita la bacheca." }
                             ].map((v) => (
                                 <div key={v.t} className="p-4 bg-slate-800 rounded-sm">
                                     <p className="text-[9px] font-black uppercase text-slate-400 mb-1">{v.t}</p>
