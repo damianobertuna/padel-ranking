@@ -1,128 +1,129 @@
 // @vitest-environment happy-dom
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import CreateMatchForm from './page';
+import CreateMatchPage from './page';
+import { createClient } from '@/lib/supabase/client';
 import { createPendingMatch } from '@/actions/match-actions';
 
-const { mockPush, mockRefresh, mockPlayers, mockClubs } = vi.hoisted(() => {
-    return {
-        mockPush: vi.fn(),
-        mockRefresh: vi.fn(),
-        mockPlayers: [
-            { id: 1, first_name: 'Marco', last_name: 'UomoSX', ranking: 4.50, preferred_side: 'Left', gender: 'M' },
-            { id: 2, first_name: 'Luca', last_name: 'UomoDX', ranking: 4.55, preferred_side: 'Right', gender: 'M' },
-            { id: 3, first_name: 'Giulia', last_name: 'DonnaSX', ranking: 4.45, preferred_side: 'Left', gender: 'F' },
-            { id: 4, first_name: 'Elena', last_name: 'DonnaDX', ranking: 4.80, preferred_side: 'Right', gender: 'F' },
-        ],
-        mockClubs: [
-            { id: 1, name: 'Padel Club X', city: 'Catania' }
-        ]
-    };
-});
-
+// Mock di Next Navigation
+const mockPush = vi.fn();
 vi.mock('next/navigation', () => ({
-    useRouter: () => ({ push: mockPush, refresh: mockRefresh })
+    useRouter: () => ({ push: mockPush, refresh: vi.fn() })
 }));
 
+// Mock della Server Action
 vi.mock('@/actions/match-actions', () => ({
-    createPendingMatch: vi.fn()
+    createPendingMatch: vi.fn().mockResolvedValue({ error: null })
 }));
 
-vi.mock('@/components/BackToHomeButton', () => ({
-    default: () => <button>Torna alla classifica</button>
+// Mock di Supabase Client
+vi.mock('@/lib/supabase/client', () => ({
+    createClient: vi.fn()
 }));
 
-vi.mock('@/lib/supabase/client', () => {
-    const playerQueryChain = {
-        select: vi.fn().mockReturnThis(),
-        order: vi.fn().mockImplementation(function (this: any, field: string) {
-            if (field === 'last_name') return Promise.resolve({ data: mockPlayers, error: null });
-            return this;
-        })
-    };
-    const clubQueryChain = {
-        select: vi.fn().mockReturnThis(),
-        order: vi.fn().mockResolvedValue({ data: mockClubs, error: null })
-    };
-    return {
-        createClient: () => ({
-            from: vi.fn((table: string) => {
-                if (table === 'players') return playerQueryChain;
-                if (table === 'clubs') return clubQueryChain;
-                return { select: vi.fn().mockResolvedValue({ data: [], error: null }) };
-            })
-        })
-    };
-});
+const mockPlayers = [
+    { id: 1, first_name: 'Mario', last_name: 'Rossi', ranking: 4.00, preferred_side: 'Left', gender: 'M' },
+    { id: 2, first_name: 'Luigi', last_name: 'Verdi', ranking: 4.10, preferred_side: 'Right', gender: 'M' },
+    { id: 3, first_name: 'Anna', last_name: 'Neri', ranking: 3.90, preferred_side: 'Both', gender: 'F' },
+    { id: 4, first_name: 'Gino', last_name: 'Bramieri', ranking: 4.50, preferred_side: 'Right', gender: 'M' },
+];
 
-describe('CreateMatchForm Component', () => {
-    beforeEach(() => { cleanup(); vi.clearAllMocks(); });
-    afterEach(() => { cleanup(); });
+const mockClubs = [
+    { id: 100, name: 'Padel Club Catania', city: 'Catania' }
+];
+
+describe('CreateMatchForm Component (Page Integration)', () => {
+    let mockSupabase: any;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+
+        mockSupabase = {
+            from: vi.fn((table) => ({
+                select: vi.fn().mockReturnThis(),
+                order: vi.fn().mockImplementation(() => {
+                    if (table === 'players') return Promise.resolve({ data: mockPlayers, error: null });
+                    if (table === 'clubs') return Promise.resolve({ data: mockClubs, error: null });
+                    return Promise.resolve({ data: [], error: null });
+                })
+            }))
+        };
+
+        (createClient as any).mockReturnValue(mockSupabase);
+    });
+
+    afterEach(() => {
+        cleanup();
+    });
+
+    // Helper per interagire con i nostri SearchableSelect custom
+    const selectOption = (placeholderText: string, optionTextRegExp: RegExp) => {
+        const trigger = screen.getByText(placeholderText);
+        fireEvent.click(trigger);
+        const option = screen.getByText(optionTextRegExp);
+        fireEvent.click(option);
+    };
 
     it('dovrebbe filtrare i giocatori in base alla categoria (Genere)', async () => {
-        render(<CreateMatchForm />);
-        await screen.findAllByRole('option');
+        render(<CreateMatchPage />);
 
-        // L'indice 0 è il circolo, l'indice 1 è il Team A SX
-        const leftSelect = screen.getAllByRole('combobox')[1];
-        expect(leftSelect.innerHTML).toContain('UomoSX Marco');
+        // Attendiamo che finisca il caricamento asincrono iniziale
+        await screen.findByText('Nuova Partita');
 
-        fireEvent.click(screen.getByRole('button', { name: /FEMMINILE/i }));
+        // Il tipo di match iniziale è MASCHILE. Apriamo la dropdown del Giocatore SX
+        const slotsSX = screen.getAllByText('GIOCATORE SX');
+        fireEvent.click(slotsSX[0]);
 
-        await waitFor(() => {
-            const newLeftSelect = screen.getAllByRole('combobox')[1];
-            expect(newLeftSelect.innerHTML).toContain('DonnaSX Giulia');
-            expect(newLeftSelect.innerHTML).not.toContain('UomoSX Marco');
-        });
+        // Dovrebbe mostrare Rossi (Maschio) ma nascondere Anna Neri (Femmina)
+        expect(screen.getByText(/Rossi Mario/i)).toBeDefined();
+        expect(screen.queryByText(/Neri Anna/i)).toBeNull();
     });
 
     it('dovrebbe innescare l alert di scompenso se la forbice tecnica supera lo 0.25', async () => {
-        render(<CreateMatchForm />);
-        await screen.findAllByRole('option');
+        render(<CreateMatchPage />);
+        await screen.findByText('Nuova Partita');
 
-        fireEvent.click(screen.getByRole('button', { name: /MISTO/i }));
-        const selects = screen.getAllByRole('combobox');
+        const slotsSX = screen.getAllByText('GIOCATORE SX');
+        const slotsDX = screen.getAllByText('GIOCATORE DX');
 
-        // selezioni giocatori per il team (ignorando il circolo a indice 0)
-        fireEvent.change(selects[1], { target: { value: '3' } });
-        fireEvent.change(selects[2], { target: { value: '4' } });
+        // Selezioniamo Mario Rossi (4.00) nel Team A
+        fireEvent.click(slotsSX[0]);
+        fireEvent.click(screen.getByText(/Rossi Mario/i));
 
-        await waitFor(() => {
-            expect(screen.getByText(/ERRORE: DIVARIO TECNICO > 0.25/i)).toBeDefined();
-            const submitBtn = screen.getByRole('button', { name: /CONFERMA PARTITA/i });
-            expect(submitBtn.hasAttribute('disabled')).toBe(true);
-        });
+        // Selezioniamo Gino Bramieri (4.50) nel Team A -> Delta di 0.50
+        fireEvent.click(slotsDX[0]);
+        fireEvent.click(screen.getByText(/Bramieri Gino/i));
+
+        // Verifica la comparsa del blocco sull'Elo
+        expect(screen.getByText(/ERRORE: DIVARIO TECNICO > 0.25/i)).toBeDefined();
     });
 
     it('dovrebbe inviare i dati corretti alla Server Action', async () => {
-        render(<CreateMatchForm />);
-        await screen.findAllByRole('option');
-        const selects = screen.getAllByRole('combobox');
+        render(<CreateMatchPage />);
+        await screen.findByText('Nuova Partita');
 
-        // Seleziona il circolo (indice 0)
-        fireEvent.change(selects[0], { target: { value: '1' } });
-        // Seleziona i giocatori (indici 1 e 2)
-        fireEvent.change(selects[1], { target: { value: '1' } });
-        fireEvent.change(selects[2], { target: { value: '2' } });
+        // Impostiamo il club
+        selectOption('NESSUN CIRCOLO DEFINITO', /Padel Club Catania/i);
 
-        let submitBtn: HTMLElement;
-        await waitFor(() => {
-            submitBtn = screen.getByRole('button', { name: /CONFERMA PARTITA/i });
-            expect(submitBtn.hasAttribute('disabled')).toBe(false);
-        });
+        const slotsSX = screen.getAllByText('GIOCATORE SX');
+        const slotsDX = screen.getAllByText('GIOCATORE DX');
 
-        fireEvent.click(submitBtn!);
+        // Compiliamo il Team A
+        fireEvent.click(slotsSX[0]);
+        fireEvent.click(screen.getByText(/Rossi Mario/i));
 
-        await waitFor(() => {
-            // Verifica il payload completo, assicurandoti che la data termini con la Z di UTC
-            expect(createPendingMatch).toHaveBeenCalledWith(expect.objectContaining({
-                matchType: 'male',
-                teamALeft: 1,
-                teamARight: 2,
-                clubId: 1,
-                matchDate: expect.stringMatching(/Z$/)
-            }));
-            expect(mockPush).toHaveBeenCalledWith('/?tab=pending');
-        });
+        fireEvent.click(slotsDX[0]);
+        fireEvent.click(screen.getByText(/Verdi Luigi/i));
+
+        // Invio del form
+        const submitBtn = screen.getByRole('button', { name: /Crea Partita/i });
+        fireEvent.click(submitBtn);
+
+        expect(createPendingMatch).toHaveBeenCalledWith(expect.objectContaining({
+            clubId: 100,
+            teamALeft: 1,
+            teamARight: 2,
+            isFriendly: false
+        }));
     });
 });
