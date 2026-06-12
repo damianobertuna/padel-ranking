@@ -23,6 +23,7 @@ export interface Match {
     team_a_delta?: number | null;
     team_b_delta?: number | null;
     organizer_id: number | null;
+    is_friendly: boolean;
 }
 
 export interface MatchWithResult {

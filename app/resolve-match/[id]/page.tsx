@@ -60,27 +60,30 @@ export default function ResolveMatch() {
         const teamAIds = [match.team_a_left_id, match.team_a_right_id].filter((id): id is number => id !== null);
         const teamBIds = [match.team_b_left_id, match.team_b_right_id].filter((id): id is number => id !== null);
 
-        const ctx: MatchContext = {
-            winnerIds: finalWinningTeam === 'A' ? teamAIds : teamBIds,
-            loserIds: finalWinningTeam === 'A' ? teamBIds : teamAIds,
-            kingLeftIds: players.filter(p => p.preferred_side === 'Left').sort((a,b) => b.ranking - a.ranking).slice(0,1).map(p => p.id),
-            kingRightIds: players.filter(p => p.preferred_side === 'Right').sort((a,b) => b.ranking - a.ranking).slice(0,1).map(p => p.id),
-            kingBothIds: players.filter(p => p.preferred_side === 'Both').sort((a,b) => b.ranking - a.ranking).slice(0,1).map(p => p.id),
-            lastPlaceIds: players.sort((a,b) => a.ranking - b.ranking).slice(0,1).map(p => p.id),
-        };
+        // Se è un'amichevole, saltiamo del tutto il calcolo del contesto del ranking lato client
+        if (!match.is_friendly) {
+            const ctx: MatchContext = {
+                winnerIds: finalWinningTeam === 'A' ? teamAIds : teamBIds,
+                loserIds: finalWinningTeam === 'A' ? teamBIds : teamAIds,
+                kingLeftIds: players.filter(p => p.preferred_side === 'Left').sort((a,b) => b.ranking - a.ranking).slice(0,1).map(p => p.id),
+                kingRightIds: players.filter(p => p.preferred_side === 'Right').sort((a,b) => b.ranking - a.ranking).slice(0,1).map(p => p.id),
+                kingBothIds: players.filter(p => p.preferred_side === 'Both').sort((a,b) => b.ranking - a.ranking).slice(0,1).map(p => p.id),
+                lastPlaceIds: players.sort((a,b) => a.ranking - b.ranking).slice(0,1).map(p => p.id),
+            };
+            calculateRankingUpdates(ctx); // Logica applicata lato server in resolveMatchWithRanking
+        }
 
-        calculateRankingUpdates(ctx); // Logica applicata lato server in resolveMatchWithRanking
         try {
-            await resolveMatchWithRanking({ matchId: match.id, score: scoreArray });
+            await resolveMatchWithRanking({
+                matchId: match.id,
+                score: scoreArray
+            });
             router.push('/'); router.refresh();
         } catch (err: any) { setError(err.message); setSubmitting(false); }
     };
 
     if (pageLoading) return <main className="min-h-screen flex items-center justify-center text-[10px] font-black uppercase tracking-widest">Caricamento referto...</main>;
 
-    // === GUARDIA TYPESCRIPT ===
-    // Se il caricamento è finito ma il match non c'è, mostriamo un 404 e fermiamo l'esecuzione.
-    // Questo rassicura TypeScript che da qui in poi "match" non sarà mai null.
     if (!match) {
         return (
             <main className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-50">
@@ -96,19 +99,20 @@ export default function ResolveMatch() {
             </main>
         );
     }
-    // ==========================
 
     return (
         <main className="w-full max-w-4xl mx-auto px-4 sm:px-8">
             <div className=" w-full bg-white border border-slate-200 shadow-sm p-6 rounded-sm">
                 <div className="mb-6"><BackToHomeButton /></div>
-                <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-6">Referto Gara</h1>
+                <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-6">
+                    Referto Gara {match.is_friendly && <span className="text-slate-400 text-lg ml-2">(AMICHEVOLE)</span>}
+                </h1>
 
                 {error && <div className="p-3 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest mb-4">{error}</div>}
 
                 <form onSubmit={handleSubmitScore} className="space-y-4">
+                    {/* ... (Il blocco dei Team A e Team B rimane invariato) ... */}
                     <div className="grid grid-cols-2 gap-2 mb-6">
-                        {/* Team A - SINISTRA */}
                         <div className="bg-blue-50 border border-blue-200 p-2 text-center">
                             <p className="text-[9px] font-black text-blue-800 uppercase tracking-widest mb-1">TEAM A (BLU)</p>
                             <p className="text-[10px] font-bold text-slate-900 leading-tight">
@@ -116,8 +120,6 @@ export default function ResolveMatch() {
                                 {getPlayerName(match.team_a_right_id)}
                             </p>
                         </div>
-
-                        {/* Team B - DESTRA */}
                         <div className="bg-red-50 border border-red-200 p-2 text-center">
                             <p className="text-[9px] font-black text-red-800 uppercase tracking-widest mb-1">TEAM B (ROSSO)</p>
                             <p className="text-[10px] font-bold text-slate-900 leading-tight">
@@ -141,8 +143,14 @@ export default function ResolveMatch() {
                         </div>
                     ))}
 
-                    <button type="submit" disabled={submitting} className="w-full bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest py-4 rounded-sm hover:bg-black disabled:opacity-50 mt-4">
-                        {submitting ? 'ELABORAZIONE...' : 'CONFERMA E CALCOLA RANKING'}
+                    <button
+                        type="submit"
+                        disabled={submitting}
+                        className="w-full bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest py-4 rounded-sm hover:bg-black disabled:opacity-50 mt-4"
+                    >
+                        {submitting
+                            ? 'ELABORAZIONE...'
+                            : (match.is_friendly ? 'REGISTRA AMICHEVOLE' : 'CONFERMA E CALCOLA RANKING')}
                     </button>
                 </form>
             </div>
