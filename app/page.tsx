@@ -177,7 +177,7 @@ export default async function Home({ searchParams }: PageProps) {
     const toRange = fromRange + MATCHES_PER_PAGE - 1;
 
     const { data: completedMatches, count: totalCompletedCount } = await completedQuery
-        .order('updated_at', { ascending: false })
+        .order('match_date', { ascending: false, nullsLast: true })
         .range(fromRange, toRange);
 
     const totalPages = totalCompletedCount ? Math.ceil(totalCompletedCount / MATCHES_PER_PAGE) : 1;
