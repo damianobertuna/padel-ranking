@@ -13,8 +13,9 @@ export default function PendingMatchCard({
                                              rawPlayers,
                                              currentUserPlayer,
                                              clubs,
-                                             playerTitles
-                                         }: PendingMatchCardProps & { clubs?: Club[] }) {
+                                             playerTitles,
+                                             managedClubIds = [] // <-- NUOVO: Array dei circoli gestiti
+                                         }: PendingMatchCardProps & { clubs?: Club[]; managedClubIds?: number[] }) {
 
     const isExpired = match.match_date ? new Date(match.match_date) < new Date() : false;
     const [isManaging, setIsManaging] = useState(false);
@@ -43,13 +44,11 @@ export default function PendingMatchCard({
         const isMatchComplete = activeRankings.length === 4;
 
         if (isMatchComplete) {
-            // Se la partita è piena, mostriamo il livello reale in campo
             levelLabel = 'LIVELLO MATCH:';
             levelText = minLvl === maxLvl ? `${minLvl.toFixed(2)}` : `${minLvl.toFixed(2)} - ${maxLvl.toFixed(2)}`;
         } else {
-            // Se ci sono slot liberi, calcoliamo e mostriamo il range matematico consentito
             levelLabel = 'RANGE CONSENTITO:';
-            const minAllowed = Math.max(0, maxLvl - 0.25); // Impedisce ranking negativi
+            const minAllowed = Math.max(0, maxLvl - 0.25);
             const maxAllowed = minLvl + 0.25;
             levelText = `${minAllowed.toFixed(2)} - ${maxAllowed.toFixed(2)}`;
         }
@@ -61,9 +60,11 @@ export default function PendingMatchCard({
     const isAdmin = currentUserPlayer?.role === 'admin';
     const isOrganizer = currentUserPlayer?.id === match.organizer_id;
 
-    // La VERA regola di autorizzazione:
-    // Puoi gestire se sei Admin, se sei l'Organizzatore, oppure (per i vecchi match senza org) se sei in campo.
-    const canManage = isAdmin || isOrganizer || (!match.organizer_id && isUserInMatch);
+    // NUOVO: Verifica se l'utente corrente è un club_manager autorizzato per questo specifico circolo
+    const isManagerForThisMatch = currentUserPlayer?.role === 'club_manager' && managedClubIds.includes(match.club_id);
+
+    // Estendiamo la regola di autorizzazione includendo il manager del circolo
+    const canManage = isAdmin || isOrganizer || isManagerForThisMatch || (!match.organizer_id && isUserInMatch);
 
     // --- CALCOLO COMPATIBILITÀ LATO ---
     const fullCurrentUser = currentUserPlayer
@@ -105,22 +106,17 @@ export default function PendingMatchCard({
     const generaLinkWhatsAppLocal = (m: Match) => {
         const getPlayerObj = (id: number | null) => rawPlayers.find(player => player.id === id) || null;
 
-        const pA1 = getPlayerObj(m.team_a_left_id); // Giocatore nello slot SX
-        const pA2 = getPlayerObj(m.team_a_right_id); // Giocatore nello slot DX
-        const pB1 = getPlayerObj(m.team_b_left_id); // Giocatore nello slot SX
-        const pB2 = getPlayerObj(m.team_b_right_id); // Giocatore nello slot DX
+        const pA1 = getPlayerObj(m.team_a_left_id);
+        const pA2 = getPlayerObj(m.team_a_right_id);
+        const pB1 = getPlayerObj(m.team_b_left_id);
+        const pB2 = getPlayerObj(m.team_b_right_id);
 
-        // ========================================================
-        // CALCOLO DINAMICO DEI LATI PER GLI SLOT LIBERI (GESTIONE MIX)
-        // ========================================================
         let labelA1 = "[SX]";
         let labelA2 = "[DX]";
 
         if (pA1 && !pA2) {
-            // C'è il sinistro ma manca il destro. Se il sinistro è MIX, il destro può essere chiunque
             labelA2 = pA1.preferred_side === 'Both' ? "[SX/DX]" : "[DX]";
         } else if (!pA1 && pA2) {
-            // Manca il sinistro ma c'è il destro. Se il destro è MIX, il sinistro può essere chiunque
             labelA1 = pA2.preferred_side === 'Both' ? "[SX/DX]" : "[SX]";
         }
 
@@ -133,11 +129,8 @@ export default function PendingMatchCard({
             labelB1 = pB2.preferred_side === 'Both' ? "[SX/DX]" : "[SX]";
         }
 
-        // ========================================================
-        // GEOLOCALIZZAZIONE DINAMICA CIRCOLO
-        // ========================================================
         const dataFormattata = new Date(m.match_date || m.created_at).toLocaleString('it-IT', {
-            weekday: 'short', // <-- AGGIUNTA: Include il giorno della settimana (es. "lun", "mar"...)
+            weekday: 'short',
             day: '2-digit',
             month: 'short',
             hour: '2-digit',
@@ -146,7 +139,6 @@ export default function PendingMatchCard({
 
         const clubText = matchClub ? `${matchClub.name}${matchClub.city ? ` (${matchClub.city})` : ''}` : 'Da definire';
 
-        // Generiamo un URL di ricerca universale per Google Maps basato sul nome e sulla città del circolo
         const mapsUrl = matchClub
             ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(matchClub.name + ' ' + (matchClub.city || ''))}`
             : null;
@@ -154,11 +146,10 @@ export default function PendingMatchCard({
         const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
         const matchLink = `${baseUrl}/match/${m.id}/join`;
 
-        // Costruzione del testo finale per WhatsApp
         const testo = `🎾 *RanKING Padel - Convocazione Match* 🎾\n\n` +
             `📅 *Data:* ${dataFormattata}\n` +
             `📍 *Campo:* ${clubText}\n` +
-            (mapsUrl ? `🗺️ *Posizione:* ${mapsUrl}\n` : '') + // Inserisce la riga della mappa solo se il circolo è definito
+            (mapsUrl ? `🗺️ *Posizione:* ${mapsUrl}\n` : '') +
             `📊 *Livello Attuale:* ${levelText}\n\n` +
             `👥 *SQUADRA A:*\n` +
             `• ${pA1 ? '[SX]' : labelA1} ${pA1 ? `${pA1.first_name} ${pA1.last_name}` : 'Slot Libero'} (${pA1 ? pA1.ranking.toFixed(2) : '0.00'})\n` +
@@ -213,8 +204,10 @@ export default function PendingMatchCard({
         );
     };
 
-    const authCtx = currentUserPlayer ? { userRole: currentUserPlayer.role as 'admin' | 'user', userPlayerId: currentUserPlayer.id } : null;
-    const canResolve = isMatchComplete && canUserResolveMatch(authCtx, match as any);
+    const authCtx = currentUserPlayer ? { userRole: currentUserPlayer.role as 'admin' | 'user' | 'club_manager', userPlayerId: currentUserPlayer.id } : null;
+
+    // Anche per la risoluzione del match, abilitiamo il manager se la partita si gioca nel suo circolo ed è al completo
+    const canResolve = isMatchComplete && (canUserResolveMatch(authCtx as any, match as any) || isManagerForThisMatch);
 
     return (
         <div className="bg-white p-5 rounded-sm shadow-sm border border-slate-200 flex flex-col justify-between gap-4 transition-all hover:border-slate-300">
@@ -271,7 +264,7 @@ export default function PendingMatchCard({
                     </a>
 
                     <div className="flex gap-2 w-full">
-                        {(!isExpired || currentUserPlayer?.role === 'admin') && (
+                        {(!isExpired || isAdmin || isManagerForThisMatch) && (
                             <button
                                 onClick={() => {
                                     if (actionType === 'leave') {
@@ -302,7 +295,7 @@ export default function PendingMatchCard({
                         )}
 
                         {canResolve && <ResolveMatchButton matchId={match.id} />}
-                        {(currentUserPlayer?.role === 'admin' || canResolve) && <DeleteMatchButton matchId={match.id} />}
+                        {(isAdmin || isManagerForThisMatch || canResolve) && <DeleteMatchButton matchId={match.id} />}
                     </div>
                 </div>
             )}

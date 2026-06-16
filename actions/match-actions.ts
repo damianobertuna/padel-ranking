@@ -11,6 +11,20 @@ export interface SetScore {
     team_b: number;
 }
 
+// ============================================================================
+// HELPER SICUREZZA: Verifica se il giocatore è manager di un determinato circolo
+// ============================================================================
+async function isUserManagerOfClub(supabase: any, playerId: number, clubId: number | null): Promise<boolean> {
+    if (!clubId) return false;
+    const { data } = await supabase
+        .from('club_managers')
+        .select('id')
+        .eq('player_id', playerId)
+        .eq('club_id', clubId)
+        .maybeSingle();
+    return !!data;
+}
+
 /**
  * 1. CANCELLAZIONE DI UN MATCH IN PROGRAMMA
  */
@@ -40,15 +54,19 @@ export async function deletePendingMatch(matchId: string) {
     if (!match) throw new Error("Partita non trovata");
     if (match.status !== 'pending') throw new Error("Puoi cancellare solo partite in programma");
 
-    // Sicurezza: Può cancellare solo l'admin o uno dei 4 giocatori scesi in campo
+    // Sicurezza: Admin, Giocatore in campo, o Club Manager del circolo
     const isPlayerInMatch =
         currentUserPlayer.id === match.team_a_left_id ||
         currentUserPlayer.id === match.team_a_right_id ||
         currentUserPlayer.id === match.team_b_left_id ||
         currentUserPlayer.id === match.team_b_right_id;
 
-    if (currentUserPlayer.role !== 'admin' && !isPlayerInMatch) {
-        throw new Error("Non hai i permessi per cancellare questa partita");
+    const isManager = currentUserPlayer.role === 'club_manager'
+        ? await isUserManagerOfClub(supabase, currentUserPlayer.id, match.club_id)
+        : false;
+
+    if (currentUserPlayer.role !== 'admin' && !isPlayerInMatch && !isManager) {
+        throw new Error("ACCESSO NEGATO: Non hai i permessi per cancellare questa partita.");
     }
 
     // Recuperiamo i nomi dei giocatori coinvolti per costruire la stringa di Log
@@ -66,9 +84,11 @@ export async function deletePendingMatch(matchId: string) {
     const dettagliMatch = `${getName(match.team_a_left_id)}/${getName(match.team_a_right_id)} VS ${getName(match.team_b_left_id)}/${getName(match.team_b_right_id)}`;
     const operatore = `${currentUserPlayer.first_name} ${currentUserPlayer.last_name}`;
 
-    const logDescription = currentUserPlayer.role === 'admin'
-        ? `L'admin ${operatore} ha annullato la partita in programma: ${dettagliMatch}`
-        : `Il giocatore ${operatore} ha annullato la propria partita in programma: ${dettagliMatch}`;
+    let qualifica = "Il giocatore";
+    if (currentUserPlayer.role === 'admin') qualifica = "L'admin";
+    else if (isManager) qualifica = "Il Club Manager";
+
+    const logDescription = `${qualifica} ${operatore} ha annullato la partita in programma: ${dettagliMatch}`;
 
     const { error: logError } = await logAction(
         'MATCH_DELETED',
@@ -131,12 +151,19 @@ export async function createPendingMatch(data: {
     const selectedPlayerIds = [data.teamALeft, data.teamARight, data.teamBLeft, data.teamBRight].filter(Boolean) as number[];
     const isCreatorInMatch = selectedPlayerIds.includes(currentUserPlayer.id);
 
+    const isManager = currentUserPlayer.role === 'club_manager'
+        ? await isUserManagerOfClub(supabase, currentUserPlayer.id, data.clubId || null)
+        : false;
+
     let matchOrganizerId = null;
 
     if (isCreatorInMatch) {
         matchOrganizerId = currentUserPlayer.id;
     } else if (currentUserPlayer.role === 'admin') {
         matchOrganizerId = selectedPlayerIds.length > 0 ? selectedPlayerIds[0] : null;
+    } else if (isManager) {
+        // Il manager può creare partite vuote per il suo circolo
+        matchOrganizerId = currentUserPlayer.id;
     } else {
         throw new Error("OPERAZIONE NEGATA: Devi occupare almeno uno slot per creare una partita.");
     }
@@ -179,9 +206,11 @@ export async function createPendingMatch(data: {
     const operatore = `${currentUserPlayer.first_name} ${currentUserPlayer.last_name}`;
     const tipoLabel = data.isFriendly ? "AMICHEVOLE" : "classificata";
 
-    const logDescription = currentUserPlayer.role === 'admin'
-        ? `L'admin ${operatore} ha creato una nuova partita ${tipoLabel}: ${dettagliMatch} - ${data.matchType} - ${data.matchDate}`
-        : `Il giocatore ${operatore} ha organizzato una nuova partita ${tipoLabel}: ${dettagliMatch} - ${data.matchType} - ${data.matchDate}`;
+    let qualifica = "Il giocatore";
+    if (currentUserPlayer.role === 'admin') qualifica = "L'admin";
+    else if (isManager) qualifica = "Il gestore del campo";
+
+    const logDescription = `${qualifica} ${operatore} ha organizzato una nuova partita ${tipoLabel}: ${dettagliMatch} - ${data.matchType} - ${data.matchDate}`;
 
     // Scrittura Audit Log
     const { error: logError } = await logAction(
@@ -207,7 +236,7 @@ export async function createPendingMatch(data: {
 }
 
 /**
- * 3. RISOLUZIONE DI UN MATCH CON CALCOLO RANKING, SET OBBLIGATORI E AUDIT LOG
+ * 3. RISOLUZIONE DI UN MATCH CON CALCOLO RANKING E AUDIT LOG
  */
 export async function resolveMatchWithRanking(data: {
     matchId: string;
@@ -231,7 +260,19 @@ export async function resolveMatchWithRanking(data: {
         if (!match) throw new Error("Partita non trovata nel database");
         if (match.status !== 'pending') throw new Error("Questa partita è già stata risolta");
 
-        // 3. Validazione Score e Calcolo Vincitore (Helper)
+        // --- NUOVO: BLOCCO DI SICUREZZA SEVERO ---
+        const isPlayerInMatch = [match.team_a_left_id, match.team_a_right_id, match.team_b_left_id, match.team_b_right_id].includes(currentUserPlayer.id);
+        const isAdmin = currentUserPlayer.role === 'admin';
+        const isManager = currentUserPlayer.role === 'club_manager'
+            ? await isUserManagerOfClub(supabase, currentUserPlayer.id, match.club_id)
+            : false;
+
+        if (!isAdmin && !isPlayerInMatch && !isManager) {
+            throw new Error("VIOLAZIONE DI SICUREZZA: Non sei autorizzato a inserire il risultato per questa partita.");
+        }
+        // ----------------------------------------
+
+        // 3. Validazione Score e Calcolo Vincitore
         const { finalWinningTeam, stringaPunteggio } = evaluateMatchScore(data.score);
 
         // 4. Recupero e strutturazione Atleti
@@ -245,7 +286,7 @@ export async function resolveMatchWithRanking(data: {
         const teamA = playersInMatch.filter(p => p.id === match.team_a_left_id || p.id === match.team_a_right_id);
         const teamB = playersInMatch.filter(p => p.id === match.team_b_left_id || p.id === match.team_b_right_id);
 
-        // 5. Calcolo Delta ELO (Helper)
+        // 5. Calcolo Delta ELO
         let teamADelta = 0;
         let teamBDelta = 0;
 
@@ -257,9 +298,7 @@ export async function resolveMatchWithRanking(data: {
             teamBDelta = deltas.teamBDelta;
         }
 
-        // ========================================================
-        // 6. PREPARAZIONE SNAPSHOT RANKING PER AUDIT LOG
-        // ========================================================
+        // 6. PREPARAZIONE SNAPSHOT RANKING
         const safeAdd = (rank: number, delta: number) => parseFloat((rank + delta).toFixed(2));
 
         const playerRankingDetails = [
@@ -273,9 +312,7 @@ export async function resolveMatchWithRanking(data: {
             .map(p => `${p.name} (${p.old_ranking.toFixed(2)} ➡️ ${p.new_ranking.toFixed(2)})`)
             .join(' | ');
 
-        // ========================================================
-        // 7. AGGIORNAMENTO DATABASE (ADMIN CLIENT)
-        // ========================================================
+        // 7. AGGIORNAMENTO DATABASE
         const { error: matchError } = await supabaseAdmin
             .from('matches')
             .update({
@@ -297,9 +334,7 @@ export async function resolveMatchWithRanking(data: {
             await Promise.all(playerUpdates);
         }
 
-        // ========================================================
         // 8. AUDIT LOG
-        // ========================================================
         const nomeTeamA = `${teamA[0].first_name} ${teamA[0].last_name} / ${teamA[1].first_name} ${teamA[1].last_name}`;
         const nomeTeamB = `${teamB[0].first_name} ${teamB[0].last_name} / ${teamB[1].first_name} ${teamB[1].last_name}`;
 
@@ -384,7 +419,21 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
 
     const isAdmin = currentPlayer.role === 'admin';
     const isOrganizer = currentPlayer.id === oldMatch.organizer_id;
-    const canManage = isAdmin || isOrganizer || (!oldMatch.organizer_id && isUserInMatch);
+
+    // Controlliamo se gestisce il circolo ATTUALE della partita
+    const isManager = currentPlayer.role === 'club_manager'
+        ? await isUserManagerOfClub(supabase, currentPlayer.id, oldMatch.club_id)
+        : false;
+
+    // Se sta cercando di spostare la partita in un NUOVO circolo, deve avere i permessi anche per quello
+    if (updatedFields.club_id !== undefined && updatedFields.club_id !== oldMatch.club_id && currentPlayer.role === 'club_manager') {
+        const isManagerOfNewClub = await isUserManagerOfClub(supabase, currentPlayer.id, updatedFields.club_id);
+        if (!isManagerOfNewClub) {
+            throw new Error("ACCESSO NEGATO: Non puoi spostare la partita in un circolo che non gestisci.");
+        }
+    }
+
+    const canManage = isAdmin || isOrganizer || (!oldMatch.organizer_id && isUserInMatch) || isManager;
 
     if (!canManage) {
         throw new Error("ACCESSO NEGATO: Non hai i permessi per gestire questa partita.");
@@ -418,7 +467,11 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
 
     if (modifiche.length > 0) {
         const operatore = `${currentPlayer.first_name} ${currentPlayer.last_name}`;
-        const qualifica = isAdmin ? "L'Admin" : (isOrganizer ? "L'Organizzatore" : "Il Giocatore");
+
+        let qualifica = "Il Giocatore";
+        if (isAdmin) qualifica = "L'Admin";
+        else if (isManager) qualifica = "Il Club Manager";
+        else if (isOrganizer) qualifica = "L'Organizzatore";
 
         await logAction(
             'MATCH_UPDATED',

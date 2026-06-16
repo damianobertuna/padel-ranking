@@ -53,8 +53,11 @@ export default async function Home({ searchParams }: PageProps) {
         Both: 'Mix'
     };
 
+    // --- DIETRO LE QUINTE: RECUPERO UTENTE LOGGATO E PERMESSI ---
     const { data: { user } } = await supabase.auth.getUser();
     let currentUserPlayer = null;
+    let managedClubIds: number[] = [];
+
     if (user) {
         const { data: playerData } = await supabase
             .from('players')
@@ -62,6 +65,18 @@ export default async function Home({ searchParams }: PageProps) {
             .eq('user_id', user.id)
             .single();
         currentUserPlayer = playerData;
+
+        // Se l'utente è un manager, recuperiamo gli ID dei circoli che gestisce
+        if (playerData?.role === 'club_manager') {
+            const { data: managementData } = await supabase
+                .from('club_managers')
+                .select('club_id')
+                .eq('player_id', playerData.id);
+
+            if (managementData) {
+                managedClubIds = managementData.map(m => Number(m.club_id));
+            }
+        }
     }
 
     const { data: playersStatsData } = await supabase.from('view_player_stats').select('*');
@@ -123,9 +138,13 @@ export default async function Home({ searchParams }: PageProps) {
         const isUserInMatch = currentUserPlayer ? playerIds.includes(currentUserPlayer.id) : false;
         const isExpired = match.match_date ? new Date(match.match_date) < new Date() : false;
 
+        // Verifica se l'utente è un manager di QUEL circolo
+        const isManagerForThisMatch = currentUserPlayer?.role === 'club_manager' && managedClubIds.includes(match.club_id);
+
         if (isExpired) {
-            if (!isMatchComplete && !isAdmin) return false;
-            if (isMatchComplete && !isAdmin && !isUserInMatch) return false;
+            // I manager possono visualizzare e gestire i match scaduti dei loro circoli
+            if (!isMatchComplete && !isAdmin && !isManagerForThisMatch) return false;
+            if (isMatchComplete && !isAdmin && !isUserInMatch && !isManagerForThisMatch) return false;
         }
 
         if (currentSlots === 'free' && isMatchComplete) return false;
@@ -188,7 +207,6 @@ export default async function Home({ searchParams }: PageProps) {
     const renderPagination = (type: 'players' | 'matches', total: number, current: number) => {
         if (total <= 1) return null;
 
-        // Calcola la finestra di 5 pagine (es: 1 2 3 4 5 oppure 4 5 6 7 8)
         const maxVisible = 5;
         let start = Math.max(1, current - Math.floor(maxVisible / 2));
         let end = Math.min(total, start + maxVisible - 1);
@@ -202,7 +220,6 @@ export default async function Home({ searchParams }: PageProps) {
             visiblePages.push(i);
         }
 
-        // Helper per renderizzare il singolo bottone o Link
         const renderButton = (page: number, label: string | number, title: string, disabled: boolean, isActive: boolean = false) => {
             const buttonClass = `w-8 h-8 flex items-center justify-center border rounded-sm text-[10px] font-black uppercase tracking-wider transition-colors ${
                 isActive
@@ -210,35 +227,21 @@ export default async function Home({ searchParams }: PageProps) {
                     : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white cursor-pointer'
             }`;
 
-            // Se il bottone è disabilitato o è la pagina corrente, non è cliccabile (niente navigazione)
             if (disabled || isActive) {
                 return (
-                    <button
-                        key={`${type}-${label}`}
-                        type="button"
-                        disabled={true}
-                        title={title}
-                        className={buttonClass}
-                    >
+                    <button key={`${type}-${label}`} type="button" disabled={true} title={title} className={buttonClass}>
                         {label}
                     </button>
                 );
             }
 
-            // Altrimenti, generiamo un vero Link di Next.js che non scrolla la pagina
             const targetPlayerPage = type === 'players' ? page : playerPage;
             const targetMatchPage = type === 'matches' ? page : currentPage;
 
             const href = `/?tab=${currentTab}&gender=${currentGender}&sort=${currentSort}&search=${encodeURIComponent(currentSearch)}&slots=${currentSlots}&level=${currentLevel}&completedClub=${currentCompletedClub}&completedScope=${currentCompletedScope}&playerPage=${targetPlayerPage}&page=${targetMatchPage}`;
 
             return (
-                <Link
-                    key={`${type}-${label}`}
-                    href={href}
-                    scroll={false}
-                    title={title}
-                    className={buttonClass}
-                >
+                <Link key={`${type}-${label}`} href={href} scroll={false} title={title} className={buttonClass}>
                     {label}
                 </Link>
             );
@@ -246,14 +249,9 @@ export default async function Home({ searchParams }: PageProps) {
 
         return (
             <div className="flex items-center justify-center gap-1 mt-6">
-                {/* Tasti Iniziali */}
                 {renderButton(1, '«', 'Prima Pagina', current === 1)}
                 {renderButton(Math.max(1, current - 1), '‹', 'Precedente', current === 1)}
-
-                {/* Pagine Numeriche */}
                 {visiblePages.map(p => renderButton(p, p, `Pagina ${p}`, false, p === current))}
-
-                {/* Tasti Finali */}
                 {renderButton(Math.min(total, current + 1), '›', 'Successiva', current === total)}
                 {renderButton(total, '»', 'Ultima Pagina', current === total)}
             </div>
@@ -430,6 +428,7 @@ export default async function Home({ searchParams }: PageProps) {
                                                     currentUserPlayer={currentUserPlayer}
                                                     clubs={clubsList}
                                                     playerTitles={playerTitlesMap}
+                                                    managedClubIds={managedClubIds}
                                                 />
                                             </div>
                                         </div>
@@ -483,7 +482,7 @@ export default async function Home({ searchParams }: PageProps) {
                                         <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                                             <div className="flex items-center gap-2">
                                                 <span>
-                                                    {new Date(match.updated_at).toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' })}
+                                                    {new Date(match.match_date || match.updated_at).toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' })}
                                                 </span>
                                                 {match.is_friendly ? (
                                                     <span className="bg-purple-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded-sm shadow-sm tracking-wider uppercase">
