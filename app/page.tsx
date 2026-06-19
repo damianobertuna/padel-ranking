@@ -136,11 +136,19 @@ export default async function Home({ searchParams }: PageProps) {
     const startIndex = (playerPage - 1) * PLAYERS_PER_PAGE;
     const paginatedPlayers = sortedPlayers.slice(startIndex, startIndex + PLAYERS_PER_PAGE);
 
-    // --- PENDING MATCHES ---
-    const { data: pendingMatches } = await supabase
-        .from('matches')
-        .select('*')
-        .eq('status', 'pending')
+        // --- PENDING MATCHES ---
+        const isPureManager = currentUserPlayer?.role === 'club_manager' && currentUserPlayer?.id === null;
+        let pendingQuery = supabase
+            .from('matches')
+            .select('*')
+            .eq('status', 'pending');
+
+        // Pure manager: only see their club's pending matches
+        if (isPureManager && managedClubIds.length > 0) {
+            pendingQuery = pendingQuery.in('club_id', managedClubIds);
+        }
+
+    const { data: pendingMatches } = await pendingQuery
         .order('match_date', { ascending: true, nullsFirst: false });
 
     const filteredPendingMatches = (pendingMatches || []).filter(match => {
@@ -177,7 +185,7 @@ export default async function Home({ searchParams }: PageProps) {
         return true;
     });
 
-    // --- RISULTATI COMPLETATI ---
+        // --- RISULTATI COMPLETATI ---
     let completedQuery = supabase
         .from('matches')
         .select('*', { count: 'exact' })
@@ -187,8 +195,16 @@ export default async function Home({ searchParams }: PageProps) {
         completedQuery = completedQuery.eq('club_id', parseInt(currentCompletedClub, 10));
     }
 
-        if (currentCompletedScope === 'mine' && currentUserPlayer?.id) {
+        // Club manager: auto-filter to their managed clubs
+    if (isPureManager && currentCompletedClub === 'all' && managedClubIds.length > 0) {
+        completedQuery = completedQuery.in('club_id', managedClubIds);
+    }
+
+    if (currentCompletedScope === 'mine' && currentUserPlayer?.id) {
         completedQuery = completedQuery.or(`team_a_left_id.eq.${currentUserPlayer.id},team_a_right_id.eq.${currentUserPlayer.id},team_b_left_id.eq.${currentUserPlayer.id},team_b_right_id.eq.${currentUserPlayer.id}`);
+    } else if (currentCompletedScope === 'mine' && isPureManager && managedClubIds.length > 0) {
+        // Pure manager "I Miei Match" = matches from their clubs
+        completedQuery = completedQuery.in('club_id', managedClubIds);
     }
 
     if (currentTab === 'completed' && currentSearch) {
@@ -465,11 +481,20 @@ export default async function Home({ searchParams }: PageProps) {
                             <SearchBar placeholder="FILTRA STORICO PER NOME GIOCATORE..." />
                         </div>
 
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white border border-slate-200 p-2 rounded-sm shadow-sm gap-3 text-xs font-bold uppercase tracking-wider">
+                                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white border border-slate-200 p-2 rounded-sm shadow-sm gap-3 text-xs font-bold uppercase tracking-wider">
                             {currentUserPlayer ? (
                                 <div className="flex gap-1 bg-slate-100 p-1 rounded-sm shrink-0 w-full md:w-auto">
-                                    <Link href={`/?tab=completed&completedScope=all&completedClub=${currentCompletedClub}&gender=${currentGender}&sort=${currentSort}&search=${currentSearch}&slots=${currentSlots}&level=${currentLevel}`} scroll={false} className={`px-4 py-1.5 rounded-sm transition-colors text-center flex-1 md:flex-initial ${currentCompletedScope === 'all' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Tutti i Risultati</Link>
-                                    <Link href={`/?tab=completed&completedScope=mine&completedClub=${currentCompletedClub}&gender=${currentGender}&sort=${currentSort}&search=${currentSearch}&slots=${currentSlots}&level=${currentLevel}`} scroll={false} className={`px-4 py-1.5 rounded-sm transition-colors text-center flex-1 md:flex-initial ${currentCompletedScope === 'mine' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>I Miei Match</Link>
+                                    {isPureManager ? (
+                                        <>
+                                            <Link href={`/?tab=completed&completedScope=all&completedClub=${currentCompletedClub}&gender=${currentGender}&sort=${currentSort}&search=${currentSearch}&slots=${currentSlots}&level=${currentLevel}`} scroll={false} className={`px-4 py-1.5 rounded-sm transition-colors text-center flex-1 md:flex-initial ${currentCompletedScope === 'all' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Tutti i Risultati</Link>
+                                            <Link href={`/?tab=completed&completedScope=mine&completedClub=${currentCompletedClub}&gender=${currentGender}&sort=${currentSort}&search=${currentSearch}&slots=${currentSlots}&level=${currentLevel}`} scroll={false} className={`px-4 py-1.5 rounded-sm transition-colors text-center flex-1 md:flex-initial ${currentCompletedScope === 'mine' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>I Miei Circoli</Link>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Link href={`/?tab=completed&completedScope=all&completedClub=${currentCompletedClub}&gender=${currentGender}&sort=${currentSort}&search=${currentSearch}&slots=${currentSlots}&level=${currentLevel}`} scroll={false} className={`px-4 py-1.5 rounded-sm transition-colors text-center flex-1 md:flex-initial ${currentCompletedScope === 'all' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Tutti i Risultati</Link>
+                                            <Link href={`/?tab=completed&completedScope=mine&completedClub=${currentCompletedClub}&gender=${currentGender}&sort=${currentSort}&search=${currentSearch}&slots=${currentSlots}&level=${currentLevel}`} scroll={false} className={`px-4 py-1.5 rounded-sm transition-colors text-center flex-1 md:flex-initial ${currentCompletedScope === 'mine' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>I Miei Match</Link>
+                                        </>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="text-[10px] text-slate-400 flex items-center justify-center px-2 font-medium tracking-normal shrink-0">
