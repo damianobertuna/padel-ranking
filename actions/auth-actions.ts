@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 // ============================================================================
 // HELPER: Logica pura per la risoluzione dell'identità utente
 // ============================================================================
-function resolveUserIdentity(player: any, roleData: any) {
+async function resolveUserIdentity(supabase: any, player: any, roleData: any, userId?: string) {
     const isAdmin = roleData?.role === 'admin' || player?.role === 'admin';
 
     // 1. Priorità massima: Admin
@@ -28,9 +28,20 @@ function resolveUserIdentity(player: any, roleData: any) {
 
     // 3. Gestore puro (senza profilo giocatore)
     if (roleData?.role === 'club_manager') {
+        let operatore = "Gestore Campo";
+        if (userId) {
+            const { data: manager } = await supabase
+                .from('club_managers')
+                .select('first_name, last_name')
+                .eq('user_id', userId)
+                .maybeSingle();
+            if (manager?.first_name || manager?.last_name) {
+                operatore = `${manager.first_name} ${manager.last_name}`.trim();
+            }
+        }
         return {
             qualifica: "Il Club Manager",
-            operatore: "Gestore Campo"
+            operatore
         };
     }
 
@@ -60,8 +71,8 @@ export async function logUserLogin(userId: string) {
             return;
         }
 
-        // Deleghiamo l'estrazione delle stringhe all'helper
-        const { qualifica, operatore } = resolveUserIdentity(player, roleData);
+                // Deleghiamo l'estrazione delle stringhe all'helper
+                const { qualifica, operatore } = await resolveUserIdentity(supabase, player, roleData, userId);
 
         await logAction(
             'USER_LOGIN',
@@ -95,7 +106,7 @@ export async function logUserRegistration(userId: string, fullName: string) {
 // ============================================================================
 // NUOVO SISTEMA RBAC: GESTIONE INVITI MANAGER E PASSWORD
 // ============================================================================
-export async function inviteClubManager(email: string, clubId: number) {
+export async function inviteClubManager(email: string, clubId: number, firstName: string, lastName: string) {
     // Usiamo ESCLUSIVAMENTE il client Admin che ha i permessi di Service Role
     // necessari per aggirare la RLS e usare le API di Auth
     const supabaseAdmin = createAdminClient();
@@ -121,10 +132,15 @@ export async function inviteClubManager(email: string, clubId: number) {
 
         if (roleError) throw new Error(`Errore assegnazione ruolo: ${roleError.message}`);
 
-        // 3. Assegnazione del circolo nella tabella ponte (aggiornata al nuovo schema)
+                // 3. Assegnazione del circolo nella tabella ponte (aggiornata al nuovo schema)
         const { error: clubError } = await supabaseAdmin
             .from('club_managers')
-            .insert([{ user_id: newUserId, club_id: clubId }]);
+            .insert([{
+                user_id: newUserId,
+                club_id: clubId,
+                first_name: firstName,
+                last_name: lastName,
+            }]);
 
         if (clubError) throw new Error(`Errore assegnazione circolo: ${clubError.message}`);
 

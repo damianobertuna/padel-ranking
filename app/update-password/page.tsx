@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
 export default function UpdatePasswordPage() {
-    const [password, setPassword] = useState('');
+        const [password, setPassword] = useState('');
     const [confirm, setConfirm] = useState('');
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [sessionReady, setSessionReady] = useState(false);
@@ -94,10 +96,15 @@ export default function UpdatePasswordPage() {
             return;
         }
 
-        setLoading(true);
+                setLoading(true);
         try {
             const { error: updateError } = await supabase.auth.updateUser({
-                password: password
+                password: password,
+                data: {
+                    full_name: `${firstName} ${lastName}`.trim(),
+                    first_name: firstName,
+                    last_name: lastName,
+                }
             });
 
             if (updateError) throw new Error(updateError.message);
@@ -136,7 +143,35 @@ export default function UpdatePasswordPage() {
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">
+                            Nome
+                        </label>
+                        <input
+                            type="text"
+                            placeholder="Mario"
+                            value={firstName}
+                            onChange={(e) => setFirstName(e.target.value)}
+                            disabled={!sessionReady}
+                            className="w-full border border-slate-200 p-2 text-sm font-bold text-slate-900 focus:outline-none focus:border-slate-400 disabled:bg-slate-50 disabled:text-slate-400"
+                            required
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">
+                            Cognome
+                        </label>
+                        <input
+                            type="text"
+                            placeholder="Rossi"
+                            value={lastName}
+                            onChange={(e) => setLastName(e.target.value)}
+                            disabled={!sessionReady}
+                            className="w-full border border-slate-200 p-2 text-sm font-bold text-slate-900 focus:outline-none focus:border-slate-400 disabled:bg-slate-50 disabled:text-slate-400"
+                            required
+                        />
+                    </div>
                     <div>
                         <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">
                             Nuova Password

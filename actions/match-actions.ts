@@ -47,13 +47,25 @@ async function resolveUserIdentity(supabase: any, authUserId: string): Promise<U
         .eq('user_id', authUserId)
         .maybeSingle();
 
-    if (userRole?.role === 'club_manager') {
-        return {
-            type: 'club_manager',
-            userId: authUserId,
-            displayName: 'Club Manager',
-        };
-    }
+        if (userRole?.role === 'club_manager') {
+            // 3. Resolve real name from club_managers table (stored at invitation time)
+            let displayName = 'Club Manager';
+            const { data: manager } = await supabase
+                .from('club_managers')
+                .select('first_name, last_name')
+                .eq('user_id', authUserId)
+                .maybeSingle();
+
+            if (manager?.first_name || manager?.last_name) {
+                displayName = `${manager.first_name} ${manager.last_name}`.trim();
+            }
+
+            return {
+                type: 'club_manager',
+                userId: authUserId,
+                displayName,
+            };
+        }
 
     throw new Error("ACCESSO NEGATO: Profilo utente non riconosciuto.");
 }

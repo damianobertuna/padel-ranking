@@ -12,6 +12,8 @@ interface Club {
 export default function InviteManagerModal({ clubs }: { clubs: Club[] }) {
     const [isOpen, setIsOpen] = useState(false);
     const [email, setEmail] = useState('');
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
     const [clubId, setClubId] = useState<number | ''>('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -22,16 +24,18 @@ export default function InviteManagerModal({ clubs }: { clubs: Club[] }) {
         setError('');
         setSuccess(false);
 
-        if (!email || clubId === '') {
-            setError("Seleziona un circolo e inserisci l'email.");
+                if (!email || clubId === '' || !firstName || !lastName) {
+            setError("Compila tutti i campi: nome, cognome, circolo ed email.");
             return;
         }
 
         setLoading(true);
         try {
-            await inviteClubManager(email, Number(clubId));
+            await inviteClubManager(email, Number(clubId), firstName, lastName);
             setSuccess(true);
             setEmail('');
+            setFirstName('');
+            setLastName('');
             setClubId('');
 
             // Chiude la modale in automatico dopo 2 secondi dal successo
@@ -78,7 +82,7 @@ export default function InviteManagerModal({ clubs }: { clubs: Club[] }) {
                                 ✅ Invito inviato con successo!
                             </div>
                         ) : (
-                            <form onSubmit={handleSubmit} className="space-y-4">
+                                                        <form onSubmit={handleSubmit} className="space-y-4">
                                 {error && (
                                     <div className="bg-red-50 text-red-700 p-3 text-[10px] font-bold uppercase rounded-sm">
                                         ⚠️ {error}
@@ -101,6 +105,35 @@ export default function InviteManagerModal({ clubs }: { clubs: Club[] }) {
                                             </option>
                                         ))}
                                     </select>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">
+                                            Nome
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="Mario"
+                                            value={firstName}
+                                            onChange={(e) => setFirstName(e.target.value)}
+                                            className="w-full border border-slate-200 p-2 text-sm font-bold text-slate-900 focus:outline-none focus:border-slate-400"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">
+                                            Cognome
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="Rossi"
+                                            value={lastName}
+                                            onChange={(e) => setLastName(e.target.value)}
+                                            className="w-full border border-slate-200 p-2 text-sm font-bold text-slate-900 focus:outline-none focus:border-slate-400"
+                                            required
+                                        />
+                                    </div>
                                 </div>
 
                                 <div>
@@ -142,3 +175,4 @@ export default function InviteManagerModal({ clubs }: { clubs: Club[] }) {
         </>
     );
 }
+

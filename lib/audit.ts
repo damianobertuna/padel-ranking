@@ -1,11 +1,11 @@
-// lib/audit.ts
 import { createClient } from "@/lib/supabase/server";
 
 export async function logAction(
     actionType: string,
     entityId: string | number,
     details: string,
-    metadata: Record<string, any> = {}
+    metadata: Record<string, any> = {},
+    adminNameOverride?: string
 ): Promise<{ error: any | null }> {
     const supabase = await createClient();
 
@@ -21,26 +21,32 @@ export async function logAction(
         .eq('user_id', user.id)
         .maybeSingle();
 
-    let adminName = player ? `${player.first_name} ${player.last_name}` : 'Unknown';
+        let adminName = player ? `${player.first_name} ${player.last_name}` : 'Unknown';
 
-    // If no player profile, check if user is a club_manager
-    if (!player) {
-        const { data: userRole } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', user.id)
-            .maybeSingle();
-
-        if (userRole?.role === 'club_manager') {
-            const { data: manager } = await supabase
-                .from('club_managers')
-                .select('id')
+        // If no player profile, check if user is a club_manager
+        if (!player) {
+            const { data: userRole } = await supabase
+                .from('user_roles')
+                .select('role')
                 .eq('user_id', user.id)
                 .maybeSingle();
 
-            if (manager) adminName = 'Club Manager';
+            if (userRole?.role === 'club_manager') {
+                // Resolve real name from club_managers table (stored at invitation time)
+                const { data: manager } = await supabase
+                    .from('club_managers')
+                    .select('first_name, last_name')
+                    .eq('user_id', user.id)
+                    .maybeSingle();
+
+                adminName = manager ? `${manager.first_name} ${manager.last_name}`.trim() : 'Club Manager';
+            }
         }
-    }
+
+        // Allow caller to override admin_name
+        if (adminNameOverride) {
+            adminName = adminNameOverride;
+        }
 
     // Inserimento unificato
     const { error } = await supabase.from('audit_logs').insert([{
@@ -57,3 +63,4 @@ export async function logAction(
 
     return { error };
 }
+
