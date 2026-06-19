@@ -19,22 +19,64 @@ export default function CreateMatchPage() {
     useEffect(() => {
         async function loadData() {
             try {
+                // 1. Identifichiamo l'utente loggato
+                const { data: { user } } = await supabase.auth.getUser();
+
+                // Prepariamo la query base per i circoli (che prenderà tutto)
+                let clubsQuery = supabase.from('clubs').select('*').order('name');
+                console.log("User ID:", user?.id);
+
+                if (user) {
+                    // 2. Verifichiamo se l'utente è un manager
+                    const { data: roleData, error: roleError } = await supabase
+                        .from('user_roles')
+                        .select('role')
+                        .eq('user_id', user.id)
+                        .maybeSingle();
+                    console.log("Role:", roleData);
+                    console.log("Role Error:", roleError);
+
+                    if (roleData?.role === 'club_manager') {
+                        // 3. Troviamo a quale circolo è assegnato
+                        const { data: managerData } = await supabase
+                            .from('club_managers')
+                            .select('club_id')
+                            .eq('user_id', user.id)
+                            .maybeSingle();
+
+                        if (managerData?.club_id) {
+                            // 4. Sovrascriviamo la query per filtrare in modo stretto!
+                            clubsQuery = supabase
+                                .from('clubs')
+                                .select('*')
+                                .eq('id', managerData.club_id)
+                                .order('name');
+                        }
+
+                        console.log("Assigned Club:", managerData);
+                    }
+                }
+
+                // 5. Lanciamo le query in parallelo per massimizzare le performance
                 const [playersRes, clubsRes] = await Promise.all([
                     supabase.from('players').select('id, first_name, last_name, ranking, preferred_side, gender').order('last_name'),
-                    supabase.from('clubs').select('*').order('name')
+                    clubsQuery
                 ]);
+
                 if (playersRes.data) setPlayers(playersRes.data);
                 if (clubsRes.data) setClubs(clubsRes.data);
+            } catch (error) {
+                console.error("Errore nel caricamento dei dati:", error);
             } finally {
                 setLoading(false);
             }
         }
+
         loadData();
     }, [supabase]);
 
     const handleSubmit = async (data: MatchFormData) => {
         try {
-            // Convertiamo le stringhe vuote del frontend in null per il database
             await createPendingMatch({
                 matchDate: data.matchDate,
                 matchType: data.matchType,
