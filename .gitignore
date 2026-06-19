@@ -55,4 +55,4 @@ DOMAIN_RULES_AUDIT.md
 supabase/types/*
 .continue/*
 agent.md
-.kiro
+.kiro/*
