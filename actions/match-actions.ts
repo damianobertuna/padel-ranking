@@ -121,7 +121,7 @@ export async function deletePendingMatch(matchId: string) {
         return p ? `${p.first_name} ${p.last_name}` : 'Sconosciuto';
     };
 
-        const dettagliMatch = `${getName(match.team_a_left_id)}/${getName(match.team_a_right_id)} VS ${getName(match.team_b_left_id)}/${getName(match.team_b_right_id)}`;
+    const dettagliMatch = `${getName(match.team_a_left_id)}/${getName(match.team_a_right_id)} VS ${getName(match.team_b_left_id)}/${getName(match.team_b_right_id)}`;
     const operatore = identity.displayName;
 
     let qualifica = "Il giocatore";
@@ -149,13 +149,20 @@ export async function deletePendingMatch(matchId: string) {
         throw new Error(`Impossibile procedere: Errore nel registro delle attività`);
     }
 
-    // Cancelliamo fisicamente il match
-    const { error } = await supabase
+    // Cancelliamo fisicamente il match e verifichiamo che sia stato rimosso
+    const { data: deletedData, error: deleteError } = await supabase
         .from('matches')
         .delete()
-        .eq('id', matchId);
+        .eq('id', matchId)
+        .select('id');
 
-    if (error) throw new Error(error.message);
+    if (deleteError) throw new Error(`Errore database: ${deleteError.message}`);
+
+    // Se deletedData è vuoto/null, RLS ha bloccato la cancellazione senza errore
+    if (!deletedData || deletedData.length === 0) {
+        console.error("❌ RLS BLOCK: cancellazione match bloccata da Row Level Security per l'utente:", user.id);
+        throw new Error("ACCESSO NEGATO: Impossibile cancellare la partita. Verifica i permessi (RLS).");
+    }
 
     revalidatePath('/');
 }
