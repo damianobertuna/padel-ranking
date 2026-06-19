@@ -15,6 +15,7 @@ export default function CreateMatchPage() {
     const [players, setPlayers] = useState<Player[]>([]);
     const [clubs, setClubs] = useState<Club[]>([]);
     const [loading, setLoading] = useState(true);
+    const [disabledClubId, setDisabledClubId] = useState<number | null>(null);
 
     useEffect(() => {
         async function loadData() {
@@ -36,7 +37,7 @@ export default function CreateMatchPage() {
                     console.log("Role:", roleData);
                     console.log("Role Error:", roleError);
 
-                    if (roleData?.role === 'club_manager') {
+                                        if (roleData?.role === 'club_manager') {
                         // 3. Troviamo a quale circolo è assegnato
                         const { data: managerData } = await supabase
                             .from('club_managers')
@@ -45,7 +46,8 @@ export default function CreateMatchPage() {
                             .maybeSingle();
 
                         if (managerData?.club_id) {
-                            // 4. Sovrascriviamo la query per filtrare in modo stretto!
+                            // 4. Lock del circolo manager — dropdown bloccato, nessuna scelta
+                            setDisabledClubId(managerData.club_id);
                             clubsQuery = supabase
                                 .from('clubs')
                                 .select('*')
@@ -99,13 +101,15 @@ export default function CreateMatchPage() {
     return (
         <main className="w-full max-w-4xl mx-auto px-4 sm:px-8 mt-6 pb-12">
             <div className="mb-6"><BackToHomeButton tab="pending" /></div>
-            <MatchForm
+                        <MatchForm
                 title="Nuova Partita"
                 submitLabel="Crea Partita"
                 players={players}
                 clubs={clubs}
+                disabledClubId={disabledClubId}
                 onSubmit={handleSubmit}
             />
         </main>
     );
 }
+

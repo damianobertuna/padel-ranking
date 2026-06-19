@@ -14,11 +14,12 @@ export default function EditMatchPage() {
     const router = useRouter();
     const matchId = params.id as string;
 
-    const [players, setPlayers] = useState<Player[]>([]);
+        const [players, setPlayers] = useState<Player[]>([]);
     const [clubs, setClubs] = useState<Club[]>([]);
     const [initialMatchData, setInitialMatchData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [disabledClubId, setDisabledClubId] = useState<number | null>(null);
 
     useEffect(() => {
         async function loadData() {
@@ -58,13 +59,17 @@ export default function EditMatchPage() {
                     userRole = userRoleData?.role || null;
                 }
 
-                if (userRole === 'club_manager' && match.club_id) {
+                                if (userRole === 'club_manager' && match.club_id) {
                     const { data: managerData } = await supabase.from('club_managers')
                         .select('id')
                         .eq('user_id', user.id)
                         .eq('club_id', match.club_id)
                         .maybeSingle();
                     isManagerForThisMatch = !!managerData;
+
+                    if (isManagerForThisMatch) {
+                        setDisabledClubId(match.club_id);
+                    }
                 }
 
                 const isPlayerInMatch = currentUserId
@@ -142,13 +147,14 @@ export default function EditMatchPage() {
                 </div>
             )}
 
-            {!error && initialMatchData && (
+                        {!error && initialMatchData && (
                 <MatchForm
                     title="Modifica Partita"
                     submitLabel="Salva Modifiche"
                     players={players}
                     clubs={clubs}
                     initialData={initialMatchData}
+                    disabledClubId={disabledClubId}
                     onSubmit={handleSubmit}
                 />
             )}

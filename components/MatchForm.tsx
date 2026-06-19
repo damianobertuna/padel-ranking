@@ -21,6 +21,7 @@ interface MatchFormProps {
     players: Player[];
     clubs: Club[];
     initialData?: Partial<MatchFormData> & { matchTime?: string };
+    disabledClubId?: number | null;
     onSubmit: (data: MatchFormData) => Promise<void>;
 }
 
@@ -120,10 +121,10 @@ function SearchableSelect({ value, onChange, options, placeholder }: SearchableS
 // ============================================================================
 // COMPONENTE PRINCIPALE: MatchForm
 // ============================================================================
-export default function MatchForm({ title, submitLabel, players, clubs, initialData, onSubmit }: MatchFormProps) {
-    const [matchDate, setMatchDate] = useState<string>(initialData?.matchDate || '');
+export default function MatchForm({ title, submitLabel, players, clubs, initialData, disabledClubId, onSubmit }: MatchFormProps) {
+        const [matchDate, setMatchDate] = useState<string>(initialData?.matchDate || '');
     const [matchTime, setMatchTime] = useState<string>(initialData?.matchTime || '');
-    const [clubId, setClubId] = useState<number | ''>(initialData?.clubId ?? '');
+    const [clubId, setClubId] = useState<number | ''>(initialData?.clubId ?? (disabledClubId ?? ''));
     const [matchType, setMatchType] = useState<'male' | 'female' | 'mixed'>(initialData?.matchType || 'male');
     const [isFriendly, setIsFriendly] = useState<boolean>(initialData?.isFriendly || false);
 
@@ -250,14 +251,21 @@ export default function MatchForm({ title, submitLabel, players, clubs, initialD
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="relative">
+                                        <div className="relative">
                         <label className="block text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1.5">Circolo</label>
-                        <SearchableSelect
-                            value={clubId}
-                            onChange={setClubId}
-                            options={clubOptions}
-                            placeholder="NESSUN CIRCOLO DEFINITO"
-                        />
+                        {disabledClubId ? (
+                            <div className="w-full p-2 text-[10px] font-bold border border-slate-300 rounded-sm bg-slate-100 text-slate-600 flex items-center">
+                                {clubs.find(c => c.id === disabledClubId)?.name ?? 'Circolo assegnato'}
+                                <span className="ml-auto text-[8px] text-slate-400 uppercase tracking-wider">Bloccato</span>
+                            </div>
+                        ) : (
+                            <SearchableSelect
+                                value={clubId}
+                                onChange={setClubId}
+                                options={clubOptions}
+                                placeholder="NESSUN CIRCOLO DEFINITO"
+                            />
+                        )}
                     </div>
                     <div>
                         <label className="block text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1.5">Tipo Partita</label>
