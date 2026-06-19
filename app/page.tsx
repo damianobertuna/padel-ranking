@@ -6,8 +6,6 @@ import { Player } from "@/types";
 import { computeKingAndFanalino } from '@/lib/rankingCalc';
 import ClubSelectFilter from '@/components/ClubSelectFilter';
 import { Hand } from 'lucide-react';
-import Pagination from '@/components/Pagination'; // Assicurati di aver creato questo componente!
-import { redirect } from 'next/navigation';
 
 const MATCHES_PER_PAGE = 5;
 const PLAYERS_PER_PAGE = 10;

@@ -10,6 +10,13 @@ const createMockPlayer = (id: number, side: 'Left' | 'Right' | 'Both', ranking: 
     ranking,
     preferred_side: side,
     gender: 'M',
+    dominant_hand: 'Destro',
+    avatar_url: null,
+    role: 'user',
+    user_id: null,
+    created_at: new Date().toISOString(),
+    absence_days: 0,
+    phone: null,
 });
 
 describe('Engine Calcolo King e Fanalino', () => {

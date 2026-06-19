@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import MatchForm, { MatchFormData } from './MatchForm';
+import MatchForm from './MatchForm';
 import { Player, Club } from '@/types';
 
 // Dati finti minimi per il testing

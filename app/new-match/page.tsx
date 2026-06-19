@@ -61,7 +61,7 @@ export default function CreateMatchPage() {
 
                 // 5. Lanciamo le query in parallelo per massimizzare le performance
                 const [playersRes, clubsRes] = await Promise.all([
-                    supabase.from('players').select('id, first_name, last_name, ranking, preferred_side, gender').order('last_name'),
+                    supabase.from('players').select('*').order('last_name'),
                     clubsQuery
                 ]);
 

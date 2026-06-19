@@ -93,9 +93,10 @@ export default function ResolveMatch() {
         fetchData();
     }, [matchId, supabase]);
 
-    const getPlayerName = (id: number | null) => {
+        const getPlayerName = (id: number | null) => {
         const p = players.find(pl => pl.id === id);
-        return p ? `${p.last_name.toUpperCase()} ${p.first_name[0]}.` : 'N.D.';
+        if (!p || !p.last_name || !p.first_name) return 'N.D.';
+        return `${p.last_name.toUpperCase()} ${p.first_name[0]}.`;
     };
 
     const handleSubmitScore = async (e: React.FormEvent) => {

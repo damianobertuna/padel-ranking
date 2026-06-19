@@ -45,10 +45,6 @@ const mockPlayers = [
     leftSideUser
 ] as Player[];
 
-const mockClubs = [
-    { id: 100, name: 'Padel Club Catania', city: 'Catania' }
-] as Club[];
-
 // FIX: DATE DINAMICHE PER PREVENIRE IL FALLIMENTO NEL TEMPO
 const futureDate = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString(); // Tra 7 giorni
 const pastDate = new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString();   // 7 giorni fa

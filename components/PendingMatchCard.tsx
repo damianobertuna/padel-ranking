@@ -25,10 +25,10 @@ export default function PendingMatchCard({
     const matchClub = clubs?.find(c => c.id === match.club_id);
 
     // --- LOGICA LIVELLO E RANGE CONSENTITO ---
-    const activePlayerIds = [
+        const activePlayerIds = [
         match.team_a_left_id, match.team_a_right_id,
         match.team_b_left_id, match.team_b_right_id
-    ].filter(Boolean) as number[];
+    ].filter((id): id is number => id !== null && id !== undefined);
 
     const activeRankings = activePlayerIds
         .map(id => rawPlayers.find(p => p.id === id)?.ranking)
@@ -56,12 +56,12 @@ export default function PendingMatchCard({
 
     // --- LOGICA DI DOMINIO E RUOLI ---
     const isMatchComplete = Boolean(match.team_a_left_id && match.team_a_right_id && match.team_b_left_id && match.team_b_right_id);
-    const isUserInMatch = currentUserPlayer && activePlayerIds.includes(currentUserPlayer.id);
+    const isUserInMatch = currentUserPlayer && currentUserPlayer.id != null && activePlayerIds.includes(currentUserPlayer.id);
     const isAdmin = currentUserPlayer?.role === 'admin';
     const isOrganizer = currentUserPlayer?.id === match.organizer_id;
 
     // NUOVO: Verifica se l'utente corrente è un club_manager autorizzato per questo specifico circolo
-    const isManagerForThisMatch = currentUserPlayer?.role === 'club_manager' && managedClubIds.includes(match.club_id);
+    const isManagerForThisMatch = currentUserPlayer?.role === 'club_manager' && match.club_id != null && managedClubIds.includes(match.club_id);
 
     // Estendiamo la regola di autorizzazione includendo il manager del circolo
     const canManage = isAdmin || isOrganizer || isManagerForThisMatch || (!match.organizer_id && isUserInMatch);
