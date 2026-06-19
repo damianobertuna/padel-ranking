@@ -38,29 +38,41 @@ export default function ResolveMatch() {
                 const matchData = matchRes.data;
                 if (!matchData) throw new Error("Partita non trovata o referto inesistente.");
 
-                const allPlayers = playersRes.data || [];
+                                const allPlayers = playersRes.data || [];
                 const currentUserPlayer = allPlayers.find(p => p.user_id === user.id);
-                if (!currentUserPlayer) throw new Error("Profilo giocatore non trovato.");
 
                 // --- CONTROLLO DI SICUREZZA LATO CLIENT ---
                 let isManagerForThisMatch = false;
-                if (currentUserPlayer.role === 'club_manager' && matchData.club_id) {
+                let currentUserId: number | null = null;
+                let userRole: string | null = null;
+
+                if (currentUserPlayer) {
+                    currentUserId = currentUserPlayer.id;
+                    userRole = currentUserPlayer.role;
+                } else {
+                    // Potrebbe essere un club_manager senza profilo giocatore
+                    const { data: userRoleData } = await supabase
+                        .from('user_roles')
+                        .select('role')
+                        .eq('user_id', user.id)
+                        .maybeSingle();
+                    userRole = userRoleData?.role || null;
+                }
+
+                if (userRole === 'club_manager' && matchData.club_id) {
                     const { data: managerData } = await supabase.from('club_managers')
                         .select('id')
-                        .eq('player_id', currentUserPlayer.id)
+                        .eq('user_id', user.id)
                         .eq('club_id', matchData.club_id)
                         .maybeSingle();
                     isManagerForThisMatch = !!managerData;
                 }
 
-                const isPlayerInMatch = [
-                    matchData.team_a_left_id,
-                    matchData.team_a_right_id,
-                    matchData.team_b_left_id,
-                    matchData.team_b_right_id
-                ].includes(currentUserPlayer.id);
+                const isPlayerInMatch = currentUserId
+                    ? [matchData.team_a_left_id, matchData.team_a_right_id, matchData.team_b_left_id, matchData.team_b_right_id].includes(currentUserId)
+                    : false;
 
-                const isAdmin = currentUserPlayer.role === 'admin';
+                const isAdmin = userRole === 'admin';
 
                 // Chi può inserire il punteggio? L'Admin, un giocatore in campo o il gestore del circolo
                 const canResolve = isAdmin || isPlayerInMatch || isManagerForThisMatch;
