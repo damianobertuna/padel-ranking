@@ -12,14 +12,25 @@ export default async function RootLayout({
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    let currentUserPlayer = null;
+        let currentUserPlayer = null;
+    let currentUserManager = null;
     if (user) {
         const { data: playerData } = await supabase
             .from('players')
             .select('*')
             .eq('user_id', user.id)
-            .single();
+            .maybeSingle();
         currentUserPlayer = playerData;
+
+        // If no player profile, try club_manager
+        if (!currentUserPlayer) {
+            const { data: managerData } = await supabase
+                .from('club_managers')
+                .select('first_name, last_name')
+                .eq('user_id', user.id)
+                .maybeSingle();
+            currentUserManager = managerData;
+        }
     }
 
     return (
@@ -30,27 +41,27 @@ export default async function RootLayout({
         <div className="mb-3 sticky top-0 z-50 w-full bg-slate-900/95 backdrop-blur-sm text-white flex justify-between items-center py-2.5 px-4 sm:px-8 text-xs font-semibold uppercase tracking-wider shadow-sm">
             <div className="shrink-0 pr-2">
                 {user ? (
-                    <Link
-                        href="/profile"
-                        className="flex items-center gap-2 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-blue-500 transition-all rounded-full py-1 pr-3 pl-1 cursor-pointer group"
-                        title="Gestisci il tuo profilo"
-                    >
-                        {/* AVATAR O INIZIALI */}
-                        <div className="w-6 h-6 shrink-0 rounded-full bg-blue-600 text-white text-[9px] flex items-center justify-center font-black overflow-hidden border border-slate-900">
-                            {currentUserPlayer?.avatar_url ? (
-                                <img src={currentUserPlayer.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-                            ) : (
-                                <span>{currentUserPlayer?.first_name?.charAt(0)}{currentUserPlayer?.last_name?.charAt(0)}</span>
-                            )}
-                        </div>
+                        <Link
+                            href="/profile"
+                            className="flex items-center gap-2 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-blue-500 transition-all rounded-full py-1 pr-3 pl-1 cursor-pointer group"
+                            title="Gestisci il tuo profilo"
+                        >
+                            {/* AVATAR O INIZIALI */}
+                            <div className="w-6 h-6 shrink-0 rounded-full bg-blue-600 text-white text-[9px] flex items-center justify-center font-black overflow-hidden border border-slate-900">
+                                {currentUserPlayer?.avatar_url ? (
+                                    <img src={currentUserPlayer.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                                ) : (
+                                    <span>{(currentUserPlayer?.first_name || currentUserManager?.first_name)?.charAt(0)}{(currentUserPlayer?.last_name || currentUserManager?.last_name)?.charAt(0)}</span>
+                                )}
+                            </div>
 
-                        {/* NOME (Nascosto su mobile piccolo, visibile da sm in su) */}
-                        <span className="hidden sm:inline font-bold text-white text-xs truncate max-w-[120px]">
-              {currentUserPlayer?.first_name} {currentUserPlayer?.last_name}
+                            {/* NOME (Nascosto su mobile piccolo, visibile da sm in su) */}
+                            <span className="hidden sm:inline font-bold text-white text-xs truncate max-w-[120px]">
+                  {currentUserPlayer?.first_name || currentUserManager?.first_name} {currentUserPlayer?.last_name || currentUserManager?.last_name}
           </span>
-                        {/* TESTO "PROFILO" per Mobile */}
-                        <span className="sm:hidden font-bold text-white text-[10px] uppercase tracking-widest">
-              Profilo
+                            {/* TESTO "PROFILO" per Mobile */}
+                            <span className="sm:hidden font-bold text-white text-[10px] uppercase tracking-widest">
+                  Profilo
           </span>
 
                         {/* ICONA INGRANAGGIO (appare all'hover su desktop, fissa su mobile) */}
