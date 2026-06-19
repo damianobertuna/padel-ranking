@@ -34,13 +34,17 @@ describe('Match Server Actions', () => {
         updateSpy = vi.fn().mockReturnThis();
         deleteSpy = vi.fn().mockReturnThis();
 
-        const mockQueryBuilder = (table: string) => {
+                const mockQueryBuilder = (table: string) => {
             return {
                 select: vi.fn().mockReturnThis(),
                 eq: vi.fn().mockReturnThis(),
                 in: vi.fn().mockReturnThis(),
                 update: updateSpy, // Riferimento alla spia globale
                 delete: deleteSpy, // Riferimento alla spia globale
+                maybeSingle: vi.fn().mockImplementation(() => {
+                    if (table === 'players') return Promise.resolve({ data: mockPlayer, error: null });
+                    return Promise.resolve({ data: null, error: null });
+                }),
                 single: vi.fn().mockImplementation(() => {
                     if (table === 'players') return Promise.resolve({ data: mockPlayer, error: null });
                     if (table === 'matches') return Promise.resolve({ data: mockMatch, error: null });
@@ -181,6 +185,25 @@ describe('resolveMatchWithRanking (Logica Punteggi e Regole)', () => {
                     {id:10, first_name: 'J', last_name: 'Player', preferred_side:'Both', ranking: 3.0} // Normale MIX
                 ];
 
+                                if (table === 'players') {
+                    // The resolveUserIdentity helper will call maybeSingle on 'players' first
+                    return {
+                        select: vi.fn().mockReturnThis(),
+                        eq: vi.fn().mockReturnThis(),
+                        in: vi.fn().mockImplementation((c, ids: number[]) => {
+                            return Promise.resolve({ data: mockAll.filter(p => ids.includes(p.id)), error: null });
+                        }),
+                        update: updateSpy,
+                        maybeSingle: vi.fn().mockResolvedValue({ data: { id: 99, role: 'admin', first_name: 'Op', last_name: 'Test' }, error: null }),
+                        single: vi.fn().mockImplementation(() => {
+                            if (table === 'matches') return Promise.resolve({ data: matchData, error: null });
+                            return Promise.resolve({ data: { id: 99, role: 'admin', first_name: 'Op', last_name: 'Test' }, error: null });
+                        }),
+                        then: function(res: any) {
+                            res({ data: mockAll, error: null });
+                        }
+                    };
+                }
                 return {
                     select: vi.fn().mockReturnThis(),
                     eq: vi.fn().mockReturnThis(),
@@ -191,7 +214,6 @@ describe('resolveMatchWithRanking (Logica Punteggi e Regole)', () => {
                     maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }), // Mock per isUserManagerOfClub
                     single: vi.fn().mockImplementation(() => {
                         if (table === 'matches') return Promise.resolve({ data: matchData, error: null });
-                        // MODIFICA QUI: Impostiamo il ruolo 'admin' in modo che il check di sicurezza venga superato
                         return Promise.resolve({ data: { id: 99, role: 'admin', first_name: 'Op', last_name: 'Test' }, error: null });
                     }),
                     then: function(res: any) {
@@ -297,24 +319,24 @@ describe('Autorizzazioni per ruolo club_manager', () => {
 
         const mockSupabaseManager = {
             auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'manager-123' } } }) },
-            from: vi.fn((table) => {
-                return {
+                        from: vi.fn((table) => {
+                const managerPlayer = { id: 88, role: 'club_manager', first_name: 'Gestore', last_name: 'Test', preferred_side: 'Both' };
+                const clubManagerRow = managedClubId === clubIdOfMatch ? { id: 'link-1' } : null;
+
+                                return {
                     select: vi.fn().mockReturnThis(),
                     eq: vi.fn().mockReturnThis(),
                     in: vi.fn().mockImplementation(() => Promise.resolve({ data: [{id:1, ranking:3}, {id:2, ranking:3}, {id:3, ranking:3}, {id:4, ranking:3}], error: null })),
                     update: updateSpy,
                     maybeSingle: vi.fn().mockImplementation(() => {
-                        // Simuliamo il check sulla tabella club_managers
-                        if (table === 'club_managers' && managedClubId === clubIdOfMatch) {
-                            // L'utente è manager di QUESTO circolo
-                            return Promise.resolve({ data: { id: 'link-1' }, error: null });
-                        }
-                        // L'utente NON è manager di questo circolo
+                        if (table === 'players') return Promise.resolve({ data: null, error: null }); // club_manager has no player row
+                        if (table === 'user_roles') return Promise.resolve({ data: { role: 'club_manager' }, error: null }); // but has user_roles entry
+                        if (table === 'club_managers') return Promise.resolve({ data: clubManagerRow, error: null });
                         return Promise.resolve({ data: null, error: null });
                     }),
                     single: vi.fn().mockImplementation(() => {
                         if (table === 'matches') return Promise.resolve({ data: matchData, error: null });
-                        if (table === 'players') return Promise.resolve({ data: { id: 88, role: 'club_manager', first_name: 'Gestore', last_name: 'Test' }, error: null });
+                        return Promise.resolve({ data: managerPlayer, error: null });
                     }),
                     then: function(res: any) { res({ data: [], error: null }); }
                 };
@@ -358,17 +380,29 @@ describe('Autorizzazioni per ruolo user (Giocatore Standard)', () => {
 
         const mockSupabaseUser = {
             auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-123' } } }) },
-            from: vi.fn((table) => {
+                        from: vi.fn((table) => {
+                const userPlayer = { id: userId, role: 'user', first_name: 'User', last_name: 'Test', preferred_side: 'Both' };
+
+                if (table === 'players') {
+                    return {
+                        select: vi.fn().mockReturnThis(),
+                        eq: vi.fn().mockReturnThis(),
+                        in: vi.fn().mockImplementation(() => Promise.resolve({ data: playersInMatch.map(id => ({id, ranking:3})), error: null })),
+                        update: updateSpy,
+                        maybeSingle: vi.fn().mockResolvedValue({ data: userPlayer, error: null }),
+                        single: vi.fn().mockResolvedValue({ data: userPlayer, error: null }),
+                        then: function(res: any) { res({ data: [], error: null }); }
+                    };
+                }
                 return {
                     select: vi.fn().mockReturnThis(),
                     eq: vi.fn().mockReturnThis(),
                     in: vi.fn().mockImplementation(() => Promise.resolve({ data: playersInMatch.map(id => ({id, ranking:3})), error: null })),
                     update: updateSpy,
-                    maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }), // Un user normale NON gestisce circoli
+                    maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
                     single: vi.fn().mockImplementation(() => {
                         if (table === 'matches') return Promise.resolve({ data: matchData, error: null });
-                        // Mockiamo il profilo dell'utente loggato come 'user' standard
-                        if (table === 'players') return Promise.resolve({ data: { id: userId, role: 'user', first_name: 'User', last_name: 'Test' }, error: null });
+                        return Promise.resolve({ data: userPlayer, error: null });
                     }),
                     then: function(res: any) { res({ data: [], error: null }); }
                 };
