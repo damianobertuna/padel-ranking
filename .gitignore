@@ -56,3 +56,4 @@ supabase/types/*
 .continue/*
 agent.md
 .kiro/*
+TEST_HARDENING_TASKS.md
