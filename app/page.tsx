@@ -53,29 +53,42 @@ export default async function Home({ searchParams }: PageProps) {
         Both: 'Mix'
     };
 
-    // --- DIETRO LE QUINTE: RECUPERO UTENTE LOGGATO E PERMESSI ---
+        // --- DIETRO LE QUINTE: RECUPERO UTENTE LOGGATO E PERMESSI ---
     const { data: { user } } = await supabase.auth.getUser();
     let currentUserPlayer = null;
     let managedClubIds: number[] = [];
 
     if (user) {
+        // 1) Cerca il profilo giocatore (player/club_manager con profilo)
         const { data: playerData } = await supabase
             .from('players')
             .select('*')
             .eq('user_id', user.id)
-            .single();
+            .maybeSingle();
         currentUserPlayer = playerData;
 
-        // Se l'utente è un manager, recuperiamo gli ID dei circoli che gestisce
-        if (playerData?.role === 'club_manager') {
-            const { data: managementData } = await supabase
-                .from('club_managers')
-                .select('club_id')
-                .eq('player_id', playerData.id);
+        // 2) Se non ha profilo giocatore, verifica se è un club_manager puro (solo user_roles)
+        if (!currentUserPlayer) {
+            const { data: userRole } = await supabase
+                .from('user_roles')
+                .select('role')
+                .eq('user_id', user.id)
+                .maybeSingle();
 
-            if (managementData) {
-                managedClubIds = managementData.map(m => Number(m.club_id));
+            if (userRole?.role === 'club_manager') {
+                // Crea un oggetto fittizio per rappresentare il manager nell'UI
+                currentUserPlayer = { id: null, role: 'club_manager', first_name: null, last_name: null };
             }
+        }
+
+        // 3) Recupera i circoli gestiti (usa user_id, non player_id)
+        const { data: managementData } = await supabase
+            .from('club_managers')
+            .select('club_id')
+            .eq('user_id', user.id);
+
+        if (managementData) {
+            managedClubIds = managementData.map(m => Number(m.club_id));
         }
     }
 
@@ -124,7 +137,6 @@ export default async function Home({ searchParams }: PageProps) {
     const paginatedPlayers = sortedPlayers.slice(startIndex, startIndex + PLAYERS_PER_PAGE);
 
     // --- PENDING MATCHES ---
-    const isAdmin = currentUserPlayer?.role === 'admin';
     const { data: pendingMatches } = await supabase
         .from('matches')
         .select('*')
@@ -135,21 +147,22 @@ export default async function Home({ searchParams }: PageProps) {
         const playerIds = [match.team_a_left_id, match.team_a_right_id, match.team_b_left_id, match.team_b_right_id];
         const activeCount = playerIds.filter(Boolean).length;
         const isMatchComplete = activeCount === 4;
-        const isUserInMatch = currentUserPlayer ? playerIds.includes(currentUserPlayer.id) : false;
+        const isUserInMatch = currentUserPlayer?.id ? playerIds.includes(currentUserPlayer.id) : false;
         const isExpired = match.match_date ? new Date(match.match_date) < new Date() : false;
 
         // Verifica se l'utente è un manager di QUEL circolo
         const isManagerForThisMatch = currentUserPlayer?.role === 'club_manager' && managedClubIds.includes(match.club_id);
 
-        if (isExpired) {
+                if (isExpired) {
             // I manager possono visualizzare e gestire i match scaduti dei loro circoli
-            if (!isMatchComplete && !isAdmin && !isManagerForThisMatch) return false;
-            if (isMatchComplete && !isAdmin && !isUserInMatch && !isManagerForThisMatch) return false;
+            const isAdminUser = currentUserPlayer?.role === 'admin';
+            if (!isMatchComplete && !isAdminUser && !isManagerForThisMatch) return false;
+            if (isMatchComplete && !isAdminUser && !isUserInMatch && !isManagerForThisMatch) return false;
         }
 
         if (currentSlots === 'free' && isMatchComplete) return false;
 
-        if (currentLevel === 'compatible' && currentUserPlayer && !isUserInMatch && !isMatchComplete) {
+                if (currentLevel === 'compatible' && currentUserPlayer?.id && !isUserInMatch && !isMatchComplete) {
             const activeRankings = playerIds
                 .map(id => playersWithStats.find(p => p.id === id)?.ranking)
                 .filter((r): r is number => r !== undefined);
@@ -174,7 +187,7 @@ export default async function Home({ searchParams }: PageProps) {
         completedQuery = completedQuery.eq('club_id', parseInt(currentCompletedClub, 10));
     }
 
-    if (currentCompletedScope === 'mine' && currentUserPlayer) {
+        if (currentCompletedScope === 'mine' && currentUserPlayer?.id) {
         completedQuery = completedQuery.or(`team_a_left_id.eq.${currentUserPlayer.id},team_a_right_id.eq.${currentUserPlayer.id},team_b_left_id.eq.${currentUserPlayer.id},team_b_right_id.eq.${currentUserPlayer.id}`);
     }
 

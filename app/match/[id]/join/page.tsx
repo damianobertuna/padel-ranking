@@ -31,30 +31,47 @@ export default function EditMatchPage() {
                     supabase.auth.getUser()
                 ]);
 
-                const user = authRes.data.user;
+                                const user = authRes.data.user;
                 if (!user) throw new Error("Devi effettuare l'accesso.");
 
                 const match = matchRes.data;
                 if (!match) throw new Error("Partita non trovata.");
 
-                // Peschiamo il giocatore corrente dalla lista scaricata (zero query aggiuntive)
+                // Cerca profilo giocatore (esiste per player/admin, non per club_manager puro)
                 const currentUserPlayer = playersRes.data?.find(p => p.user_id === user.id);
-                if (!currentUserPlayer) throw new Error("Profilo giocatore non trovato.");
 
                 // --- CONTROLLO DI SICUREZZA LATO CLIENT ---
                 let isManagerForThisMatch = false;
-                if (currentUserPlayer.role === 'club_manager' && match.club_id) {
+                let currentUserId: number | null = null;
+                let userRole: string | null = null;
+
+                if (currentUserPlayer) {
+                    currentUserId = currentUserPlayer.id;
+                    userRole = currentUserPlayer.role;
+                } else {
+                    // Potrebbe essere un club_manager senza profilo giocatore
+                    const { data: userRoleData } = await supabase
+                        .from('user_roles')
+                        .select('role')
+                        .eq('user_id', user.id)
+                        .maybeSingle();
+                    userRole = userRoleData?.role || null;
+                }
+
+                if (userRole === 'club_manager' && match.club_id) {
                     const { data: managerData } = await supabase.from('club_managers')
                         .select('id')
-                        .eq('player_id', currentUserPlayer.id)
+                        .eq('user_id', user.id)
                         .eq('club_id', match.club_id)
                         .maybeSingle();
                     isManagerForThisMatch = !!managerData;
                 }
 
-                const isPlayerInMatch = [match.team_a_left_id, match.team_a_right_id, match.team_b_left_id, match.team_b_right_id].includes(currentUserPlayer.id);
-                const isAdmin = currentUserPlayer.role === 'admin';
-                const isOrganizer = currentUserPlayer.id === match.organizer_id;
+                const isPlayerInMatch = currentUserId
+                    ? [match.team_a_left_id, match.team_a_right_id, match.team_b_left_id, match.team_b_right_id].includes(currentUserId)
+                    : false;
+                const isAdmin = userRole === 'admin';
+                const isOrganizer = currentUserId ? currentUserId === match.organizer_id : false;
 
                 const canManage = isAdmin || isOrganizer || isManagerForThisMatch || (!match.organizer_id && isPlayerInMatch);
 
