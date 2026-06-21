@@ -335,8 +335,8 @@ export async function resolveMatchWithRanking(data: {
         }
         // ----------------------------------------
 
-        // 3. Validazione Score e Calcolo Vincitore
-        const { finalWinningTeam, stringaPunteggio } = evaluateMatchScore(data.score);
+                // 3. Validazione Score e Calcolo Vincitore
+        const { finalWinningTeam, stringaPunteggio } = await evaluateMatchScore(data.score);
 
         // 4. Recupero e strutturazione Atleti
         const playerIds = [match.team_a_left_id, match.team_a_right_id, match.team_b_left_id, match.team_b_right_id];
@@ -678,7 +678,7 @@ export async function joinMatchAction(matchId: string) {
 /**
  * Valida i punteggi e determina il team vincente
  */
-function evaluateMatchScore(score: SetScore[]): { finalWinningTeam: 'A' | 'B', stringaPunteggio: string } {
+export async function evaluateMatchScore(score: SetScore[]): Promise<{ finalWinningTeam: 'A' | 'B', stringaPunteggio: string }> {
     if (!score || score.length < 2) {
         throw new Error("I dati dei set sono incompleti. Almeno i primi 2 set sono obbligatori.");
     }
@@ -686,8 +686,11 @@ function evaluateMatchScore(score: SetScore[]): { finalWinningTeam: 'A' | 'B', s
     let setsWonA = 0;
     let setsWonB = 0;
 
-    score.forEach((set, index) => {
-        if (!isSetValid(set.team_a, set.team_b, index)) {
+        for (let i = 0; i < score.length; i++) {
+        const set = score[i];
+        const index = i;
+        const valid = await isSetValid(set.team_a, set.team_b, index);
+        if (!valid) {
             throw new Error(
                 `Punteggio non valido al Set ${index + 1}: [${set.team_a}-${set.team_b}]. ` +
                 (index < 2
@@ -698,7 +701,7 @@ function evaluateMatchScore(score: SetScore[]): { finalWinningTeam: 'A' | 'B', s
 
         if (set.team_a > set.team_b) setsWonA++;
         else if (set.team_b > set.team_a) setsWonB++;
-    });
+    }
 
     if (setsWonA === setsWonB) {
         throw new Error("Pareggio nei set impossibile. Inserisci il terzo set per decretare il vincitore.");
@@ -763,7 +766,7 @@ async function calculateCompetitiveDeltas(
 }
 
 // Funzione helper per validare un singolo set di Padel/Tennis
-function isSetValid(teamA: number, teamB: number, setIndex: number): boolean {
+export async function isSetValid(teamA: number, teamB: number, setIndex: number): Promise<boolean> {
     if (teamA < 0 || teamB < 0) return false;
     if (teamA === teamB) return false;
 

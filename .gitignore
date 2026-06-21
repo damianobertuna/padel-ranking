@@ -57,3 +57,5 @@ supabase/types/*
 agent.md
 .kiro/*
 TEST_HARDENING_TASKS.md
+bundle-context.js
+project-context.txt

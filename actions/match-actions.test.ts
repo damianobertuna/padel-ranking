@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { leaveMatchAction, joinMatchAction, resolveMatchWithRanking } from './match-actions';
+import { leaveMatchAction, joinMatchAction, resolveMatchWithRanking, evaluateMatchScore, isSetValid } from './match-actions';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { logAction } from '@/lib/audit';
 
@@ -421,8 +421,112 @@ describe('Autorizzazioni per ruolo user (Giocatore Standard)', () => {
         expect(updateSpy).toHaveBeenCalled();
     });
 
-    it('dovrebbe BLOCCARE un utente normale se tenta di risolvere una partita in cui NON GIOCA', async () => {
+        it('dovrebbe BLOCCARE un utente normale se tenta di risolvere una partita in cui NON GIOCA', async () => {
         // L'utente ha ID 99, ma in campo ci sono i giocatori 1, 2, 3 e 4
         await expect(executeUserResolve(99, [1, 2, 3, 4])).rejects.toThrow('VIOLAZIONE DI SICUREZZA');
+    });
+});
+
+describe('isSetValid — Single Set Validation', () => {
+    it('dovrebbe ACCETTARE 6-0 come set valido (primo set)', async () => {
+        expect(await isSetValid(6, 0, 0)).toBe(true);
+    });
+    it('dovrebbe ACCETTARE 6-4 come set valido (primo set)', async () => {
+        expect(await isSetValid(6, 4, 0)).toBe(true);
+    });
+    it('dovrebbe ACCETTARE 7-5 come set valido (primo set)', async () => {
+        expect(await isSetValid(7, 5, 0)).toBe(true);
+    });
+    it('dovrebbe ACCETTARE 7-6 come set valido (primo set)', async () => {
+        expect(await isSetValid(7, 6, 0)).toBe(true);
+    });
+    it('dovrebbe RIFIUTARE 8-6 (vincitore > 7)', async () => {
+        expect(await isSetValid(8, 6, 0)).toBe(false);
+    });
+    it('dovrebbe RIFIUTARE 6-6 (pareggio)', async () => {
+        expect(await isSetValid(6, 6, 0)).toBe(false);
+    });
+    it('dovrebbe RIFIUTARE 7-4 (scarto 3 con vincente 7)', async () => {
+        expect(await isSetValid(7, 4, 0)).toBe(false);
+    });
+    it('dovrebbe RIFIUTARE -1-6 (punteggio negativo)', async () => {
+        expect(await isSetValid(-1, 6, 0)).toBe(false);
+    });
+    it('dovrebbe RIFIUTARE NaN', async () => {
+        expect(await isSetValid(NaN, 6, 0)).toBe(false);
+    });
+});
+
+describe('isSetValid — Third Set (Super Tie-Break)', () => {
+    it('dovrebbe ACCETTARE 6-0 nel terzo set', async () => {
+        expect(await isSetValid(6, 0, 2)).toBe(true);
+    });
+    it('dovrebbe ACCETTARE 7-6 nel terzo set', async () => {
+        expect(await isSetValid(7, 6, 2)).toBe(true);
+    });
+    it('dovrebbe ACCETTARE 10-0 super tie-break', async () => {
+        expect(await isSetValid(10, 0, 2)).toBe(true);
+    });
+    it('dovrebbe ACCETTARE 10-8 super tie-break', async () => {
+        expect(await isSetValid(10, 8, 2)).toBe(true);
+    });
+    it('dovrebbe ACCETTARE 12-10 super tie-break', async () => {
+        expect(await isSetValid(12, 10, 2)).toBe(true);
+    });
+    it('dovrebbe ACCETTARE 15-13 super tie-break', async () => {
+        expect(await isSetValid(15, 13, 2)).toBe(true);
+    });
+    it('dovrebbe RIFIUTARE 10-9 (diff 1)', async () => {
+        expect(await isSetValid(10, 9, 2)).toBe(false);
+    });
+    it('dovrebbe RIFIUTARE 9-7 (vincitore < 10)', async () => {
+        expect(await isSetValid(9, 7, 2)).toBe(false);
+    });
+    it('dovrebbe RIFIUTARE 15-12 (vincitore >10 diff!=2)', async () => {
+        expect(await isSetValid(15, 12, 2)).toBe(false);
+    });
+});
+
+describe('evaluateMatchScore — Full Score Validation', () => {
+    it('dovrebbe RIFIUTARE array vuoto', async () => {
+        await expect(evaluateMatchScore([])).rejects.toThrow('Almeno i primi 2 set sono obbligatori.');
+    });
+    it('dovrebbe RIFIUTARE array con 1 set', async () => {
+        await expect(evaluateMatchScore([{ team_a: 6, team_b: 4 }])).rejects.toThrow('Almeno i primi 2 set');
+    });
+    it('dovrebbe RIFIUTARE null', async () => {
+        await expect(evaluateMatchScore(null as any)).rejects.toThrow('Almeno i primi 2 set');
+    });
+    it('dovrebbe RIFIUTARE undefined', async () => {
+        await expect(evaluateMatchScore(undefined as any)).rejects.toThrow('Almeno i primi 2 set');
+    });
+    it('dovrebbe RIFIUTARE set 1 non valido (6-6)', async () => {
+        await expect(evaluateMatchScore([{ team_a: 6, team_b: 6 }, { team_a: 6, team_b: 4 }])).rejects.toThrow('Punteggio non valido al Set 1');
+    });
+    it('dovrebbe RIFIUTARE set 3 (10-9)', async () => {
+        await expect(evaluateMatchScore([{ team_a: 6, team_b: 4 }, { team_a: 4, team_b: 6 }, { team_a: 10, team_b: 9 }])).rejects.toThrow('Punteggio non valido al Set 3');
+    });
+    it('dovrebbe RILEVARE pareggio 1-1', async () => {
+        await expect(evaluateMatchScore([{ team_a: 6, team_b: 4 }, { team_a: 2, team_b: 6 }])).rejects.toThrow('Pareggio nei set impossibile');
+    });
+    it('dovrebbe Team A vince 2-0', async () => {
+        const r = await evaluateMatchScore([{ team_a: 6, team_b: 4 }, { team_a: 6, team_b: 2 }]);
+        expect(r.finalWinningTeam).toBe('A');
+    });
+    it('dovrebbe Team B vince 2-0', async () => {
+        const r = await evaluateMatchScore([{ team_a: 3, team_b: 6 }, { team_a: 4, team_b: 6 }]);
+        expect(r.finalWinningTeam).toBe('B');
+    });
+    it('dovrebbe Team A vince 2-1', async () => {
+        const r = await evaluateMatchScore([{ team_a: 6, team_b: 4 }, { team_a: 4, team_b: 6 }, { team_a: 6, team_b: 2 }]);
+        expect(r.finalWinningTeam).toBe('A');
+    });
+    it('dovrebbe Team B vince 2-1', async () => {
+        const r = await evaluateMatchScore([{ team_a: 6, team_b: 4 }, { team_a: 4, team_b: 6 }, { team_a: 3, team_b: 6 }]);
+        expect(r.finalWinningTeam).toBe('B');
+    });
+    it('dovrebbe restituire stringa punteggio formattata', async () => {
+        const r = await evaluateMatchScore([{ team_a: 6, team_b: 4 }, { team_a: 7, team_b: 5 }]);
+        expect(r.stringaPunteggio).toBe('6-4 / 7-5');
     });
 });
