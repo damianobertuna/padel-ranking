@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server';
-import Link from 'next/link';
 import WinRateWidget from '@/components/WinRateWidget';
 import StreakWidget from '@/components/StreakWidget';
 import PartnersAndNemesisWidget from '@/components/PartnersAndNemesisWidget';
@@ -61,8 +60,7 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
     const totalMatches = victories + defeats;
     const statsForWidget = { totalPlayed: totalMatches, totalWon: victories, totalLost: defeats, winRate: totalMatches > 0 ? parseFloat(((victories / totalMatches) * 100).toFixed(1)) : 0 };
     const paginatedMatches = enrichedMatches.slice((currentPage - 1) * MATCHES_PER_PAGE, currentPage * MATCHES_PER_PAGE);
-    const totalPages = Math.ceil(enrichedMatches.length / MATCHES_PER_PAGE) || 1;
-
+    
     // Controllo Sicurezza: Il visitatore è il proprietario di questo profilo?
     const isOwner = user?.id === player.user_id;
 

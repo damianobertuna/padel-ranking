@@ -5,6 +5,7 @@ import NewClubForm from './NewClubForm';
 import DeleteClubButton from './DeleteClubButton';
 import { Club } from '@/types';
 import BackToHomeButton from "@/components/BackToHomeButton";
+import InviteManagerModal from "@/components/InviteManagerModal";
 
 export const revalidate = 0;
 const CLUBS_PER_PAGE = 10;
@@ -25,18 +26,25 @@ export default async function AdminClubsPage({ searchParams }: PageProps) {
     const resolvedParams = await searchParams;
     const currentPage = parseInt(resolvedParams.page || '1', 10) || 1;
 
-    // Calcolo range per la query
+    // Calcolo range per la query paginata
     const fromRange = (currentPage - 1) * CLUBS_PER_PAGE;
     const toRange = fromRange + CLUBS_PER_PAGE - 1;
 
-    // Fetch mirato con conteggio esatto
+    // Fetch mirato con conteggio esatto per la tabella
     const { data: clubsData, count: totalClubsCount } = await supabase
         .from('clubs')
         .select('*', { count: 'exact' })
         .order('name', { ascending: true })
         .range(fromRange, toRange);
 
+    // Fetch ultraleggero di TUTTI i circoli per popolare la tendina della modale
+    const { data: allClubsData } = await supabase
+        .from('clubs')
+        .select('id, name, city')
+        .order('name');
+
     const clubs: Club[] = clubsData || [];
+    const allClubs = allClubsData || [];
     const totalPages = totalClubsCount ? Math.ceil(totalClubsCount / CLUBS_PER_PAGE) : 1;
 
     // --- WRAPPER PER LA PAGINAZIONE LATO SERVER ---
@@ -97,8 +105,16 @@ export default async function AdminClubsPage({ searchParams }: PageProps) {
             <div className="max-w-3xl w-full mx-auto">
                 <div className="mb-8 mt-2 border-b-2 border-slate-900 pb-4">
                     <BackToHomeButton />
-                    <h1 className="text-3xl font-black text-slate-900 mt-2 uppercase tracking-tighter">Gestione Circoli</h1>
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Area Amministrativa Federale</p>
+
+                    <div className="flex justify-between items-end mt-2">
+                        <div>
+                            <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Gestione Circoli</h1>
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Area Amministrativa Federale</p>
+                        </div>
+
+                        {/* Il nuovo bottone per invitare i gestori */}
+                        <InviteManagerModal clubs={allClubs} />
+                    </div>
                 </div>
 
                 <div className="mb-8">

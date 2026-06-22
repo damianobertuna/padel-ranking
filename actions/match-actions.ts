@@ -11,24 +11,92 @@ export interface SetScore {
     team_b: number;
 }
 
+// ============================================================================
+// HELPER SICUREZZA: Recupera identità utente (player o club_manager)
+// ============================================================================
+type UserIdentity = {
+    type: 'player' | 'club_manager' | 'admin';
+    userId: string;
+    playerId?: number;
+    displayName: string;
+    preferredSide?: string;
+};
+
+async function resolveUserIdentity(supabase: any, authUserId: string): Promise<UserIdentity> {
+    // 1. Check if user has a player profile
+    const { data: player } = await supabase
+        .from('players')
+        .select('id, role, first_name, last_name, preferred_side')
+        .eq('user_id', authUserId)
+        .maybeSingle();
+
+    if (player) {
+        return {
+            type: player.role === 'admin' ? 'admin' : 'player',
+            userId: authUserId,
+            playerId: player.id,
+            displayName: `${player.first_name ?? ''} ${player.last_name ?? ''}`.trim() || 'Giocatore',
+            preferredSide: player.preferred_side,
+        };
+    }
+
+    // 2. No player profile — check if user is a club_manager
+    const { data: userRole } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', authUserId)
+        .maybeSingle();
+
+        if (userRole?.role === 'club_manager') {
+            // 3. Resolve real name from club_managers table (stored at invitation time)
+            let displayName = 'Club Manager';
+            const { data: manager } = await supabase
+                .from('club_managers')
+                .select('first_name, last_name')
+                .eq('user_id', authUserId)
+                .maybeSingle();
+
+            if (manager?.first_name || manager?.last_name) {
+                displayName = `${manager.first_name} ${manager.last_name}`.trim();
+            }
+
+            return {
+                type: 'club_manager',
+                userId: authUserId,
+                displayName,
+            };
+        }
+
+    throw new Error("ACCESSO NEGATO: Profilo utente non riconosciuto.");
+}
+
+// ============================================================================
+// HELPER SICUREZZA: Verifica se l'utente è manager di un determinato circolo
+// Note: utilizza auth.users ID (UUID), non player_id
+// ============================================================================
+async function isUserManagerOfClub(supabase: any, authUserId: string, clubId: number | null): Promise<boolean> {
+    if (!clubId) return false;
+    const { data } = await supabase
+        .from('club_managers')
+        .select('id')
+        .eq('user_id', authUserId)
+        .eq('club_id', clubId)
+        .maybeSingle();
+    return !!data;
+}
+
 /**
  * 1. CANCELLAZIONE DI UN MATCH IN PROGRAMMA
  */
 export async function deletePendingMatch(matchId: string) {
     const supabase = await createClient();
 
-    // Controlliamo l'autenticazione
+        // Controlliamo l'autenticazione
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Utente non autenticato");
 
-    // Recuperiamo il profilo del giocatore operativo
-    const { data: currentUserPlayer } = await supabase
-        .from('players')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-    if (!currentUserPlayer) throw new Error("Profilo giocatore non trovato");
+    // Risolvi identità (player o club_manager)
+    const identity = await resolveUserIdentity(supabase, user.id);
 
     // Recuperiamo la partita per verificare lo stato e i partecipanti
     const { data: match } = await supabase
@@ -40,15 +108,17 @@ export async function deletePendingMatch(matchId: string) {
     if (!match) throw new Error("Partita non trovata");
     if (match.status !== 'pending') throw new Error("Puoi cancellare solo partite in programma");
 
-    // Sicurezza: Può cancellare solo l'admin o uno dei 4 giocatori scesi in campo
-    const isPlayerInMatch =
-        currentUserPlayer.id === match.team_a_left_id ||
-        currentUserPlayer.id === match.team_a_right_id ||
-        currentUserPlayer.id === match.team_b_left_id ||
-        currentUserPlayer.id === match.team_b_right_id;
+    // Sicurezza: Admin, Giocatore in campo, o Club Manager del circolo
+    const isPlayerInMatch = identity.playerId
+        ? [match.team_a_left_id, match.team_a_right_id, match.team_b_left_id, match.team_b_right_id].includes(identity.playerId)
+        : false;
 
-    if (currentUserPlayer.role !== 'admin' && !isPlayerInMatch) {
-        throw new Error("Non hai i permessi per cancellare questa partita");
+    const isManager = identity.type === 'club_manager'
+        ? await isUserManagerOfClub(supabase, user.id, match.club_id)
+        : false;
+
+    if (identity.type !== 'admin' && !isPlayerInMatch && !isManager) {
+        throw new Error("ACCESSO NEGATO: Non hai i permessi per cancellare questa partita.");
     }
 
     // Recuperiamo i nomi dei giocatori coinvolti per costruire la stringa di Log
@@ -64,11 +134,13 @@ export async function deletePendingMatch(matchId: string) {
     };
 
     const dettagliMatch = `${getName(match.team_a_left_id)}/${getName(match.team_a_right_id)} VS ${getName(match.team_b_left_id)}/${getName(match.team_b_right_id)}`;
-    const operatore = `${currentUserPlayer.first_name} ${currentUserPlayer.last_name}`;
+    const operatore = identity.displayName;
 
-    const logDescription = currentUserPlayer.role === 'admin'
-        ? `L'admin ${operatore} ha annullato la partita in programma: ${dettagliMatch}`
-        : `Il giocatore ${operatore} ha annullato la propria partita in programma: ${dettagliMatch}`;
+    let qualifica = "Il giocatore";
+    if (identity.type === 'admin') qualifica = "L'admin";
+    else if (isManager) qualifica = "Il Club Manager";
+
+    const logDescription = `${qualifica} ${operatore} ha annullato la partita in programma: ${dettagliMatch}`;
 
     const { error: logError } = await logAction(
         'MATCH_DELETED',
@@ -89,13 +161,20 @@ export async function deletePendingMatch(matchId: string) {
         throw new Error(`Impossibile procedere: Errore nel registro delle attività`);
     }
 
-    // Cancelliamo fisicamente il match
-    const { error } = await supabase
+    // Cancelliamo fisicamente il match e verifichiamo che sia stato rimosso
+    const { data: deletedData, error: deleteError } = await supabase
         .from('matches')
         .delete()
-        .eq('id', matchId);
+        .eq('id', matchId)
+        .select('id');
 
-    if (error) throw new Error(error.message);
+    if (deleteError) throw new Error(`Errore database: ${deleteError.message}`);
+
+    // Se deletedData è vuoto/null, RLS ha bloccato la cancellazione senza errore
+    if (!deletedData || deletedData.length === 0) {
+        console.error("❌ RLS BLOCK: cancellazione match bloccata da Row Level Security per l'utente:", user.id);
+        throw new Error("ACCESSO NEGATO: Impossibile cancellare la partita. Verifica i permessi (RLS).");
+    }
 
     revalidatePath('/');
 }
@@ -115,28 +194,37 @@ export async function createPendingMatch(data: {
 }) {
     const supabase = await createClient();
 
-    // Controlliamo l'autenticazione
+        // Controlliamo l'autenticazione
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Utente non autenticato");
 
-    const { data: currentUserPlayer } = await supabase
-        .from('players')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+    // Risolvi identità (player o club_manager)
+    const identity = await resolveUserIdentity(supabase, user.id);
 
-    if (!currentUserPlayer) throw new Error("Profilo giocatore non trovato");
+    // --- ANTI-CLONING ---
+    const rawPlayerIds = [data.teamALeft, data.teamARight, data.teamBLeft, data.teamBRight];
+    const selectedPlayerIds = rawPlayerIds.filter((v): v is number => v !== null && v !== undefined);
+    const uniquePlayerIds = new Set(selectedPlayerIds);
+    if (uniquePlayerIds.size !== selectedPlayerIds.length) {
+        throw new Error("ERRORE: Non puoi inserire lo stesso giocatore in più slot.");
+    }
 
     // --- CALCOLO DINAMICO ORGANIZZATORE E SICUREZZA ---
-    const selectedPlayerIds = [data.teamALeft, data.teamARight, data.teamBLeft, data.teamBRight].filter(Boolean) as number[];
-    const isCreatorInMatch = selectedPlayerIds.includes(currentUserPlayer.id);
+    const isCreatorInMatch = identity.playerId ? selectedPlayerIds.includes(identity.playerId) : false;
+
+    const isManager = identity.type === 'club_manager'
+        ? await isUserManagerOfClub(supabase, user.id, data.clubId || null)
+        : false;
 
     let matchOrganizerId = null;
 
     if (isCreatorInMatch) {
-        matchOrganizerId = currentUserPlayer.id;
-    } else if (currentUserPlayer.role === 'admin') {
+        matchOrganizerId = identity.playerId!;
+    } else if (identity.type === 'admin') {
         matchOrganizerId = selectedPlayerIds.length > 0 ? selectedPlayerIds[0] : null;
+    } else if (isManager) {
+        // Il manager può creare partite vuote per il suo circolo: organizer = null
+        matchOrganizerId = null;
     } else {
         throw new Error("OPERAZIONE NEGATA: Devi occupare almeno uno slot per creare una partita.");
     }
@@ -175,13 +263,15 @@ export async function createPendingMatch(data: {
         return p ? `${p.first_name} ${p.last_name}` : 'Sconosciuto';
     };
 
-    const dettagliMatch = `${getName(data.teamALeft)}/${getName(data.teamARight)} VS ${getName(data.teamBLeft)}/${getName(data.teamBRight)}`;
-    const operatore = `${currentUserPlayer.first_name} ${currentUserPlayer.last_name}`;
+        const dettagliMatch = `${getName(data.teamALeft)}/${getName(data.teamARight)} VS ${getName(data.teamBLeft)}/${getName(data.teamBRight)}`;
+    const operatore = identity.displayName;
     const tipoLabel = data.isFriendly ? "AMICHEVOLE" : "classificata";
 
-    const logDescription = currentUserPlayer.role === 'admin'
-        ? `L'admin ${operatore} ha creato una nuova partita ${tipoLabel}: ${dettagliMatch} - ${data.matchType} - ${data.matchDate}`
-        : `Il giocatore ${operatore} ha organizzato una nuova partita ${tipoLabel}: ${dettagliMatch} - ${data.matchType} - ${data.matchDate}`;
+    let qualifica = "Il giocatore";
+    if (identity.type === 'admin') qualifica = "L'admin";
+    else if (isManager) qualifica = "Il Club Manager";
+
+    const logDescription = `${qualifica} ${operatore} ha organizzato una nuova partita ${tipoLabel}: ${dettagliMatch} - ${data.matchType} - ${data.matchDate}`;
 
     // Scrittura Audit Log
     const { error: logError } = await logAction(
@@ -207,7 +297,7 @@ export async function createPendingMatch(data: {
 }
 
 /**
- * 3. RISOLUZIONE DI UN MATCH CON CALCOLO RANKING, SET OBBLIGATORI E AUDIT LOG
+ * 3. RISOLUZIONE DI UN MATCH CON CALCOLO RANKING E AUDIT LOG
  */
 export async function resolveMatchWithRanking(data: {
     matchId: string;
@@ -219,20 +309,34 @@ export async function resolveMatchWithRanking(data: {
     try {
         console.log("🚀 Server Action avviata per Risoluzione Match ID:", data.matchId);
 
-        // 1. Controllo Autenticazione ed Identità
+                // 1. Controllo Autenticazione ed Identità
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("Utente non autenticato");
 
-        const { data: currentUserPlayer } = await supabase.from('players').select('*').eq('user_id', user.id).single();
-        if (!currentUserPlayer) throw new Error("Profilo giocatore non trovato");
+        // Risolvi identità (player o club_manager)
+        const identity = await resolveUserIdentity(supabase, user.id);
 
         // 2. Recupero Match
         const { data: match } = await supabase.from('matches').select('*').eq('id', data.matchId).single();
         if (!match) throw new Error("Partita non trovata nel database");
         if (match.status !== 'pending') throw new Error("Questa partita è già stata risolta");
 
-        // 3. Validazione Score e Calcolo Vincitore (Helper)
-        const { finalWinningTeam, stringaPunteggio } = evaluateMatchScore(data.score);
+        // --- BLOCCO DI SICUREZZA ---
+        const isPlayerInMatch = identity.playerId
+            ? [match.team_a_left_id, match.team_a_right_id, match.team_b_left_id, match.team_b_right_id].includes(identity.playerId)
+            : false;
+        const isAdmin = identity.type === 'admin';
+        const isManager = identity.type === 'club_manager'
+            ? await isUserManagerOfClub(supabase, user.id, match.club_id)
+            : false;
+
+        if (!isAdmin && !isPlayerInMatch && !isManager) {
+            throw new Error("VIOLAZIONE DI SICUREZZA: Non sei autorizzato a inserire il risultato per questa partita.");
+        }
+        // ----------------------------------------
+
+                // 3. Validazione Score e Calcolo Vincitore
+        const { finalWinningTeam, stringaPunteggio } = await evaluateMatchScore(data.score);
 
         // 4. Recupero e strutturazione Atleti
         const playerIds = [match.team_a_left_id, match.team_a_right_id, match.team_b_left_id, match.team_b_right_id];
@@ -245,7 +349,7 @@ export async function resolveMatchWithRanking(data: {
         const teamA = playersInMatch.filter(p => p.id === match.team_a_left_id || p.id === match.team_a_right_id);
         const teamB = playersInMatch.filter(p => p.id === match.team_b_left_id || p.id === match.team_b_right_id);
 
-        // 5. Calcolo Delta ELO (Helper)
+        // 5. Calcolo Delta ELO
         let teamADelta = 0;
         let teamBDelta = 0;
 
@@ -257,9 +361,7 @@ export async function resolveMatchWithRanking(data: {
             teamBDelta = deltas.teamBDelta;
         }
 
-        // ========================================================
-        // 6. PREPARAZIONE SNAPSHOT RANKING PER AUDIT LOG
-        // ========================================================
+        // 6. PREPARAZIONE SNAPSHOT RANKING
         const safeAdd = (rank: number, delta: number) => parseFloat((rank + delta).toFixed(2));
 
         const playerRankingDetails = [
@@ -273,9 +375,7 @@ export async function resolveMatchWithRanking(data: {
             .map(p => `${p.name} (${p.old_ranking.toFixed(2)} ➡️ ${p.new_ranking.toFixed(2)})`)
             .join(' | ');
 
-        // ========================================================
-        // 7. AGGIORNAMENTO DATABASE (ADMIN CLIENT)
-        // ========================================================
+        // 7. AGGIORNAMENTO DATABASE
         const { error: matchError } = await supabaseAdmin
             .from('matches')
             .update({
@@ -297,9 +397,7 @@ export async function resolveMatchWithRanking(data: {
             await Promise.all(playerUpdates);
         }
 
-        // ========================================================
         // 8. AUDIT LOG
-        // ========================================================
         const nomeTeamA = `${teamA[0].first_name} ${teamA[0].last_name} / ${teamA[1].first_name} ${teamA[1].last_name}`;
         const nomeTeamB = `${teamB[0].first_name} ${teamB[0].last_name} / ${teamB[1].first_name} ${teamB[1].last_name}`;
 
@@ -307,11 +405,12 @@ export async function resolveMatchWithRanking(data: {
             ? `Vince il Team A (${nomeTeamA}) contro il Team B (${nomeTeamB})`
             : `Vince il Team B (${nomeTeamB}) contro il Team A (${nomeTeamA})`;
 
-        const operatore = `${currentUserPlayer.first_name} ${currentUserPlayer.last_name}`;
+                const operatore = identity.displayName;
+        const qualificaResolve = isAdmin ? 'Admin' : (isManager ? 'Club Manager' : 'Giocatore');
 
         const logDetails = match.is_friendly
-            ? `L'operatore ${operatore} ha registrato l'AMICHEVOLE: ${esitoDescrizione} [${stringaPunteggio}]. Nessuna variazione.`
-            : `L'operatore ${operatore} ha chiuso il match: ${esitoDescrizione} [${stringaPunteggio}]. Elo: ${rankingLogText}`;
+            ? `Il ${qualificaResolve} ${operatore} ha registrato l'AMICHEVOLE: ${esitoDescrizione} [${stringaPunteggio}]. Nessuna variazione.`
+            : `Il ${qualificaResolve} ${operatore} ha chiuso il match: ${esitoDescrizione} [${stringaPunteggio}]. Elo: ${rankingLogText}`;
 
         const { error: logError } = await logAction('MATCH_RESOLVED', data.matchId, logDetails, {
             winning_team: finalWinningTeam,
@@ -354,18 +453,13 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
 }) {
     const supabase = await createClient();
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
         throw new Error("Accesso negato: devi effettuare il login per modificare una partita.");
     }
 
-    const { data: currentPlayer } = await supabase
-        .from('players')
-        .select('id, role, first_name, last_name')
-        .eq('user_id', user.id)
-        .single();
-
-    if (!currentPlayer) throw new Error("Profilo giocatore non trovato");
+    // Risolvi identità (player o club_manager)
+    const identity = await resolveUserIdentity(supabase, user.id);
 
     const { data: oldMatch } = await supabase
         .from('matches')
@@ -375,16 +469,27 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
 
     if (!oldMatch) throw new Error("Match non trovato");
 
-    const isUserInMatch = [
-        oldMatch.team_a_left_id,
-        oldMatch.team_a_right_id,
-        oldMatch.team_b_left_id,
-        oldMatch.team_b_right_id
-    ].includes(currentPlayer.id);
+    const isUserInMatch = identity.playerId
+        ? [oldMatch.team_a_left_id, oldMatch.team_a_right_id, oldMatch.team_b_left_id, oldMatch.team_b_right_id].includes(identity.playerId)
+        : false;
 
-    const isAdmin = currentPlayer.role === 'admin';
-    const isOrganizer = currentPlayer.id === oldMatch.organizer_id;
-    const canManage = isAdmin || isOrganizer || (!oldMatch.organizer_id && isUserInMatch);
+    const isAdmin = identity.type === 'admin';
+    const isOrganizer = identity.playerId ? identity.playerId === oldMatch.organizer_id : false;
+
+    // Controlliamo se gestisce il circolo ATTUALE della partita
+    const isManager = identity.type === 'club_manager'
+        ? await isUserManagerOfClub(supabase, user.id, oldMatch.club_id)
+        : false;
+
+    // Se sta cercando di spostare la partita in un NUOVO circolo, deve avere i permessi anche per quello
+    if (updatedFields.club_id !== undefined && updatedFields.club_id !== oldMatch.club_id && identity.type === 'club_manager') {
+        const isManagerOfNewClub = await isUserManagerOfClub(supabase, user.id, updatedFields.club_id);
+        if (!isManagerOfNewClub) {
+            throw new Error("ACCESSO NEGATO: Non puoi spostare la partita in un circolo che non gestisci.");
+        }
+    }
+
+    const canManage = isAdmin || isOrganizer || (!oldMatch.organizer_id && isUserInMatch) || isManager;
 
     if (!canManage) {
         throw new Error("ACCESSO NEGATO: Non hai i permessi per gestire questa partita.");
@@ -416,9 +521,13 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
         }
     });
 
-    if (modifiche.length > 0) {
-        const operatore = `${currentPlayer.first_name} ${currentPlayer.last_name}`;
-        const qualifica = isAdmin ? "L'Admin" : (isOrganizer ? "L'Organizzatore" : "Il Giocatore");
+        if (modifiche.length > 0) {
+        const operatore = identity.displayName;
+
+        let qualifica = "Il Giocatore";
+        if (isAdmin) qualifica = "L'Admin";
+        else if (isManager) qualifica = "Il Club Manager";
+        else if (isOrganizer) qualifica = "L'Organizzatore";
 
         await logAction(
             'MATCH_UPDATED',
@@ -440,13 +549,11 @@ export async function leaveMatchAction(matchId: string) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Utente non autenticato");
 
-    const { data: currentPlayer } = await supabase
-        .from('players')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-    if (!currentPlayer) throw new Error("Profilo giocatore non trovato");
+    // Solo i player con profilo possono lasciare una partita
+    const identity = await resolveUserIdentity(supabase, user.id);
+    if (!identity.playerId) {
+        throw new Error("I Club Manager non possono abbandonare una partita perché non sono in campo.");
+    }
 
     const { data: match, error: fetchError } = await supabase
         .from('matches')
@@ -456,11 +563,11 @@ export async function leaveMatchAction(matchId: string) {
 
     if (fetchError || !match) throw new Error("Match non trovato");
 
-    let slotToClear: string | null = null;
-    if (match.team_a_left_id === currentPlayer.id) slotToClear = 'team_a_left_id';
-    else if (match.team_a_right_id === currentPlayer.id) slotToClear = 'team_a_right_id';
-    else if (match.team_b_left_id === currentPlayer.id) slotToClear = 'team_b_left_id';
-    else if (match.team_b_right_id === currentPlayer.id) slotToClear = 'team_b_right_id';
+        let slotToClear: string | null = null;
+    if (match.team_a_left_id === identity.playerId) slotToClear = 'team_a_left_id';
+    else if (match.team_a_right_id === identity.playerId) slotToClear = 'team_a_right_id';
+    else if (match.team_b_left_id === identity.playerId) slotToClear = 'team_b_left_id';
+    else if (match.team_b_right_id === identity.playerId) slotToClear = 'team_b_right_id';
 
     if (!slotToClear) {
         throw new Error("Impossibile uscire: non sei iscritto a questa partita.");
@@ -471,15 +578,15 @@ export async function leaveMatchAction(matchId: string) {
         match.team_b_left_id, match.team_b_right_id
     ];
 
-    const remainingPlayers = allSlots.filter(id => id !== null && id !== currentPlayer.id);
+    const remainingPlayers = allSlots.filter(id => id !== null && id !== identity.playerId);
 
     let updatePayload: Record<string, any> = { [slotToClear]: null };
     let shouldDeleteMatch = false;
-    let logMessage = `Il giocatore ${currentPlayer.first_name} ha lasciato la partita.`;
+    let logMessage = `Il giocatore ${identity.displayName} ha lasciato la partita.`;
 
     if (remainingPlayers.length === 0) {
         shouldDeleteMatch = true;
-    } else if (match.organizer_id === currentPlayer.id) {
+    } else if (match.organizer_id === identity.playerId) {
         const newOrganizerId = remainingPlayers[0];
         updatePayload.organizer_id = newOrganizerId;
         logMessage += ` Il ruolo di Organizzatore è passato automaticamente al giocatore ID: ${newOrganizerId}.`;
@@ -509,13 +616,11 @@ export async function joinMatchAction(matchId: string) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Utente non autenticato");
 
-    const { data: currentPlayer } = await supabase
-        .from('players')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-    if (!currentPlayer) throw new Error("Profilo giocatore non trovato");
+    // Solo i player con profilo possono unirsi a una partita
+    const identity = await resolveUserIdentity(supabase, user.id);
+    if (!identity.playerId) {
+        throw new Error("I Club Manager non possono unirsi a una partita perché non hanno un profilo giocatore.");
+    }
 
     const { data: match, error: fetchError } = await supabase
         .from('matches')
@@ -525,16 +630,16 @@ export async function joinMatchAction(matchId: string) {
 
     if (fetchError || !match) throw new Error("Match non trovato");
 
-    const allSlots = [
+        const allSlots = [
         match.team_a_left_id, match.team_a_right_id,
         match.team_b_left_id, match.team_b_right_id
     ];
 
-    if (allSlots.includes(currentPlayer.id)) {
+    if (allSlots.includes(identity.playerId)) {
         throw new Error("Sei già iscritto a questa partita.");
     }
 
-    const preferredSide = currentPlayer.preferred_side || 'Both';
+    const preferredSide = identity.preferredSide || 'Both';
     const canPlayLeft = preferredSide === 'Left' || preferredSide === 'Both';
     const canPlayRight = preferredSide === 'Right' || preferredSide === 'Both';
 
@@ -552,7 +657,7 @@ export async function joinMatchAction(matchId: string) {
 
     const { error: updateError } = await supabase
         .from('matches')
-        .update({ [slotToFill]: currentPlayer.id })
+        .update({ [slotToFill]: identity.playerId })
         .eq('id', matchId);
 
     if (updateError) throw new Error(`Errore durante l'iscrizione: ${updateError.message}`);
@@ -560,7 +665,7 @@ export async function joinMatchAction(matchId: string) {
     await logAction(
         'PLAYER_JOINED_MATCH',
         matchId,
-        `Il giocatore ${currentPlayer.first_name} ${currentPlayer.last_name} si è unito automaticamente alla partita nello slot ${slotToFill}.`
+        `Il giocatore ${identity.displayName} si è unito automaticamente alla partita nello slot ${slotToFill}.`
     );
 
     revalidatePath('/');
@@ -573,7 +678,7 @@ export async function joinMatchAction(matchId: string) {
 /**
  * Valida i punteggi e determina il team vincente
  */
-function evaluateMatchScore(score: SetScore[]): { finalWinningTeam: 'A' | 'B', stringaPunteggio: string } {
+export async function evaluateMatchScore(score: SetScore[]): Promise<{ finalWinningTeam: 'A' | 'B', stringaPunteggio: string }> {
     if (!score || score.length < 2) {
         throw new Error("I dati dei set sono incompleti. Almeno i primi 2 set sono obbligatori.");
     }
@@ -581,8 +686,11 @@ function evaluateMatchScore(score: SetScore[]): { finalWinningTeam: 'A' | 'B', s
     let setsWonA = 0;
     let setsWonB = 0;
 
-    score.forEach((set, index) => {
-        if (!isSetValid(set.team_a, set.team_b, index)) {
+        for (let i = 0; i < score.length; i++) {
+        const set = score[i];
+        const index = i;
+        const valid = await isSetValid(set.team_a, set.team_b, index);
+        if (!valid) {
             throw new Error(
                 `Punteggio non valido al Set ${index + 1}: [${set.team_a}-${set.team_b}]. ` +
                 (index < 2
@@ -593,7 +701,7 @@ function evaluateMatchScore(score: SetScore[]): { finalWinningTeam: 'A' | 'B', s
 
         if (set.team_a > set.team_b) setsWonA++;
         else if (set.team_b > set.team_a) setsWonB++;
-    });
+    }
 
     if (setsWonA === setsWonB) {
         throw new Error("Pareggio nei set impossibile. Inserisci il terzo set per decretare il vincitore.");
@@ -658,7 +766,7 @@ async function calculateCompetitiveDeltas(
 }
 
 // Funzione helper per validare un singolo set di Padel/Tennis
-function isSetValid(teamA: number, teamB: number, setIndex: number): boolean {
+export async function isSetValid(teamA: number, teamB: number, setIndex: number): Promise<boolean> {
     if (teamA < 0 || teamB < 0) return false;
     if (teamA === teamB) return false;
 

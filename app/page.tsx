@@ -6,8 +6,6 @@ import { Player } from "@/types";
 import { computeKingAndFanalino } from '@/lib/rankingCalc';
 import ClubSelectFilter from '@/components/ClubSelectFilter';
 import { Hand } from 'lucide-react';
-import Pagination from '@/components/Pagination'; // Assicurati di aver creato questo componente!
-import { redirect } from 'next/navigation';
 
 const MATCHES_PER_PAGE = 5;
 const PLAYERS_PER_PAGE = 10;
@@ -53,15 +51,43 @@ export default async function Home({ searchParams }: PageProps) {
         Both: 'Mix'
     };
 
+        // --- DIETRO LE QUINTE: RECUPERO UTENTE LOGGATO E PERMESSI ---
     const { data: { user } } = await supabase.auth.getUser();
     let currentUserPlayer = null;
+    let managedClubIds: number[] = [];
+
     if (user) {
+        // 1) Cerca il profilo giocatore (player/club_manager con profilo)
         const { data: playerData } = await supabase
             .from('players')
             .select('*')
             .eq('user_id', user.id)
-            .single();
+            .maybeSingle();
         currentUserPlayer = playerData;
+
+        // 2) Se non ha profilo giocatore, verifica se è un club_manager puro (solo user_roles)
+        if (!currentUserPlayer) {
+            const { data: userRole } = await supabase
+                .from('user_roles')
+                .select('role')
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+            if (userRole?.role === 'club_manager') {
+                // Crea un oggetto fittizio per rappresentare il manager nell'UI
+                currentUserPlayer = { id: null, role: 'club_manager', first_name: null, last_name: null };
+            }
+        }
+
+        // 3) Recupera i circoli gestiti (usa user_id, non player_id)
+        const { data: managementData } = await supabase
+            .from('club_managers')
+            .select('club_id')
+            .eq('user_id', user.id);
+
+        if (managementData) {
+            managedClubIds = managementData.map(m => Number(m.club_id));
+        }
     }
 
     const { data: playersStatsData } = await supabase.from('view_player_stats').select('*');
@@ -108,29 +134,41 @@ export default async function Home({ searchParams }: PageProps) {
     const startIndex = (playerPage - 1) * PLAYERS_PER_PAGE;
     const paginatedPlayers = sortedPlayers.slice(startIndex, startIndex + PLAYERS_PER_PAGE);
 
-    // --- PENDING MATCHES ---
-    const isAdmin = currentUserPlayer?.role === 'admin';
-    const { data: pendingMatches } = await supabase
-        .from('matches')
-        .select('*')
-        .eq('status', 'pending')
+        // --- PENDING MATCHES ---
+        const isPureManager = currentUserPlayer?.role === 'club_manager' && currentUserPlayer?.id === null;
+        let pendingQuery = supabase
+            .from('matches')
+            .select('*')
+            .eq('status', 'pending');
+
+        // Pure manager: only see their club's pending matches
+        if (isPureManager && managedClubIds.length > 0) {
+            pendingQuery = pendingQuery.in('club_id', managedClubIds);
+        }
+
+    const { data: pendingMatches } = await pendingQuery
         .order('match_date', { ascending: true, nullsFirst: false });
 
     const filteredPendingMatches = (pendingMatches || []).filter(match => {
         const playerIds = [match.team_a_left_id, match.team_a_right_id, match.team_b_left_id, match.team_b_right_id];
         const activeCount = playerIds.filter(Boolean).length;
         const isMatchComplete = activeCount === 4;
-        const isUserInMatch = currentUserPlayer ? playerIds.includes(currentUserPlayer.id) : false;
+        const isUserInMatch = currentUserPlayer?.id ? playerIds.includes(currentUserPlayer.id) : false;
         const isExpired = match.match_date ? new Date(match.match_date) < new Date() : false;
 
-        if (isExpired) {
-            if (!isMatchComplete && !isAdmin) return false;
-            if (isMatchComplete && !isAdmin && !isUserInMatch) return false;
+        // Verifica se l'utente è un manager di QUEL circolo
+        const isManagerForThisMatch = currentUserPlayer?.role === 'club_manager' && managedClubIds.includes(match.club_id);
+
+                if (isExpired) {
+            // I manager possono visualizzare e gestire i match scaduti dei loro circoli
+            const isAdminUser = currentUserPlayer?.role === 'admin';
+            if (!isMatchComplete && !isAdminUser && !isManagerForThisMatch) return false;
+            if (isMatchComplete && !isAdminUser && !isUserInMatch && !isManagerForThisMatch) return false;
         }
 
         if (currentSlots === 'free' && isMatchComplete) return false;
 
-        if (currentLevel === 'compatible' && currentUserPlayer && !isUserInMatch && !isMatchComplete) {
+                if (currentLevel === 'compatible' && currentUserPlayer?.id && !isUserInMatch && !isMatchComplete) {
             const activeRankings = playerIds
                 .map(id => playersWithStats.find(p => p.id === id)?.ranking)
                 .filter((r): r is number => r !== undefined);
@@ -145,7 +183,7 @@ export default async function Home({ searchParams }: PageProps) {
         return true;
     });
 
-    // --- RISULTATI COMPLETATI ---
+        // --- RISULTATI COMPLETATI ---
     let completedQuery = supabase
         .from('matches')
         .select('*', { count: 'exact' })
@@ -155,8 +193,16 @@ export default async function Home({ searchParams }: PageProps) {
         completedQuery = completedQuery.eq('club_id', parseInt(currentCompletedClub, 10));
     }
 
-    if (currentCompletedScope === 'mine' && currentUserPlayer) {
+        // Club manager: auto-filter to their managed clubs
+    if (isPureManager && currentCompletedClub === 'all' && managedClubIds.length > 0) {
+        completedQuery = completedQuery.in('club_id', managedClubIds);
+    }
+
+    if (currentCompletedScope === 'mine' && currentUserPlayer?.id) {
         completedQuery = completedQuery.or(`team_a_left_id.eq.${currentUserPlayer.id},team_a_right_id.eq.${currentUserPlayer.id},team_b_left_id.eq.${currentUserPlayer.id},team_b_right_id.eq.${currentUserPlayer.id}`);
+    } else if (currentCompletedScope === 'mine' && isPureManager && managedClubIds.length > 0) {
+        // Pure manager "I Miei Match" = matches from their clubs
+        completedQuery = completedQuery.in('club_id', managedClubIds);
     }
 
     if (currentTab === 'completed' && currentSearch) {
@@ -188,7 +234,6 @@ export default async function Home({ searchParams }: PageProps) {
     const renderPagination = (type: 'players' | 'matches', total: number, current: number) => {
         if (total <= 1) return null;
 
-        // Calcola la finestra di 5 pagine (es: 1 2 3 4 5 oppure 4 5 6 7 8)
         const maxVisible = 5;
         let start = Math.max(1, current - Math.floor(maxVisible / 2));
         let end = Math.min(total, start + maxVisible - 1);
@@ -202,7 +247,6 @@ export default async function Home({ searchParams }: PageProps) {
             visiblePages.push(i);
         }
 
-        // Helper per renderizzare il singolo bottone o Link
         const renderButton = (page: number, label: string | number, title: string, disabled: boolean, isActive: boolean = false) => {
             const buttonClass = `w-8 h-8 flex items-center justify-center border rounded-sm text-[10px] font-black uppercase tracking-wider transition-colors ${
                 isActive
@@ -210,35 +254,21 @@ export default async function Home({ searchParams }: PageProps) {
                     : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white cursor-pointer'
             }`;
 
-            // Se il bottone è disabilitato o è la pagina corrente, non è cliccabile (niente navigazione)
             if (disabled || isActive) {
                 return (
-                    <button
-                        key={`${type}-${label}`}
-                        type="button"
-                        disabled={true}
-                        title={title}
-                        className={buttonClass}
-                    >
+                    <button key={`${type}-${label}`} type="button" disabled={true} title={title} className={buttonClass}>
                         {label}
                     </button>
                 );
             }
 
-            // Altrimenti, generiamo un vero Link di Next.js che non scrolla la pagina
             const targetPlayerPage = type === 'players' ? page : playerPage;
             const targetMatchPage = type === 'matches' ? page : currentPage;
 
             const href = `/?tab=${currentTab}&gender=${currentGender}&sort=${currentSort}&search=${encodeURIComponent(currentSearch)}&slots=${currentSlots}&level=${currentLevel}&completedClub=${currentCompletedClub}&completedScope=${currentCompletedScope}&playerPage=${targetPlayerPage}&page=${targetMatchPage}`;
 
             return (
-                <Link
-                    key={`${type}-${label}`}
-                    href={href}
-                    scroll={false}
-                    title={title}
-                    className={buttonClass}
-                >
+                <Link key={`${type}-${label}`} href={href} scroll={false} title={title} className={buttonClass}>
                     {label}
                 </Link>
             );
@@ -246,14 +276,9 @@ export default async function Home({ searchParams }: PageProps) {
 
         return (
             <div className="flex items-center justify-center gap-1 mt-6">
-                {/* Tasti Iniziali */}
                 {renderButton(1, '«', 'Prima Pagina', current === 1)}
                 {renderButton(Math.max(1, current - 1), '‹', 'Precedente', current === 1)}
-
-                {/* Pagine Numeriche */}
                 {visiblePages.map(p => renderButton(p, p, `Pagina ${p}`, false, p === current))}
-
-                {/* Tasti Finali */}
                 {renderButton(Math.min(total, current + 1), '›', 'Successiva', current === total)}
                 {renderButton(total, '»', 'Ultima Pagina', current === total)}
             </div>
@@ -430,6 +455,7 @@ export default async function Home({ searchParams }: PageProps) {
                                                     currentUserPlayer={currentUserPlayer}
                                                     clubs={clubsList}
                                                     playerTitles={playerTitlesMap}
+                                                    managedClubIds={managedClubIds}
                                                 />
                                             </div>
                                         </div>
@@ -453,11 +479,20 @@ export default async function Home({ searchParams }: PageProps) {
                             <SearchBar placeholder="FILTRA STORICO PER NOME GIOCATORE..." />
                         </div>
 
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white border border-slate-200 p-2 rounded-sm shadow-sm gap-3 text-xs font-bold uppercase tracking-wider">
+                                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white border border-slate-200 p-2 rounded-sm shadow-sm gap-3 text-xs font-bold uppercase tracking-wider">
                             {currentUserPlayer ? (
                                 <div className="flex gap-1 bg-slate-100 p-1 rounded-sm shrink-0 w-full md:w-auto">
-                                    <Link href={`/?tab=completed&completedScope=all&completedClub=${currentCompletedClub}&gender=${currentGender}&sort=${currentSort}&search=${currentSearch}&slots=${currentSlots}&level=${currentLevel}`} scroll={false} className={`px-4 py-1.5 rounded-sm transition-colors text-center flex-1 md:flex-initial ${currentCompletedScope === 'all' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Tutti i Risultati</Link>
-                                    <Link href={`/?tab=completed&completedScope=mine&completedClub=${currentCompletedClub}&gender=${currentGender}&sort=${currentSort}&search=${currentSearch}&slots=${currentSlots}&level=${currentLevel}`} scroll={false} className={`px-4 py-1.5 rounded-sm transition-colors text-center flex-1 md:flex-initial ${currentCompletedScope === 'mine' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>I Miei Match</Link>
+                                    {isPureManager ? (
+                                        <>
+                                            <Link href={`/?tab=completed&completedScope=all&completedClub=${currentCompletedClub}&gender=${currentGender}&sort=${currentSort}&search=${currentSearch}&slots=${currentSlots}&level=${currentLevel}`} scroll={false} className={`px-4 py-1.5 rounded-sm transition-colors text-center flex-1 md:flex-initial ${currentCompletedScope === 'all' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Tutti i Risultati</Link>
+                                            <Link href={`/?tab=completed&completedScope=mine&completedClub=${currentCompletedClub}&gender=${currentGender}&sort=${currentSort}&search=${currentSearch}&slots=${currentSlots}&level=${currentLevel}`} scroll={false} className={`px-4 py-1.5 rounded-sm transition-colors text-center flex-1 md:flex-initial ${currentCompletedScope === 'mine' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>I Miei Circoli</Link>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Link href={`/?tab=completed&completedScope=all&completedClub=${currentCompletedClub}&gender=${currentGender}&sort=${currentSort}&search=${currentSearch}&slots=${currentSlots}&level=${currentLevel}`} scroll={false} className={`px-4 py-1.5 rounded-sm transition-colors text-center flex-1 md:flex-initial ${currentCompletedScope === 'all' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>Tutti i Risultati</Link>
+                                            <Link href={`/?tab=completed&completedScope=mine&completedClub=${currentCompletedClub}&gender=${currentGender}&sort=${currentSort}&search=${currentSearch}&slots=${currentSlots}&level=${currentLevel}`} scroll={false} className={`px-4 py-1.5 rounded-sm transition-colors text-center flex-1 md:flex-initial ${currentCompletedScope === 'mine' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>I Miei Match</Link>
+                                        </>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="text-[10px] text-slate-400 flex items-center justify-center px-2 font-medium tracking-normal shrink-0">
@@ -483,7 +518,7 @@ export default async function Home({ searchParams }: PageProps) {
                                         <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                                             <div className="flex items-center gap-2">
                                                 <span>
-                                                    {new Date(match.updated_at).toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' })}
+                                                    {new Date(match.match_date || match.updated_at).toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' })}
                                                 </span>
                                                 {match.is_friendly ? (
                                                     <span className="bg-purple-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded-sm shadow-sm tracking-wider uppercase">

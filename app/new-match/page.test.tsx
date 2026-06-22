@@ -38,14 +38,18 @@ describe('CreateMatchForm Component (Page Integration)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
 
-        mockSupabase = {
+                mockSupabase = {
+            auth: {
+                getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null })
+            },
             from: vi.fn((table) => ({
                 select: vi.fn().mockReturnThis(),
                 order: vi.fn().mockImplementation(() => {
                     if (table === 'players') return Promise.resolve({ data: mockPlayers, error: null });
                     if (table === 'clubs') return Promise.resolve({ data: mockClubs, error: null });
                     return Promise.resolve({ data: [], error: null });
-                })
+                }),
+                maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null })
             }))
         };
 

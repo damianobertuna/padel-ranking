@@ -51,3 +51,11 @@ node_modules/
 /playwright/.auth/
 backup_ranking_padel.sql
 schema.sql
+DOMAIN_RULES_AUDIT.md
+supabase/types/*
+.continue/*
+agent.md
+.kiro/*
+TEST_HARDENING_TASKS.md
+bundle-context.js
+project-context.txt

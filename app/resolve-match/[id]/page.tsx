@@ -24,20 +24,79 @@ export default function ResolveMatch() {
 
     useEffect(() => {
         async function fetchData() {
-            const [matchRes, playersRes] = await Promise.all([
-                supabase.from('matches').select('*').eq('id', matchId).maybeSingle(),
-                supabase.from('players').select('*')
-            ]);
-            if (matchRes.data) setMatch(matchRes.data);
-            if (playersRes.data) setPlayers(playersRes.data);
-            setPageLoading(false);
+            try {
+                // Recuperiamo parallelamente sessione, partita e lista giocatori
+                const [authRes, matchRes, playersRes] = await Promise.all([
+                    supabase.auth.getUser(),
+                    supabase.from('matches').select('*').eq('id', matchId).maybeSingle(),
+                    supabase.from('players').select('*')
+                ]);
+
+                const user = authRes.data.user;
+                if (!user) throw new Error("Devi effettuare l'accesso.");
+
+                const matchData = matchRes.data;
+                if (!matchData) throw new Error("Partita non trovata o referto inesistente.");
+
+                                const allPlayers = playersRes.data || [];
+                const currentUserPlayer = allPlayers.find(p => p.user_id === user.id);
+
+                // --- CONTROLLO DI SICUREZZA LATO CLIENT ---
+                let isManagerForThisMatch = false;
+                let currentUserId: number | null = null;
+                let userRole: string | null = null;
+
+                if (currentUserPlayer) {
+                    currentUserId = currentUserPlayer.id;
+                    userRole = currentUserPlayer.role;
+                } else {
+                    // Potrebbe essere un club_manager senza profilo giocatore
+                    const { data: userRoleData } = await supabase
+                        .from('user_roles')
+                        .select('role')
+                        .eq('user_id', user.id)
+                        .maybeSingle();
+                    userRole = userRoleData?.role || null;
+                }
+
+                if (userRole === 'club_manager' && matchData.club_id) {
+                    const { data: managerData } = await supabase.from('club_managers')
+                        .select('id')
+                        .eq('user_id', user.id)
+                        .eq('club_id', matchData.club_id)
+                        .maybeSingle();
+                    isManagerForThisMatch = !!managerData;
+                }
+
+                const isPlayerInMatch = currentUserId
+                    ? [matchData.team_a_left_id, matchData.team_a_right_id, matchData.team_b_left_id, matchData.team_b_right_id].includes(currentUserId)
+                    : false;
+
+                const isAdmin = userRole === 'admin';
+
+                // Chi può inserire il punteggio? L'Admin, un giocatore in campo o il gestore del circolo
+                const canResolve = isAdmin || isPlayerInMatch || isManagerForThisMatch;
+
+                if (!canResolve) {
+                    throw new Error("ACCESSO NEGATO: Non sei autorizzato a inserire il risultato per questa partita.");
+                }
+                // -----------------------------------------
+
+                setMatch(matchData);
+                setPlayers(allPlayers);
+            } catch (err: any) {
+                setError(err.message || "Si è verificato un errore.");
+            } finally {
+                setPageLoading(false);
+            }
         }
         fetchData();
     }, [matchId, supabase]);
 
-    const getPlayerName = (id: number | null) => {
+        const getPlayerName = (id: number | null) => {
         const p = players.find(pl => pl.id === id);
-        return p ? `${p.last_name.toUpperCase()} ${p.first_name[0]}.` : 'N.D.';
+        if (!p || !p.last_name || !p.first_name) return 'N.D.';
+        return `${p.last_name.toUpperCase()} ${p.first_name[0]}.`;
     };
 
     const handleSubmitScore = async (e: React.FormEvent) => {
@@ -84,15 +143,16 @@ export default function ResolveMatch() {
 
     if (pageLoading) return <main className="min-h-screen flex items-center justify-center text-[10px] font-black uppercase tracking-widest">Caricamento referto...</main>;
 
-    if (!match) {
+    // Se c'è un errore (es. Accesso Negato), mostriamo una schermata di stop
+    if (error || !match) {
         return (
             <main className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-50">
                 <div className="bg-white border border-slate-200 shadow-sm p-6 rounded-sm text-center max-w-sm w-full">
                     <h1 className="text-xl font-black text-red-600 uppercase tracking-tighter mb-2">
-                        ERRORE 404
+                        {error ? 'ACCESSO NEGATO' : 'ERRORE 404'}
                     </h1>
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">
-                        Referto non trovato o partita non valida.
+                        {error || 'Referto non trovato o partita non valida.'}
                     </p>
                     <BackToHomeButton />
                 </div>
@@ -101,7 +161,7 @@ export default function ResolveMatch() {
     }
 
     return (
-        <main className="w-full max-w-4xl mx-auto px-4 sm:px-8">
+        <main className="w-full max-w-4xl mx-auto px-4 sm:px-8 mt-6 pb-12">
             <div className=" w-full bg-white border border-slate-200 shadow-sm p-6 rounded-sm">
                 <div className="mb-6"><BackToHomeButton /></div>
                 <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-6">
@@ -111,7 +171,6 @@ export default function ResolveMatch() {
                 {error && <div className="p-3 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest mb-4">{error}</div>}
 
                 <form onSubmit={handleSubmitScore} className="space-y-4">
-                    {/* ... (Il blocco dei Team A e Team B rimane invariato) ... */}
                     <div className="grid grid-cols-2 gap-2 mb-6">
                         <div className="bg-blue-50 border border-blue-200 p-2 text-center">
                             <p className="text-[9px] font-black text-blue-800 uppercase tracking-widest mb-1">TEAM A (BLU)</p>
@@ -146,7 +205,7 @@ export default function ResolveMatch() {
                     <button
                         type="submit"
                         disabled={submitting}
-                        className="w-full bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest py-4 rounded-sm hover:bg-black disabled:opacity-50 mt-4"
+                        className="w-full bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest py-4 rounded-sm hover:bg-black disabled:opacity-50 mt-4 cursor-pointer"
                     >
                         {submitting
                             ? 'ELABORAZIONE...'

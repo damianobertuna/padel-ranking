@@ -1,12 +1,19 @@
+export type PlayerRole = 'user' | 'admin' | 'club_manager';
+
 export interface Player {
     id: number;
-    first_name: string;
-    last_name: string;
+    created_at: string;
+    first_name: string | null;
+    last_name: string | null;
+    preferred_side: 'Left' | 'Right' | 'Both';
     ranking: number;
-    preferred_side: string;
-    gender: 'M' | 'F';
-    total_played?: number;
-    win_rate?: number;
+    absence_days: number | null;
+    role: PlayerRole;
+    user_id: string | null;
+    dominant_hand: string | null;
+    phone: string | null;
+    gender: 'M' | 'F' | null;
+    avatar_url: string | null;
 }
 
 export interface Match {

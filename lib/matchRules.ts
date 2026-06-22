@@ -72,7 +72,7 @@ export function isRankingDifferenceValid(rankings: number[]): boolean {
 }
 
 export interface AuthContext {
-    userRole: 'admin' | 'user';
+    userRole: 'admin' | 'user' | 'club_manager';
     userPlayerId: number;
 }
 
