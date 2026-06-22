@@ -28,7 +28,7 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 type RLSConfig = {
     deleteReturnsEmpty?: boolean;
     insertReturnsEmpty?: boolean;
-    userRole?: 'player' | 'club_manager' | 'admin';
+    userRole?: 'user' | 'player' | 'club_manager' | 'admin';
     playerId?: number | null;
     managedClubId?: number | null;
 };
