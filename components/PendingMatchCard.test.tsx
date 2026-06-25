@@ -25,7 +25,7 @@ vi.mock('@/actions/match-actions', () => ({
 vi.mock('@/components/DeleteMatchButton', () => ({
     default: () => <button data-testid="delete-btn">Elimina</button>
 }));
-vi.mock('@/components/ResolveMatchButton', () => ({
+vi.mock('@/components/matches/ResolveMatchButton', () => ({
     default: () => <button data-testid="resolve-btn">Risolvi</button>
 }));
 
