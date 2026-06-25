@@ -9,6 +9,7 @@ export interface MatchFormData {
     matchType: 'male' | 'female' | 'mixed';
     clubId: number | '';
     isFriendly: boolean;
+        courtType: 'indoor' | 'outdoor';
     teamALeft: number | '';
     teamARight: number | '';
     teamBLeft: number | '';
@@ -126,7 +127,8 @@ export default function MatchForm({ title, submitLabel, players, clubs, initialD
     const [matchTime, setMatchTime] = useState<string>(initialData?.matchTime || '');
     const [clubId, setClubId] = useState<number | ''>(initialData?.clubId ?? (disabledClubId ?? ''));
     const [matchType, setMatchType] = useState<'male' | 'female' | 'mixed'>(initialData?.matchType || 'male');
-    const [isFriendly, setIsFriendly] = useState<boolean>(initialData?.isFriendly || false);
+        const [isFriendly, setIsFriendly] = useState<boolean>(initialData?.isFriendly || false);
+    const [courtType, setCourtType] = useState<'indoor' | 'outdoor'>(initialData?.courtType || 'outdoor');
 
     const [teamALeft, setTeamALeft] = useState<number | ''>(initialData?.teamALeft || '');
     const [teamARight, setTeamARight] = useState<number | ''>(initialData?.teamARight || '');
@@ -215,8 +217,7 @@ export default function MatchForm({ title, submitLabel, players, clubs, initialD
         try {
             let combinedDate = null;
             if (matchDate && matchTime) combinedDate = new Date(`${matchDate}T${matchTime}:00`).toISOString();
-
-            await onSubmit({ matchDate: combinedDate, matchType, clubId, isFriendly, teamALeft, teamARight, teamBLeft, teamBRight });
+            await onSubmit({ matchDate: combinedDate, matchType, clubId, isFriendly, courtType, teamALeft, teamARight, teamBLeft, teamBRight });
         } finally {
             setSubmitting(false);
         }
@@ -282,7 +283,7 @@ export default function MatchForm({ title, submitLabel, players, clubs, initialD
                     </div>
                 </div>
 
-                <div className="bg-slate-50 border border-slate-200 p-3 rounded-sm space-y-2">
+                                <div className="bg-slate-50 border border-slate-200 p-3 rounded-sm space-y-2">
                     <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">Regolamento</label>
                     <div className="grid grid-cols-2 gap-2 text-[10px] font-black uppercase tracking-wider">
                         <button type="button" onClick={() => setIsFriendly(false)} className={`py-2.5 rounded-sm border transition-all flex flex-col items-center gap-0.5 ${!isFriendly ? 'bg-blue-600 border-blue-700 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-100'}`}>
@@ -290,6 +291,18 @@ export default function MatchForm({ title, submitLabel, players, clubs, initialD
                         </button>
                         <button type="button" onClick={() => setIsFriendly(true)} className={`py-2.5 rounded-sm border transition-all flex flex-col items-center gap-0.5 ${isFriendly ? 'bg-purple-600 border-purple-700 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-100'}`}>
                             <span>🤝 Amichevole</span><span className={`text-[8px] font-medium normal-case tracking-normal ${isFriendly ? 'text-purple-100' : 'text-slate-400'}`}>Nessun vincolo</span>
+                        </button>
+                    </div>
+                </div>
+
+                                <div className="bg-slate-50 border border-slate-200 p-3 rounded-sm space-y-2">
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">Tipo Campo</label>
+                    <div className="flex bg-slate-100 p-1 rounded-sm gap-1 h-[34px]">
+                        <button type="button" onClick={() => setCourtType('outdoor')} className={`flex-1 text-[9px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-1 rounded-sm ${courtType === 'outdoor' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}>
+                            ☀️ SCOPERTO
+                        </button>
+                        <button type="button" onClick={() => setCourtType('indoor')} className={`flex-1 text-[9px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-1 rounded-sm ${courtType === 'indoor' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}>
+                            🏠 COPERTO
                         </button>
                     </div>
                 </div>

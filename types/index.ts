@@ -31,6 +31,7 @@ export interface Match {
     team_b_delta?: number | null;
     organizer_id: number | null;
     is_friendly: boolean;
+    court_type: 'indoor' | 'outdoor';
 }
 
 export interface MatchWithResult {
@@ -57,3 +58,4 @@ export interface Club {
     maps_url?: string | null;
     created_at?: string;
 }
+

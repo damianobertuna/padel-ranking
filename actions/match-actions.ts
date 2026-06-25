@@ -191,6 +191,7 @@ export async function createPendingMatch(data: {
     teamBRight: number | null;
     clubId?: number | null;
     isFriendly?: boolean;
+        courtType?: 'indoor' | 'outdoor';
 }) {
     const supabase = await createClient();
 
@@ -240,10 +241,11 @@ export async function createPendingMatch(data: {
                 team_a_right_id: data.teamARight,
                 team_b_left_id: data.teamBLeft,
                 team_b_right_id: data.teamBRight,
-                club_id: data.clubId || null,
+                                club_id: data.clubId || null,
                 status: 'pending',
                 organizer_id: matchOrganizerId,
-                is_friendly: data.isFriendly ?? false
+                is_friendly: data.isFriendly ?? false,
+                court_type: data.courtType
             }
         ])
         .select('id')
@@ -450,6 +452,7 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
     team_b_right_id?: number | null;
     match_type?: 'male' | 'female' | 'mixed';
     match_date?: string | null;
+        court_type?: 'indoor' | 'outdoor';
 }) {
     const supabase = await createClient();
 

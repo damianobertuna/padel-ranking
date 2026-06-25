@@ -94,11 +94,12 @@ export default function EditMatchPage() {
                     matchTime = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
                 }
 
-                setInitialMatchData({
+                                setInitialMatchData({
                     matchDate, matchTime,
                     clubId: match.club_id || '',
                     matchType: match.match_type,
                     isFriendly: match.is_friendly ?? false,
+                    courtType: match.court_type,
                     teamALeft: match.team_a_left_id || '',
                     teamARight: match.team_a_right_id || '',
                     teamBLeft: match.team_b_left_id || '',
@@ -117,12 +118,13 @@ export default function EditMatchPage() {
         loadData();
     }, [matchId, supabase]);
 
-    const handleSubmit = async (data: MatchFormData) => {
+        const handleSubmit = async (data: MatchFormData) => {
         try {
             await updateMatchPlayers(matchId, {
                 match_date: data.matchDate,
                 match_type: data.matchType,
                 club_id: data.clubId || null,
+                court_type: data.courtType,
                 team_a_left_id: data.teamALeft || null,
                 team_a_right_id: data.teamARight || null,
                 team_b_left_id: data.teamBLeft || null,
