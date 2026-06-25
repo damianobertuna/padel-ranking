@@ -146,9 +146,10 @@ export default function PendingMatchCard({
         const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
         const matchLink = `${baseUrl}/match/${m.id}/join`;
 
-        const testo = `🎾 *RanKING Padel - Convocazione Match* 🎾\n\n` +
+                const testo = `🎾 *RanKING Padel - Convocazione Match* 🎾\n\n` +
             `📅 *Data:* ${dataFormattata}\n` +
             `📍 *Campo:* ${clubText}\n` +
+            `🏟️ *Campo:* ${m.court_type === 'indoor' ? 'Coperto 🌧️' : 'Scoperto ☀️'}\n` +
             (mapsUrl ? `🗺️ *Posizione:* ${mapsUrl}\n` : '') +
             `📊 *Livello Attuale:* ${levelText}\n\n` +
             `👥 *SQUADRA A:*\n` +
@@ -225,7 +226,7 @@ export default function PendingMatchCard({
                             <span className="text-slate-400">📅</span> {new Date(match.match_date).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                         </div>
                     )}
-                    <div className="flex items-center gap-2 truncate">
+                                        <div className="flex items-center gap-2 truncate">
                         <span className="text-slate-400">📍</span>
                         {matchClub?.maps_url ? (
                             <a href={matchClub.maps_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 hover:underline transition-colors [-webkit-tap-highlight-color:transparent]">
@@ -236,6 +237,11 @@ export default function PendingMatchCard({
                         ) : (
                             <span className="italic text-slate-400 font-medium">CAMPO DA DEFINIRE</span>
                         )}
+                                                        <span className={`ml-auto text-[8px] font-black px-1.5 py-0.5 rounded-sm uppercase tracking-wider ${
+                                match.court_type === 'indoor' ? 'bg-sky-100 text-sky-700' : 'bg-emerald-100 text-emerald-700'
+                            }`}>
+                                {match.court_type === 'indoor' ? '🏠 COPERTO' : '☀️ SCOPERTO'}
+                            </span>
                     </div>
                     <div className="flex items-center gap-2 mt-1 pt-1.5 border-t border-slate-200">
                         <span className="text-slate-400">📊</span>

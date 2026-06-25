@@ -77,12 +77,13 @@ export default function CreateMatchPage() {
         loadData();
     }, [supabase]);
 
-    const handleSubmit = async (data: MatchFormData) => {
+        const handleSubmit = async (data: MatchFormData) => {
         try {
             await createPendingMatch({
                 matchDate: data.matchDate,
                 matchType: data.matchType,
                 isFriendly: data.isFriendly,
+                courtType: data.courtType,
                 clubId: data.clubId || null,
                 teamALeft: data.teamALeft || null,
                 teamARight: data.teamARight || null,
