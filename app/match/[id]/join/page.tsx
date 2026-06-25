@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { updateMatchPlayers } from '@/actions/match-actions';
 import BackToHomeButton from '@/components/BackToHomeButton';
 import { Player, Club } from '@/types';
-import MatchForm, { MatchFormData } from '@/components/MatchForm';
+import MatchForm, { MatchFormData } from '@/components/matches/MatchForm';
 
 export default function EditMatchPage() {
     const supabase = createClient();

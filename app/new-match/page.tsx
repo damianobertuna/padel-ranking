@@ -6,7 +6,7 @@ import { createPendingMatch } from '@/actions/match-actions';
 import { useRouter } from 'next/navigation';
 import { Player, Club } from '@/types';
 import BackToHomeButton from "@/components/BackToHomeButton";
-import MatchForm, { MatchFormData } from '@/components/MatchForm';
+import MatchForm, { MatchFormData } from '@/components/matches/MatchForm';
 
 export default function CreateMatchPage() {
     const supabase = createClient();
