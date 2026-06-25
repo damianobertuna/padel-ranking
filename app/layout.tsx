@@ -132,8 +132,11 @@ export default async function RootLayout({
                     {currentUserPlayer?.role === 'admin' && (
                         <div className="flex flex-wrap gap-2 justify-center sm:justify-end w-full">
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:flex items-center mr-1">Admin Tools:</span>
-                            <Link href="/admin/players" className="bg-slate-900 hover:bg-slate-800 text-white font-bold uppercase tracking-wider py-1.5 px-3 text-[10px] transition-colors rounded-sm inline-flex items-center gap-1.5 flex-1 sm:flex-none justify-center">
+                                                        <Link href="/admin/players" className="bg-slate-900 hover:bg-slate-800 text-white font-bold uppercase tracking-wider py-1.5 px-3 text-[10px] transition-colors rounded-sm inline-flex items-center gap-1.5 flex-1 sm:flex-none justify-center">
                                 ⚙️ Giocatori
+                            </Link>
+                            <Link href="/admin/managers" className="bg-slate-900 hover:bg-slate-800 text-white font-bold uppercase tracking-wider py-1.5 px-3 text-[10px] transition-colors rounded-sm inline-flex items-center gap-1.5 flex-1 sm:flex-none justify-center">
+                                🧑‍💼 Gestori
                             </Link>
                             <Link href="/admin/clubs" className="bg-slate-900 hover:bg-slate-800 text-white font-bold uppercase tracking-wider py-1.5 px-3 text-[10px] transition-colors rounded-sm inline-flex items-center gap-1.5 flex-1 sm:flex-none justify-center">
                                 📍 Club
