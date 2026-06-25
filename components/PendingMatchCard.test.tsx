@@ -22,7 +22,7 @@ vi.mock('@/actions/match-actions', () => ({
     joinMatchAction: vi.fn()
 }));
 
-vi.mock('@/components/DeleteMatchButton', () => ({
+vi.mock('@/components/matches/DeleteMatchButton', () => ({
     default: () => <button data-testid="delete-btn">Elimina</button>
 }));
 vi.mock('@/components/matches/ResolveMatchButton', () => ({
