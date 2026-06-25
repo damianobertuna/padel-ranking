@@ -3,8 +3,9 @@ import WinRateWidget from '@/components/WinRateWidget';
 import StreakWidget from '@/components/StreakWidget';
 import PartnersAndNemesisWidget from '@/components/PartnersAndNemesisWidget';
 import GameAverageWidget from '@/components/GameAverageWidget';
-import EditAvatar from '@/components/EditAvatar'; // <--- IL NUOVO COMPONENTE
+import EditAvatar from '@/components/EditAvatar';
 import BackToHomeButton from "@/components/BackToHomeButton";
+import Link from 'next/link';
 
 export const revalidate = 0;
 
@@ -57,7 +58,8 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
         return { ...match, userWon: won, pointsDelta: isTeamA ? Number(match.team_a_delta || 0) : Number(match.team_b_delta || 0) };
     });
 
-    const totalMatches = victories + defeats;
+        const totalMatches = victories + defeats;
+    const totalPages = Math.ceil(totalMatches / MATCHES_PER_PAGE) || 1;
     const statsForWidget = { totalPlayed: totalMatches, totalWon: victories, totalLost: defeats, winRate: totalMatches > 0 ? parseFloat(((victories / totalMatches) * 100).toFixed(1)) : 0 };
     const paginatedMatches = enrichedMatches.slice((currentPage - 1) * MATCHES_PER_PAGE, currentPage * MATCHES_PER_PAGE);
     
@@ -112,8 +114,13 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
                     <PartnersAndNemesisWidget playerId={playerId} enrichedMatches={enrichedMatches} allPlayers={allPlayers || []} />
                 </div>
 
-                {/* Storico Partite - Versione COMPLETA */}
-                <h2 className="text-xs font-black uppercase text-slate-500 tracking-widest mb-4">Storico Partite</h2>
+                                {/* Storico Partite - Versione COMPLETA */}
+                <h2 className="text-xs font-black uppercase text-slate-500 tracking-widest mb-4">
+                    Storico Partite
+                    {totalMatches > MATCHES_PER_PAGE && (
+                        <span className="ml-2 text-slate-400 font-normal normal-case">({totalMatches} totali)</span>
+                    )}
+                </h2>
                 <div className="space-y-3">
                     {paginatedMatches.map(match => {
                         const sets = (match.score || []) as Array<{team_a: number, team_b: number}>;
@@ -171,7 +178,45 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
                             </div>
                         );
                     })}
-                </div>
+                                </div>
+
+                {/* Paginazione Server-Side */}
+                {totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-1 mt-6 text-[10px] font-black uppercase tracking-wider">
+                        {(() => {
+                            const maxVisible = 5;
+                            let start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+                            let end = Math.min(totalPages, start + maxVisible - 1);
+                            if (end - start + 1 < maxVisible) {
+                                start = Math.max(1, end - maxVisible + 1);
+                            }
+                            const pages = [];
+                            for (let i = start; i <= end; i++) pages.push(i);
+
+                            const btn = (page: number, label: string | number, title: string, disabled: boolean, active: boolean = false) => {
+                                const cls = `w-8 h-8 flex items-center justify-center border rounded-sm text-[10px] font-black uppercase tracking-wider transition-colors ${
+                                    active
+                                        ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
+                                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white cursor-pointer'
+                                }`;
+                                if (disabled || active) {
+                                    return <button key={`page-${label}`} type="button" disabled title={title} className={cls}>{label}</button>;
+                                }
+                                return <Link key={`page-${label}`} href={`/player/${playerId}?page=${page}`} scroll={false} title={title} className={cls}>{label}</Link>;
+                            };
+
+                            return (
+                                <>
+                                    {btn(1, '«', 'Prima Pagina', currentPage === 1)}
+                                    {btn(Math.max(1, currentPage - 1), '‹', 'Precedente', currentPage === 1)}
+                                    {pages.map(p => btn(p, p, `Pagina ${p}`, false, p === currentPage))}
+                                    {btn(Math.min(totalPages, currentPage + 1), '›', 'Successiva', currentPage === totalPages)}
+                                    {btn(totalPages, '»', 'Ultima Pagina', currentPage === totalPages)}
+                                </>
+                            );
+                        })()}
+                    </div>
+                )}
             </div>
         </main>
     );
