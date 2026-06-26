@@ -453,6 +453,7 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
     match_type?: 'male' | 'female' | 'mixed';
     match_date?: string | null;
         court_type?: 'indoor' | 'outdoor';
+    is_friendly?: boolean;
 }) {
     const supabase = await createClient();
 
@@ -511,10 +512,14 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
         modifiche.push(`Tipo match: da ${oldMatch.match_type} a ${updatedFields.match_type}`);
     }
 
-    if (updatedFields.club_id !== undefined && updatedFields.club_id !== oldMatch.club_id) {
+        if (updatedFields.club_id !== undefined && updatedFields.club_id !== oldMatch.club_id) {
         const oldClubText = oldMatch.club_id ? `Club #${oldMatch.club_id}` : 'Nessuno';
         const newClubText = updatedFields.club_id ? `Club #${updatedFields.club_id}` : 'Nessuno';
         modifiche.push(`Campo: da ${oldClubText} a ${newClubText}`);
+    }
+
+    if (updatedFields.is_friendly !== undefined && updatedFields.is_friendly !== oldMatch.is_friendly) {
+        modifiche.push(`Regolamento: da ${oldMatch.is_friendly ? 'Amichevole' : 'Classificata'} a ${updatedFields.is_friendly ? 'Amichevole' : 'Classificata'}`);
     }
 
     const slotKeys = ['team_a_left_id', 'team_a_right_id', 'team_b_left_id', 'team_b_right_id'] as const;

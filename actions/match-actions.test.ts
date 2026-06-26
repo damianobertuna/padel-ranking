@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { leaveMatchAction, joinMatchAction, resolveMatchWithRanking, evaluateMatchScore, isSetValid } from './match-actions';
+import { leaveMatchAction, joinMatchAction, resolveMatchWithRanking, evaluateMatchScore, isSetValid, updateMatchPlayers } from './match-actions';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { logAction } from '@/lib/audit';
 
