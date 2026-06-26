@@ -120,11 +120,12 @@ export default function EditMatchPage() {
 
         const handleSubmit = async (data: MatchFormData) => {
         try {
-            await updateMatchPlayers(matchId, {
+                        await updateMatchPlayers(matchId, {
                 match_date: data.matchDate,
                 match_type: data.matchType,
                 club_id: data.clubId || null,
                 court_type: data.courtType,
+                is_friendly: data.isFriendly,
                 team_a_left_id: data.teamALeft || null,
                 team_a_right_id: data.teamARight || null,
                 team_b_left_id: data.teamBLeft || null,
