@@ -3,7 +3,7 @@ import WinRateWidget from '@/components/WinRateWidget';
 import StreakWidget from '@/components/StreakWidget';
 import PartnersAndNemesisWidget from '@/components/PartnersAndNemesisWidget';
 import GameAverageWidget from '@/components/GameAverageWidget';
-import EditAvatar from '@/components/EditAvatar';
+import EditAvatar from '@/app/profile/EditAvatar';
 import BackToHomeButton from "@/components/BackToHomeButton";
 import Link from 'next/link';
 

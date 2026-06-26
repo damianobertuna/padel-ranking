@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import EditProfileForm from '@/components/EditProfileForm';
+import EditProfileForm from './EditProfileForm';
 import EditManagerProfileForm from '@/components/EditManagerProfileForm';
 import BackToHomeButton from "@/components/BackToHomeButton";
 
