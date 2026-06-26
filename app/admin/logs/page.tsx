@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import BackToHomeButton from "@/components/BackToHomeButton";
-import LogFilters from '@/components/LogFilters';
+import LogFilters from './LogFilters';
 
 export const revalidate = 0;
 const LOGS_PER_PAGE = 20;
