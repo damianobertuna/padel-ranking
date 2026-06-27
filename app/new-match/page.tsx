@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { createPendingMatch } from '@/actions/match-actions';
 import { useRouter } from 'next/navigation';
 import { Player, Club } from '@/types';
-import BackToHomeButton from "@/components/BackToHomeButton";
+import BackToHomeButton from "@/components/ui/BackToHomeButton";
 import MatchForm, { MatchFormData } from '@/components/matches/MatchForm';
 
 export default function CreateMatchPage() {

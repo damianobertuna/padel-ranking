@@ -4,7 +4,7 @@ import StreakWidget from '@/components/StreakWidget';
 import PartnersAndNemesisWidget from '@/components/PartnersAndNemesisWidget';
 import GameAverageWidget from '@/components/GameAverageWidget';
 import EditAvatar from '@/app/profile/EditAvatar';
-import BackToHomeButton from "@/components/BackToHomeButton";
+import BackToHomeButton from "@/components/ui/BackToHomeButton";
 import Link from 'next/link';
 
 export const revalidate = 0;

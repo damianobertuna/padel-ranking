@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { updateMatchPlayers } from '@/actions/match-actions';
-import BackToHomeButton from '@/components/BackToHomeButton';
+import BackToHomeButton from '@/components/ui/BackToHomeButton';
 import { Player, Club } from '@/types';
 import MatchForm, { MatchFormData } from '@/components/matches/MatchForm';
 

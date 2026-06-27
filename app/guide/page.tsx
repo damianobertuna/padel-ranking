@@ -1,6 +1,6 @@
 'use client';
 
-import BackToHomeButton from "@/components/BackToHomeButton";
+import BackToHomeButton from "@/components/ui/BackToHomeButton";
 
 export default function GuidePage() {
     return (

@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import BackToHomeButton from "@/components/BackToHomeButton";
+import BackToHomeButton from "@/components/ui/BackToHomeButton";
 import InviteManagerModal from "@/components/InviteManagerModal";
 import { updateManagerByAdmin, deleteManagerByAdmin } from '@/actions/manager-actions';
 import { SubmitButton } from '@/app/admin/players/SubmitButton';

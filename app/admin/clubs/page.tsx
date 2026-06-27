@@ -4,7 +4,7 @@ import Link from 'next/link';
 import NewClubForm from './NewClubForm';
 import DeleteClubButton from './DeleteClubButton';
 import { Club } from '@/types';
-import BackToHomeButton from "@/components/BackToHomeButton";
+import BackToHomeButton from "@/components/ui/BackToHomeButton";
 import InviteManagerModal from "@/components/InviteManagerModal";
 
 export const revalidate = 0;
