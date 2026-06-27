@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import EditProfileForm from './EditProfileForm';
-import EditManagerProfileForm from '@/components/EditManagerProfileForm';
+import EditManagerProfileForm from '@/components/managers/EditManagerProfileForm';
 import BackToHomeButton from "@/components/ui/BackToHomeButton";
 
 export default async function ProfilePage() {
