@@ -512,7 +512,7 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
         modifiche.push(`Tipo match: da ${oldMatch.match_type} a ${updatedFields.match_type}`);
     }
 
-        if (updatedFields.club_id !== undefined && updatedFields.club_id !== oldMatch.club_id) {
+    if (updatedFields.club_id !== undefined && updatedFields.club_id !== oldMatch.club_id) {
         const oldClubText = oldMatch.club_id ? `Club #${oldMatch.club_id}` : 'Nessuno';
         const newClubText = updatedFields.club_id ? `Club #${updatedFields.club_id}` : 'Nessuno';
         modifiche.push(`Campo: da ${oldClubText} a ${newClubText}`);
