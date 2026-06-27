@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
-import PendingMatchCard from '@/components/PendingMatchCard';
+import PendingMatchCard from '@/components/matches/PendingMatchCard';
 import SearchBar from '@/components/ui/SearchBar';
 import { Player } from "@/types";
 import { computeKingAndFanalino } from '@/lib/rankingCalc';
