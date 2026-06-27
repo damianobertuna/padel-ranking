@@ -3,8 +3,8 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { updatePlayerByAdmin } from '../../../actions/player-actions';
 import { SubmitButton } from './SubmitButton';
-import BackToHomeButton from "@/components/BackToHomeButton";
-import DeletePlayerButton from '@/components/DeletePlayerButton';
+import BackToHomeButton from "@/components/ui/BackToHomeButton";
+import DeletePlayerButton from './DeletePlayerButton';
 
 export const revalidate = 0;
 const PLAYERS_PER_PAGE = 10;

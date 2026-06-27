@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { calculateRankingUpdates, MatchContext } from '@/lib/matchRules';
 import { resolveMatchWithRanking } from '@/actions/match-actions';
 import { Player, Match } from '@/types';
-import BackToHomeButton from "@/components/BackToHomeButton";
+import BackToHomeButton from "@/components/ui/BackToHomeButton";
 
 export default function ResolveMatch() {
     const supabase = createClient();

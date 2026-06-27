@@ -1,10 +1,10 @@
 import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
-import PendingMatchCard from '@/components/PendingMatchCard';
-import SearchBar from '@/components/SearchBar';
+import PendingMatchCard from '@/components/matches/PendingMatchCard';
+import SearchBar from '@/components/ui/SearchBar';
 import { Player } from "@/types";
 import { computeKingAndFanalino } from '@/lib/rankingCalc';
-import ClubSelectFilter from '@/components/ClubSelectFilter';
+import ClubSelectFilter from '@/components/clubs/ClubSelectFilter';
 import { Hand } from 'lucide-react';
 
 const MATCHES_PER_PAGE = 5;

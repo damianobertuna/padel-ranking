@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { logUserLogin, logUserRegistration } from '@/actions/auth-actions';
-import AvatarUpload from '@/components/AvatarUpload';
-import BackToHomeButton from "@/components/BackToHomeButton";
+import AvatarUpload from '@/components/players/AvatarUpload';
+import BackToHomeButton from "@/components/ui/BackToHomeButton";
 
 export default function LoginForm() {
     const supabase = createClient();

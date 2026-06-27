@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from 'react';
 import { canUserResolveMatch } from '@/lib/matchRules';
-import DeleteMatchButton from '@/components/DeleteMatchButton';
-import ResolveMatchButton from '@/components/ResolveMatchButton';
+import DeleteMatchButton from '@/components/matches/DeleteMatchButton';
+import ResolveMatchButton from '@/components/matches/ResolveMatchButton';
 import { useRouter } from "next/navigation";
 import { Match, PendingMatchCardProps, Club } from '@/types';
 import { leaveMatchAction, joinMatchAction } from '@/actions/match-actions';

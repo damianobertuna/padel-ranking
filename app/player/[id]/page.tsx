@@ -1,10 +1,10 @@
 import { createClient } from '@/lib/supabase/server';
-import WinRateWidget from '@/components/WinRateWidget';
-import StreakWidget from '@/components/StreakWidget';
-import PartnersAndNemesisWidget from '@/components/PartnersAndNemesisWidget';
-import GameAverageWidget from '@/components/GameAverageWidget';
-import EditAvatar from '@/components/EditAvatar';
-import BackToHomeButton from "@/components/BackToHomeButton";
+import WinRateWidget from '@/components/stats/WinRateWidget';
+import StreakWidget from '@/components/stats/StreakWidget';
+import PartnersAndNemesisWidget from '@/components/stats/PartnersAndNemesisWidget';
+import GameAverageWidget from '@/components/stats/GameAverageWidget';
+import EditAvatar from '@/app/profile/EditAvatar';
+import BackToHomeButton from "@/components/ui/BackToHomeButton";
 import Link from 'next/link';
 
 export const revalidate = 0;

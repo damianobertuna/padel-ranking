@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import AvatarUpload from '@/components/AvatarUpload';
+import AvatarUpload from '@/components/players/AvatarUpload';
 import { updatePlayerAvatar } from '@/actions/player-actions';
 
 interface EditAvatarProps {

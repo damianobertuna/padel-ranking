@@ -4,8 +4,8 @@ import Link from 'next/link';
 import NewClubForm from './NewClubForm';
 import DeleteClubButton from './DeleteClubButton';
 import { Club } from '@/types';
-import BackToHomeButton from "@/components/BackToHomeButton";
-import InviteManagerModal from "@/components/InviteManagerModal";
+import BackToHomeButton from "@/components/ui/BackToHomeButton";
+import InviteManagerModal from "@/components/admin/InviteManagerModal";
 
 export const revalidate = 0;
 const CLUBS_PER_PAGE = 10;

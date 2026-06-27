@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { updateMatchPlayers } from '@/actions/match-actions';
-import BackToHomeButton from '@/components/BackToHomeButton';
+import BackToHomeButton from '@/components/ui/BackToHomeButton';
 import { Player, Club } from '@/types';
-import MatchForm, { MatchFormData } from '@/components/MatchForm';
+import MatchForm, { MatchFormData } from '@/components/matches/MatchForm';
 
 export default function EditMatchPage() {
     const supabase = createClient();
@@ -120,7 +120,7 @@ export default function EditMatchPage() {
 
         const handleSubmit = async (data: MatchFormData) => {
         try {
-                        await updateMatchPlayers(matchId, {
+            await updateMatchPlayers(matchId, {
                 match_date: data.matchDate,
                 match_type: data.matchType,
                 club_id: data.clubId || null,
