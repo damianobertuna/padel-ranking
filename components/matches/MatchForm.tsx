@@ -9,7 +9,7 @@ export interface MatchFormData {
     matchType: 'male' | 'female' | 'mixed';
     clubId: number | '';
     isFriendly: boolean;
-        courtType: 'indoor' | 'outdoor';
+    courtType: 'indoor' | 'outdoor';
     teamALeft: number | '';
     teamARight: number | '';
     teamBLeft: number | '';

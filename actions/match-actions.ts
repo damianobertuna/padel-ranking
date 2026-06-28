@@ -140,15 +140,17 @@ export async function deletePendingMatch(matchId: string) {
     if (identity.type === 'admin') qualifica = "L'admin";
     else if (isManager) qualifica = "Il Club Manager";
 
+        const tipoPartita = match.is_friendly ? 'Amichevole' : 'Classificata';
     const logDescription = `${qualifica} ${operatore} ha annullato la partita in programma: ${dettagliMatch}`;
 
     const { error: logError } = await logAction(
         'MATCH_DELETED',
         matchId,
-        logDescription,
+        `[Match #${matchId.slice(0, 8)} - ${tipoPartita}] ${logDescription}`,
         {
             reason: 'Manuale',
             match_id: matchId,
+            is_friendly: match.is_friendly,
             teams: {
                 teamA: [match.team_a_left_id, match.team_a_right_id],
                 teamB: [match.team_b_left_id, match.team_b_right_id]
@@ -268,6 +270,7 @@ export async function createPendingMatch(data: {
         const dettagliMatch = `${getName(data.teamALeft)}/${getName(data.teamARight)} VS ${getName(data.teamBLeft)}/${getName(data.teamBRight)}`;
     const operatore = identity.displayName;
     const tipoLabel = data.isFriendly ? "AMICHEVOLE" : "classificata";
+    const tipoPartita = data.isFriendly ? 'Amichevole' : 'Classificata';
 
     let qualifica = "Il giocatore";
     if (identity.type === 'admin') qualifica = "L'admin";
@@ -279,7 +282,7 @@ export async function createPendingMatch(data: {
     const { error: logError } = await logAction(
         'MATCH_CREATED',
         matchId.id,
-        logDescription,
+        `[Match #${matchId.id.slice(0, 8)} - ${tipoPartita}] ${logDescription}`,
         {
             match_type: data.matchType,
             match_date: data.matchDate,
@@ -410,11 +413,12 @@ export async function resolveMatchWithRanking(data: {
                 const operatore = identity.displayName;
         const qualificaResolve = isAdmin ? 'Admin' : (isManager ? 'Club Manager' : 'Giocatore');
 
+        const tipoPartita = match.is_friendly ? 'Amichevole' : 'Classificata';
         const logDetails = match.is_friendly
             ? `Il ${qualificaResolve} ${operatore} ha registrato l'AMICHEVOLE: ${esitoDescrizione} [${stringaPunteggio}]. Nessuna variazione.`
             : `Il ${qualificaResolve} ${operatore} ha chiuso il match: ${esitoDescrizione} [${stringaPunteggio}]. Elo: ${rankingLogText}`;
 
-        const { error: logError } = await logAction('MATCH_RESOLVED', data.matchId, logDetails, {
+        const { error: logError } = await logAction('MATCH_RESOLVED', data.matchId, `[Match #${data.matchId.slice(0, 8)} - ${tipoPartita}] ${logDetails}`, {
             winning_team: finalWinningTeam,
             score: stringaPunteggio,
             is_completed: true,
@@ -452,12 +456,12 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
     team_b_right_id?: number | null;
     match_type?: 'male' | 'female' | 'mixed';
     match_date?: string | null;
-        court_type?: 'indoor' | 'outdoor';
+    court_type?: 'indoor' | 'outdoor';
     is_friendly?: boolean;
 }) {
     const supabase = await createClient();
 
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
         throw new Error("Accesso negato: devi effettuare il login per modificare una partita.");
     }
@@ -523,9 +527,34 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
     }
 
     const slotKeys = ['team_a_left_id', 'team_a_right_id', 'team_b_left_id', 'team_b_right_id'] as const;
+    // Collect all player IDs (old + new) to resolve names and scores
+    const changedPlayerIds: number[] = [];
     slotKeys.forEach(key => {
         if (updatedFields[key] !== undefined && updatedFields[key] !== oldMatch[key]) {
-            modifiche.push(`Slot ${key} aggiornato`);
+            if (oldMatch[key] !== null) changedPlayerIds.push(oldMatch[key]);
+            if (updatedFields[key] !== null) changedPlayerIds.push(updatedFields[key]);
+        }
+    });
+    let playerInfoMap: Record<number, { name: string; score: number }> = {};
+    if (changedPlayerIds.length > 0) {
+        const { data: players } = await supabase
+            .from('players')
+            .select('id, first_name, last_name, ranking')
+            .in('id', [...new Set(changedPlayerIds)]);
+        if (players) {
+            players.forEach(p => {
+                playerInfoMap[p.id] = { name: `${p.first_name} ${p.last_name}`, score: p.ranking };
+            });
+        }
+    }
+    slotKeys.forEach(key => {
+        if (updatedFields[key] !== undefined && updatedFields[key] !== oldMatch[key]) {
+            const oldId = oldMatch[key];
+            const newId = updatedFields[key];
+            const oldName = oldId ? (playerInfoMap[oldId]?.name || `#${oldId}`) : 'Slot Libero';
+            const newName = newId ? (playerInfoMap[newId]?.name || `#${newId}`) : 'Slot Libero';
+            const newScore = newId && playerInfoMap[newId] ? `(p.${playerInfoMap[newId].score.toFixed(2)})` : '';
+            modifiche.push(`${key}: ${oldName} ➡️ ${newName} ${newScore}`);
         }
     });
 
@@ -537,10 +566,11 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
         else if (isManager) qualifica = "Il Club Manager";
         else if (isOrganizer) qualifica = "L'Organizzatore";
 
+        const tipoPartita = oldMatch.is_friendly ? 'Amichevole' : 'Classificata';
         await logAction(
             'MATCH_UPDATED',
             matchId,
-            `${qualifica} ${operatore} ha modificato il match ${matchId.slice(0, 8)}: ${modifiche.join('; ')}`,
+            `[Match #${matchId.slice(0, 8)} - ${tipoPartita}] ${qualifica} ${operatore} ha modificato il match: ${modifiche.join('; ')}`,
             {
                 previous_data: oldMatch,
                 new_data: updatedFields
@@ -588,9 +618,18 @@ export async function leaveMatchAction(matchId: string) {
 
     const remainingPlayers = allSlots.filter(id => id !== null && id !== identity.playerId);
 
+    // Fetch own player details (first_name, last_name, ranking) for the audit log
+    const { data: leaverPlayer } = await supabase
+        .from('players')
+        .select('first_name, last_name, ranking')
+        .eq('id', identity.playerId)
+        .maybeSingle();
+    const leaverName = leaverPlayer ? `${leaverPlayer.first_name} ${leaverPlayer.last_name}` : identity.displayName;
+    const leaverScore = leaverPlayer ? `(p.${leaverPlayer.ranking.toFixed(2)})` : '';
+
     let updatePayload: Record<string, any> = { [slotToClear]: null };
     let shouldDeleteMatch = false;
-    let logMessage = `Il giocatore ${identity.displayName} ha lasciato la partita.`;
+    let logMessage = `Il giocatore ${leaverName} ${leaverScore} ha lasciato la partita (slot ${slotToClear}).`;
 
     if (remainingPlayers.length === 0) {
         shouldDeleteMatch = true;
@@ -604,7 +643,8 @@ export async function leaveMatchAction(matchId: string) {
         const { error: deleteError } = await supabase.from('matches').delete().eq('id', matchId);
         if (deleteError) throw new Error(`Errore eliminazione match vuoto: ${deleteError.message}`);
 
-        await logAction('MATCH_DELETED_AUTO', matchId, `Match #${matchId.slice(0,6)} eliminato automaticamente perché vuoto dopo l'uscita dell'ultimo giocatore.`);
+        const tipoPartitaAuto = match.is_friendly ? 'Amichevole' : 'Classificata';
+        await logAction('MATCH_DELETED_AUTO', matchId, `[Match #${matchId.slice(0, 8)} - ${tipoPartitaAuto}] Match eliminato automaticamente perché vuoto dopo l'uscita dell'ultimo giocatore.`);
     } else {
         const { error: updateError } = await supabase
             .from('matches')
@@ -612,7 +652,8 @@ export async function leaveMatchAction(matchId: string) {
             .eq('id', matchId);
         if (updateError) throw new Error(`Errore aggiornamento slot: ${updateError.message}`);
 
-        await logAction('PLAYER_LEFT_MATCH', matchId, logMessage);
+        const tipoPartitaLeft = match.is_friendly ? 'Amichevole' : 'Classificata';
+        await logAction('PLAYER_LEFT_MATCH', matchId, `[Match #${matchId.slice(0, 8)} - ${tipoPartitaLeft}] ${logMessage}`);
     }
 
     revalidatePath('/');
@@ -670,10 +711,20 @@ export async function joinMatchAction(matchId: string) {
 
     if (updateError) throw new Error(`Errore durante l'iscrizione: ${updateError.message}`);
 
+    // Fetch own player details (first_name, last_name, ranking) for the audit log
+    const { data: joinerPlayer } = await supabase
+        .from('players')
+        .select('first_name, last_name, ranking')
+        .eq('id', identity.playerId)
+        .maybeSingle();
+    const joinerName = joinerPlayer ? `${joinerPlayer.first_name} ${joinerPlayer.last_name}` : identity.displayName;
+    const joinerScore = joinerPlayer ? `(p.${joinerPlayer.ranking.toFixed(2)})` : '';
+
+    const tipoPartitaJoin = match.is_friendly ? 'Amichevole' : 'Classificata';
     await logAction(
         'PLAYER_JOINED_MATCH',
         matchId,
-        `Il giocatore ${identity.displayName} si è unito automaticamente alla partita nello slot ${slotToFill}.`
+        `[Match #${matchId.slice(0, 8)} - ${tipoPartitaJoin}] Il giocatore ${joinerName} ${joinerScore} si è unito alla partita nello slot ${slotToFill}.`
     );
 
     revalidatePath('/');

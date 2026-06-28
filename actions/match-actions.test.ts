@@ -22,7 +22,7 @@ describe('Match Server Actions', () => {
     beforeEach(() => {
         vi.clearAllMocks();
 
-        mockPlayer = { id: 10, first_name: 'Mario', last_name: 'Rossi', preferred_side: 'Both' };
+                mockPlayer = { id: 10, first_name: 'Mario', last_name: 'Rossi', preferred_side: 'Both', ranking: 3.0 };
         mockMatch = {
             id: 'match-123',
             team_a_left_id: null, team_a_right_id: null,
