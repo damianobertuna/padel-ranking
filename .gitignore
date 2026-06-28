@@ -59,3 +59,5 @@ agent.md
 TEST_HARDENING_TASKS.md
 bundle-context.js
 project-context.txt
+.husky
+docs/migration-dictionary-plan.md

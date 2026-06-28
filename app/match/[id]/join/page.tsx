@@ -32,7 +32,7 @@ export default function EditMatchPage() {
                     supabase.auth.getUser()
                 ]);
 
-                                const user = authRes.data.user;
+                const user = authRes.data.user;
                 if (!user) throw new Error("Devi effettuare l'accesso.");
 
                 const match = matchRes.data;
@@ -59,7 +59,7 @@ export default function EditMatchPage() {
                     userRole = userRoleData?.role || null;
                 }
 
-                                if (userRole === 'club_manager' && match.club_id) {
+                if (userRole === 'club_manager' && match.club_id) {
                     const { data: managerData } = await supabase.from('club_managers')
                         .select('id')
                         .eq('user_id', user.id)
@@ -94,7 +94,7 @@ export default function EditMatchPage() {
                     matchTime = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
                 }
 
-                                setInitialMatchData({
+                setInitialMatchData({
                     matchDate, matchTime,
                     clubId: match.club_id || '',
                     matchType: match.match_type,
@@ -150,7 +150,7 @@ export default function EditMatchPage() {
                 </div>
             )}
 
-                        {!error && initialMatchData && (
+            {!error && initialMatchData && (
                 <MatchForm
                     title="Modifica Partita"
                     submitLabel="Salva Modifiche"
