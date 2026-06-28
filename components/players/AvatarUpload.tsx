@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
+import { t } from '@/lib/i18n/dictionary';
 
 interface AvatarUploadProps {
     playerId?: number;
@@ -54,13 +55,13 @@ export default function AvatarUpload({ playerId, currentAvatarUrl, onUploadSucce
                 )}
                 {uploading && (
                     <div className="absolute inset-0 bg-slate-900/80 flex items-center justify-center">
-                        <span className="text-[9px] font-black text-white animate-pulse">...</span>
+                        <span className="text-[9px] font-black text-white animate-pulse">{t('ui', 'WAIT')}</span>
                     </div>
                 )}
             </div>
 
             <label className="cursor-pointer w-full text-center bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest py-2 hover:bg-black transition-colors">
-                {uploading ? 'CARICAMENTO...' : 'CARICA FOTO'}
+                {uploading ? t('ui', 'LOADING') : t('player', 'AVATAR_UPLOAD')}
                 <input type="file" accept="image/*" onChange={handleUpload} disabled={uploading} className="hidden" />
             </label>
 
@@ -68,3 +69,4 @@ export default function AvatarUpload({ playerId, currentAvatarUrl, onUploadSucce
         </div>
     );
 }
+

@@ -2,6 +2,7 @@
 
 import { useTransition } from 'react';
 import { deletePendingMatch } from '@/actions/match-actions';
+import { t } from '@/lib/i18n/dictionary';
 
 interface DeleteMatchButtonProps {
     matchId: string;
@@ -16,7 +17,7 @@ export default function DeleteMatchButton({ matchId }: DeleteMatchButtonProps) {
                 try {
                     await deletePendingMatch(matchId);
                 } catch (error: any) {
-                    alert(`ERRORE: ${error.message || error}`);
+                    alert(`${t('error', 'GENERIC')} ${error.message || error}`);
                 }
             });
         }
@@ -41,3 +42,4 @@ export default function DeleteMatchButton({ matchId }: DeleteMatchButtonProps) {
         </button>
     );
 }
+

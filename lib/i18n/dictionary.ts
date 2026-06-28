@@ -211,6 +211,9 @@ const dictionary = {
     // Back to home
     BACK_TO_HOME: '← TORNA ALLA HOME',
     BACK: 'INDIETRO',
+    MATCH: 'Match',
+    RESULTS: 'Risultati',
+    RANKING: 'Classfica',
 
     // Paginazione
     PAGINATION_FIRST: 'Prima Pagina',
@@ -221,6 +224,7 @@ const dictionary = {
 
     // Cerca
     SEARCH_PLACEHOLDER: 'CERCA ATLETA PER NOME O COGNOME...',
+    SEAECH_ONLY_PLACEHOLDER: 'Cerca...',
     SEARCH_PLACEHOLDER_HISTORY: 'FILTRA STORICO PER NOME GIOCATORE...',
     SEARCH_PLACEHOLDER_PLAYER: 'Cerca nome...',
     SEARCH_DESELECT: '-- DESELEZIONA ({placeholder}) --',
@@ -327,9 +331,13 @@ const dictionary = {
     LABEL_PLAYER: 'Giocatore',
     LABEL_SIDE: 'Lato / Mano',
     LABEL_MATCHES: 'Partite',
+    LABEL_WINS: 'Vinte',
+    LABALE_LOSTS: 'Perse',
     LABEL_POINTS: 'Punti',
     LABEL_WIN_RATE: 'Win %',
+    LABEL_PLAYER_EFFECTIVNESS: 'Efficacia in campo',
     LABEL_TOTAL_PLAYED: 'Match',
+    LABEL_TOTAL: 'Totale',
     LABEL_RATE: 'Rate',
     LABEL_PTS: 'Pts',
     LABEL_LEFT: 'Sx',
@@ -359,8 +367,15 @@ const dictionary = {
     STATS_WINS_TOGETHER: '{wins} VITTORIE INSIEME',
     STATS_NO_MATCH_PLAYED: 'NESSUN MATCH GIOCATO',
     STATS_STREAK: 'Striscia:',
+    STATS_PLAYER_STATUS: 'Stato di Forma',
     STATS_CONSECUTIVE_WINS: 'Vittorie consecutive',
     STATS_CONSECUTIVE_LOSSES: 'Sconfitte consecutive',
+    STATS_LOSSES: 'Sconfitte Subite',
+    STATS_WIN: 'Vittoria',
+    STATS_LOSE: 'Sconfitta',
+    STATS_WINS: 'Vittorie',
+    STATS_LOSES: 'Sconfitte',
+    STATS_UNBEATEN: 'Imbattuto',
     STATS_STREAK_NONE: 'Nessuna',
 
     // Squadre
@@ -451,7 +466,7 @@ const dictionary = {
 
     // Manager invite modal
     MANAGER_INVITE_TITLE: 'Nuovo Gestore',
-    MANAGER_INVITE_SUCCESS: '✅ Invito inviato con successo!',
+    MANAGER_INVITE_SUCCESS: 'Invito inviato con successo!',
     MANAGER_INVITE_CANCEL: 'Annulla',
     MANAGER_INVITE_SUBMIT: 'INVIA INVITO',
   },
@@ -465,7 +480,7 @@ const dictionary = {
     PAGE_TITLE_PLAYERS: 'Gestione Atleti',
     PAGE_TITLE_LOGS: 'Registro Attività',
 
-    BUTTON_INVITE_MANAGER: '➕ INVITA GESTORE',
+    BUTTON_INVITE_MANAGER: 'INVITA GESTORE',
     BUTTON_NEW_CLUB: '➕ Nuovo Circolo',
 
     // Colonne tabella log

@@ -1,5 +1,7 @@
 'use client';
 
+import { t } from '@/lib/i18n/dictionary';
+
 interface PaginationProps {
     currentPage: number;
     totalPages: number;
@@ -37,7 +39,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pa
                 disabled={currentPage === 1}
                 onClick={() => onPageChange(1)}
                 className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 text-slate-800 rounded-sm hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white transition-colors"
-                title="Prima Pagina"
+                title={t('ui', 'PAGINATION_FIRST')}
             >
                 «
             </button>
@@ -48,7 +50,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pa
                 disabled={currentPage === 1}
                 onClick={() => onPageChange(currentPage - 1)}
                 className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 text-slate-800 rounded-sm hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white transition-colors mr-1"
-                title="Precedente"
+                title={t('ui', 'PAGINATION_PREV')}
             >
                 ‹
             </button>
@@ -78,7 +80,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pa
                 disabled={currentPage === totalPages}
                 onClick={() => onPageChange(currentPage + 1)}
                 className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 text-slate-800 rounded-sm hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white transition-colors ml-1"
-                title="Successiva"
+                title={t('ui', 'PAGINATION_NEXT')}
             >
                 ›
             </button>
@@ -89,10 +91,11 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pa
                 disabled={currentPage === totalPages}
                 onClick={() => onPageChange(totalPages)}
                 className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 text-slate-800 rounded-sm hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white transition-colors"
-                title="Ultima Pagina"
+                title={t('ui', 'PAGINATION_LAST')}
             >
                 »
             </button>
         </div>
     );
 }
+

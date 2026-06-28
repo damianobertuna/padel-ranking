@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { inviteClubManager } from '@/actions/auth-actions';
+import { t } from '@/lib/i18n/dictionary';
 
 interface Club {
     id: number;
@@ -25,7 +26,7 @@ export default function InviteManagerModal({ clubs }: { clubs: Club[] }) {
         setSuccess(false);
 
                 if (!email || clubId === '' || !firstName || !lastName) {
-            setError("Compila tutti i campi: nome, cognome, circolo ed email.");
+            setError(t('error', 'MANAGER_INVITE_FIELDS_REQUIRED'));
             return;
         }
 
@@ -44,7 +45,7 @@ export default function InviteManagerModal({ clubs }: { clubs: Club[] }) {
                 setSuccess(false);
             }, 2000);
         } catch (err: any) {
-            setError(err.message || "Errore durante l'invio dell'invito.");
+            setError(err.message || t('error', 'MANAGER_INVITE_GENERIC'));
         } finally {
             setLoading(false);
         }
@@ -65,7 +66,7 @@ export default function InviteManagerModal({ clubs }: { clubs: Club[] }) {
                 onClick={() => setIsOpen(true)}
                 className="bg-slate-900 text-white px-4 py-2 text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-colors rounded-sm flex items-center gap-2"
             >
-                <span>➕</span> INVITA GESTORE
+                <span>➕</span> {t('admin', 'BUTTON_INVITE_MANAGER')}
             </button>
 
             {/* Overlay Modale */}
@@ -73,13 +74,13 @@ export default function InviteManagerModal({ clubs }: { clubs: Club[] }) {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div className="bg-white w-full max-w-md p-6 rounded-sm shadow-xl">
                         <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-4">
-                            <h2 className="text-lg font-black text-slate-900 uppercase tracking-tighter">Nuovo Gestore</h2>
+                            <h2 className="text-lg font-black text-slate-900 uppercase tracking-tighter">{t('form', 'MANAGER_INVITE_TITLE')}</h2>
                             <button onClick={closeModal} className="text-slate-400 hover:text-slate-700 font-bold">✕</button>
                         </div>
 
                         {success ? (
                             <div className="bg-green-50 text-green-700 p-4 font-bold text-xs uppercase tracking-widest text-center rounded-sm">
-                                ✅ Invito inviato con successo!
+                                {t('form', 'MANAGER_INVITE_SUCCESS')}
                             </div>
                         ) : (
                                                         <form onSubmit={handleSubmit} className="space-y-4">
@@ -91,14 +92,14 @@ export default function InviteManagerModal({ clubs }: { clubs: Club[] }) {
 
                                 <div>
                                     <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">
-                                        Circolo da gestire
+                                        {t('form', 'LABEL_CLUB_TO_MANAGE')}
                                     </label>
                                     <select
                                         value={clubId}
                                         onChange={(e) => setClubId(e.target.value ? Number(e.target.value) : '')}
                                         className="w-full border border-slate-200 p-2 text-sm font-bold text-slate-900 focus:outline-none focus:border-slate-400"
                                     >
-                                        <option value="">-- Seleziona un circolo --</option>
+                                        <option value="">{t('form', 'INVITE_PLACEHOLDER_CLUB')}</option>
                                         {clubs.map((c) => (
                                             <option key={c.id} value={c.id}>
                                                 {c.name} {c.city ? `(${c.city})` : ''}
@@ -110,11 +111,11 @@ export default function InviteManagerModal({ clubs }: { clubs: Club[] }) {
                                 <div className="grid grid-cols-2 gap-2">
                                     <div>
                                         <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">
-                                            Nome
+                                            {t('form', 'LABEL_NOME')}
                                         </label>
                                         <input
                                             type="text"
-                                            placeholder="Mario"
+                                            placeholder={t('form', 'PLACEHOLDER_NAME')}
                                             value={firstName}
                                             onChange={(e) => setFirstName(e.target.value)}
                                             className="w-full border border-slate-200 p-2 text-sm font-bold text-slate-900 focus:outline-none focus:border-slate-400"
@@ -123,11 +124,11 @@ export default function InviteManagerModal({ clubs }: { clubs: Club[] }) {
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">
-                                            Cognome
+                                            {t('form', 'LABEL_COGNOME')}
                                         </label>
                                         <input
                                             type="text"
-                                            placeholder="Rossi"
+                                            placeholder={t('form', 'PLACEHOLDER_SURNAME')}
                                             value={lastName}
                                             onChange={(e) => setLastName(e.target.value)}
                                             className="w-full border border-slate-200 p-2 text-sm font-bold text-slate-900 focus:outline-none focus:border-slate-400"
@@ -138,11 +139,11 @@ export default function InviteManagerModal({ clubs }: { clubs: Club[] }) {
 
                                 <div>
                                     <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">
-                                        Indirizzo Email
+                                        {t('form', 'LABEL_EMAIL')}
                                     </label>
                                     <input
                                         type="email"
-                                        placeholder="es. mario.rossi@email.it"
+                                        placeholder={t('form', 'PLACEHOLDER_EMAIL')}
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
                                         className="w-full border border-slate-200 p-2 text-sm font-bold text-slate-900 focus:outline-none focus:border-slate-400"
@@ -157,14 +158,14 @@ export default function InviteManagerModal({ clubs }: { clubs: Club[] }) {
                                         disabled={loading}
                                         className="flex-1 border border-slate-200 bg-white text-slate-600 px-4 py-2 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 disabled:opacity-50"
                                     >
-                                        Annulla
+                                        {t('form', 'MANAGER_INVITE_CANCEL')}
                                     </button>
                                     <button
                                         type="submit"
                                         disabled={loading}
                                         className="flex-1 bg-blue-600 text-white px-4 py-2 text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 disabled:opacity-50"
                                     >
-                                        {loading ? 'INVIO...' : 'INVIA INVITO'}
+                                        {loading ? t('ui', 'SENDING') : t('form', 'MANAGER_INVITE_SUBMIT')}
                                     </button>
                                 </div>
                             </form>

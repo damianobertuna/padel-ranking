@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { t } from '@/lib/i18n/dictionary';
 
 interface ResolveMatchButtonProps {
     matchId: string;
@@ -28,7 +29,8 @@ export default function ResolveMatchButton({ matchId }: ResolveMatchButtonProps)
             }
             `}
         >
-            {isRedirecting ? 'CARICAMENTO...' : 'INSERISCI RISULTATO'}
+            {isRedirecting ? t('ui', 'LOADING') : 'INSERISCI RISULTATO'}
         </button>
     );
 }
+

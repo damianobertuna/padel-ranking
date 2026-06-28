@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { t } from '@/lib/i18n/dictionary';
 
 interface WinRateWidgetProps {
     stats: {
@@ -29,7 +30,7 @@ export default function WinRateWidget({ stats }: WinRateWidgetProps) {
         <div className="bg-white p-5 border border-slate-200 shadow-sm rounded-sm flex flex-col justify-between">
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                    Efficacia in Campo
+                    {t('player', 'LABEL_PLAYER_EFFECTIVNESS')}
                 </h3>
                 <span className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-wider border ${theme.text} border-slate-200 bg-slate-50`}>
                     {theme.label}
@@ -58,23 +59,24 @@ export default function WinRateWidget({ stats }: WinRateWidgetProps) {
 
                 <div className="flex-1 space-y-1 pl-4 border-l border-slate-100">
                     <div className="flex justify-between items-baseline">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase">Totale</span>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase">{t('player', 'LABEL_TOTAL')}</span>
                         <span className="text-sm font-black text-slate-900 font-mono">{stats.totalPlayed}</span>
                     </div>
                     <div className="flex justify-between items-baseline">
-                        <span className="text-[10px] font-bold text-emerald-600 uppercase">Vinte</span>
+                        <span className="text-[10px] font-bold text-emerald-600 uppercase">{t('player', 'LABEL_WINS')}</span>
                         <span className="text-sm font-black text-emerald-600 font-mono">{stats.totalWon}</span>
                     </div>
                     <div className="flex justify-between items-baseline">
-                        <span className="text-[10px] font-bold text-red-600 uppercase">Perse</span>
+                        <span className="text-[10px] font-bold text-red-600 uppercase">{t('player', 'LABALE_LOSTS')}</span>
                         <span className="text-sm font-black text-red-600 font-mono">{stats.totalLost}</span>
                     </div>
                 </div>
             </div>
 
             <div className="mt-4 pt-3 border-t border-slate-100 text-[9px] font-bold text-slate-400 text-center uppercase tracking-widest">
-                {stats.totalPlayed === 0 ? "Nessun match" : `Calcolato su ${stats.totalPlayed} match`}
+                {stats.totalPlayed === 0 ? t('player', 'STATS_NO_MATCHES') : t('player', 'STATS_CALCULATED_ON', { count: stats.totalPlayed })}
             </div>
         </div>
     );
 }
+

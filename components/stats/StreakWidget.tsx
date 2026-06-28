@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { t } from '@/lib/i18n/dictionary';
 
 interface MatchWithResult {
     id: string;
@@ -33,7 +34,7 @@ export default function StreakWidget({ enrichedMatches }: StreakWidgetProps) {
         <div className="bg-white border border-slate-200 shadow-sm p-5 rounded-sm flex flex-col justify-between">
             <div>
                 <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">
-                    Stato di Forma
+                    {t('player', 'STATS_PLAYER_STATUS')}
                 </h3>
             </div>
 
@@ -47,7 +48,7 @@ export default function StreakWidget({ enrichedMatches }: StreakWidgetProps) {
                                 ? 'bg-emerald-600 border-emerald-700 text-white'
                                 : 'bg-red-600 border-red-700 text-white'
                         }`}
-                        title={match.userWon ? 'Vittoria' : 'Sconfitta'}
+                        title={match.userWon ? t('player', 'STATS_WIN') : t('player', 'STATS_LOSE')}
                     >
                         {match.userWon ? 'V' : 'P'}
                     </div>
@@ -63,15 +64,16 @@ export default function StreakWidget({ enrichedMatches }: StreakWidgetProps) {
 
             {/* Striscia Attuale */}
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Striscia:</span>
+                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{t('player', 'STATS_STREAK')}</span>
                 {currentStreakType === 'Nessuna' ? (
-                    <span className="text-[10px] font-black text-slate-400 uppercase">N/A</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase">{t('player', 'STATS_STREAK_NONE')}</span>
                 ) : (
                     <span className={`text-[10px] font-black uppercase ${currentStreakType === 'V' ? 'text-emerald-700' : 'text-red-700'}`}>
-                        {currentStreakCount} {currentStreakType === 'V' ? 'Vittorie' : 'Sconfitte'}
+                        {currentStreakCount} {currentStreakType === 'V' ? t('player', 'STATS_WINS') : t('player', 'STATS_LOSES')}
                     </span>
                 )}
             </div>
         </div>
     );
 }
+

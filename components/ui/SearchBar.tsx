@@ -2,8 +2,9 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { t } from '@/lib/i18n/dictionary';
 
-export default function SearchBar({ placeholder = "Cerca..." }: { placeholder?: string }) {
+export default function SearchBar({ placeholder = t('ui', 'SEAECH_ONLY_PLACEHOLDER') }: { placeholder?: string }) {
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
@@ -49,3 +50,4 @@ export default function SearchBar({ placeholder = "Cerca..." }: { placeholder?: 
         </div>
     );
 }
+

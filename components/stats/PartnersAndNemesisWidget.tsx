@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Player, MatchWithResult } from '@/types';
+import { t } from '@/lib/i18n/dictionary';
 
 interface PartnersAndNemesisWidgetProps {
     playerId: number;
@@ -12,7 +13,7 @@ interface PartnersAndNemesisWidgetProps {
 export default function PartnersAndNemesisWidget({ playerId, enrichedMatches, allPlayers }: PartnersAndNemesisWidgetProps) {
     const getPlayerName = (id: number) => {
         const p = allPlayers?.find(x => x.id === id);
-        return p ? `${p.first_name} ${p.last_name}` : 'SCONOSCIUTO';
+        return p ? `${p.first_name} ${p.last_name}` : t('match', 'SLOT_SCONOSCIUTO');
     };
 
     const partnerStats: Record<number, { won: number }> = {};
@@ -61,26 +62,27 @@ export default function PartnersAndNemesisWidget({ playerId, enrichedMatches, al
             <div className="space-y-2">
                 {/* PARTNER */}
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-sm">
-                    <div className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Partner Ideale</div>
+                    <div className="text-[9px] font-black text-blue-600 uppercase tracking-widest">{t('player', 'STATS_PARTNER_IDEAL')}</div>
                     <div className="text-sm font-black text-slate-900 uppercase truncate my-1">
-                        {bestPartnerId ? getPlayerName(Number(bestPartnerId)) : 'NESSUNO'}
+                        {bestPartnerId ? getPlayerName(Number(bestPartnerId)) : t('player', 'STATS_PARTNER_NONE')}
                     </div>
                     <div className="text-[9px] font-bold text-slate-500 uppercase">
-                        {bestPartnerId ? `${maxPartnerWins} VITTORIE INSIEME` : 'NESSUN MATCH GIOCATO'}
+                        {bestPartnerId ? t('player', 'STATS_WINS_TOGETHER', { wins: maxPartnerWins }) : t('player', 'STATS_NO_MATCH_PLAYED')}
                     </div>
                 </div>
 
                 {/* NEMESI */}
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-sm">
-                    <div className="text-[9px] font-black text-red-600 uppercase tracking-widest">La tua Nemesi</div>
+                    <div className="text-[9px] font-black text-red-600 uppercase tracking-widest">{t('player', 'STATS_NEMESIS')}</div>
                     <div className="text-sm font-black text-slate-900 uppercase truncate my-1">
-                        {nemesisId ? getPlayerName(Number(nemesisId)) : 'NESSUNA'}
+                        {nemesisId ? getPlayerName(Number(nemesisId)) : t('player', 'STATS_NEMESIS_NONE')}
                     </div>
                     <div className="text-[9px] font-bold text-slate-500 uppercase">
-                        {nemesisId ? `${maxNemesisLosses} SCONFITTE SUBITE` : 'IMBATTUTO'}
+                        {nemesisId ? `${maxNemesisLosses} ${t('player', 'STATS_LOSSES')}` : t('player', 'STATS_UNBEATEN')}
                     </div>
                 </div>
             </div>
         </div>
     );
 }
+
