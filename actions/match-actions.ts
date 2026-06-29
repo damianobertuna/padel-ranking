@@ -6,6 +6,7 @@ import { logAction } from "@/lib/audit";
 import { computeKingAndFanalino } from "@/lib/rankingCalc";
 import { sendWhatsAppNotification } from '@/lib/whatsapp';
 import { buildResultMessage, buildUpdateMessage, PlayerBrief } from '@/lib/whatsapp-messages';
+import dictAudit from "@/lib/i18n/dict-audit";
 
 // Interfaccia per la struttura del set
 export interface SetScore {
@@ -138,11 +139,11 @@ export async function deletePendingMatch(matchId: string) {
     const dettagliMatch = `${getName(match.team_a_left_id)}/${getName(match.team_a_right_id)} VS ${getName(match.team_b_left_id)}/${getName(match.team_b_right_id)}`;
     const operatore = identity.displayName;
 
-    let qualifica = "Il giocatore";
-    if (identity.type === 'admin') qualifica = "L'admin";
-    else if (isManager) qualifica = "Il Club Manager";
+    let qualifica: string = dictAudit.LABEL_QUALIFICA_PLAYER;
+    if (identity.type === 'admin') qualifica = dictAudit.LABEL_QUALIFICA_ADMIN;
+    else if (isManager) qualifica = dictAudit.LABEL_QUALIFICA_MANAGER;
 
-        const tipoPartita = match.is_friendly ? 'Amichevole' : 'Classificata';
+    const tipoPartita = match.is_friendly ? 'Amichevole' : 'Classificata';
     const logDescription = `${qualifica} ${operatore} ha annullato la partita in programma: ${dettagliMatch}`;
 
     const { error: logError } = await logAction(
@@ -274,9 +275,9 @@ export async function createPendingMatch(data: {
     const tipoLabel = data.isFriendly ? "AMICHEVOLE" : "classificata";
     const tipoPartita = data.isFriendly ? 'Amichevole' : 'Classificata';
 
-    let qualifica = "Il giocatore";
-    if (identity.type === 'admin') qualifica = "L'admin";
-    else if (isManager) qualifica = "Il Club Manager";
+    let qualifica: string = dictAudit.LABEL_QUALIFICA_PLAYER;
+    if (identity.type === 'admin') qualifica = dictAudit.LABEL_QUALIFICA_ADMIN;
+    else if (isManager) qualifica = dictAudit.LABEL_QUALIFICA_MANAGER;
 
     const logDescription = `${qualifica} ${operatore} ha organizzato una nuova partita ${tipoLabel}: ${dettagliMatch} - ${data.matchType} - ${data.matchDate}`;
 
@@ -412,8 +413,8 @@ export async function resolveMatchWithRanking(data: {
             ? `Vince il Team A (${nomeTeamA}) contro il Team B (${nomeTeamB})`
             : `Vince il Team B (${nomeTeamB}) contro il Team A (${nomeTeamA})`;
 
-                const operatore = identity.displayName;
-        const qualificaResolve = isAdmin ? 'Admin' : (isManager ? 'Club Manager' : 'Giocatore');
+        const operatore = identity.displayName;
+        const qualificaResolve = isAdmin ? dictAudit.QUALIFICA_ADMIN : (isManager ? dictAudit.QUALIFICA_MANAGER : dictAudit.QUALIFICA_PLAYER);
 
         const tipoPartita = match.is_friendly ? 'Amichevole' : 'Classificata';
         const logDetails = match.is_friendly
@@ -601,8 +602,11 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
     if (modifiche.length > 0) {
         const operatore = identity.displayName;
 
-        // 1. Logica Audit
-        let qualifica = isAdmin ? "L'Admin" : (isManager ? "Il Club Manager" : (isOrganizer ? "L'Organizzatore" : "Il Giocatore"));
+        let qualifica: string = dictAudit.LABEL_QUALIFICA_GIOCATORE;
+        if (isAdmin) qualifica = dictAudit.LABEL_QUALIFICA_ADMIN;
+        else if (isManager) qualifica = dictAudit.LABEL_QUALIFICA_MANAGER;
+        else if (isOrganizer) qualifica = dictAudit.LABEL_QUALIFICA_ORGANIZER;
+
         const tipoPartita = oldMatch.is_friendly ? 'Amichevole' : 'Classificata';
         
         await logAction('MATCH_UPDATED', matchId, `[Match #${matchId.slice(0, 8)} - ${tipoPartita}] ${qualifica} ${operatore} ha modificato: ${modifiche.join('; ')}`, {
