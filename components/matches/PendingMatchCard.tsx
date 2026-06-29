@@ -24,8 +24,8 @@ export default function PendingMatchCard({
 
     const matchClub = clubs?.find(c => c.id === match.club_id);
 
-    // --- LOGICA LIVELLO E RANGE CONSENTITO ---
-        const activePlayerIds = [
+        // --- LOGICA LIVELLO E RANGE CONSENTITO ---
+    const activePlayerIds = [
         match.team_a_left_id, match.team_a_right_id,
         match.team_b_left_id, match.team_b_right_id
     ].filter((id): id is number => id !== null && id !== undefined);
@@ -36,6 +36,8 @@ export default function PendingMatchCard({
 
     let levelLabel = 'LIVELLO:';
     let levelText = 'DA DEFINIRE';
+    let minAllowed = 0;
+    let maxAllowed = 100;
 
     if (activeRankings.length > 0) {
         const minLvl = Math.min(...activeRankings);
@@ -48,8 +50,8 @@ export default function PendingMatchCard({
             levelText = minLvl === maxLvl ? `${minLvl.toFixed(2)}` : `${minLvl.toFixed(2)} - ${maxLvl.toFixed(2)}`;
         } else {
             levelLabel = 'RANGE CONSENTITO:';
-            const minAllowed = Math.max(0, maxLvl - 0.25);
-            const maxAllowed = minLvl + 0.25;
+            minAllowed = Math.max(0, maxLvl - 0.25);
+            maxAllowed = minLvl + 0.25;
             levelText = `${minAllowed.toFixed(2)} - ${maxAllowed.toFixed(2)}`;
         }
     }
@@ -75,9 +77,20 @@ export default function PendingMatchCard({
     const canPlayLeft = prefSide === 'Left' || prefSide === 'Both';
     const canPlayRight = prefSide === 'Right' || prefSide === 'Both';
 
-    const hasCompatibleFreeSlot =
+        const hasCompatibleFreeSlot =
         (canPlayLeft && (!match.team_a_left_id || !match.team_b_left_id)) ||
         (canPlayRight && (!match.team_a_right_id || !match.team_b_right_id));
+
+    const currentUserRanking = fullCurrentUser?.ranking;
+    const isRankingInAllowedRange =
+        currentUserRanking !== undefined &&
+        currentUserRanking >= minAllowed &&
+        currentUserRanking <= maxAllowed;
+
+    const canJoin =
+        !isMatchComplete &&
+        hasCompatibleFreeSlot &&
+        (activeRankings.length === 0 || isRankingInAllowedRange);
 
     // --- MACCHINA A STATI PER L'AZIONE DEL BOTTONE ---
     let primaryActionLabel = '';
@@ -89,14 +102,16 @@ export default function PendingMatchCard({
     } else if (isUserInMatch) {
         primaryActionLabel = 'LASCIA PARTITA';
         actionType = 'leave';
+    } else if (canJoin) {
+        primaryActionLabel = 'UNISCITI ORA';
+        actionType = 'join';
     } else if (!isMatchComplete) {
-        if (hasCompatibleFreeSlot) {
-            primaryActionLabel = 'UNISCITI ORA';
-            actionType = 'join';
-        } else {
+        if (!hasCompatibleFreeSlot) {
             primaryActionLabel = 'LATO INCOMPATIBILE';
-            actionType = 'view';
+        } else {
+            primaryActionLabel = 'RANKING FUORI RANGE';
         }
+        actionType = 'view';
     } else {
         primaryActionLabel = 'VEDI DETTAGLI';
         actionType = 'view';
