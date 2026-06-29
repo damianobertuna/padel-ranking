@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { deletePlayerByAdmin } from '@/actions/player-actions';
+import { t } from '@/lib/i18n';
 
 interface DeletePlayerButtonProps {
     playerId: number;
@@ -48,12 +49,12 @@ export default function DeletePlayerButton({ playerId, playerName }: DeletePlaye
             {showConfirmModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                     <div className="bg-white p-6 rounded-sm shadow-2xl max-w-sm w-full border-t-4 border-red-500 animate-in zoom-in-95 duration-200">
-                        <h3 className="text-lg font-black uppercase text-slate-900 tracking-tight mb-2">
-                            Eliminare Giocatore?
+                                                <h3 className="text-lg font-black uppercase text-slate-900 tracking-tight mb-2">
+                            {t('admin', 'PLAYER_DELETE_TITLE')}
                         </h3>
                         <p className="text-xs text-slate-600 mb-6 font-bold leading-relaxed uppercase tracking-wider">
-                            Sei sicuro di voler eliminare <span className="text-red-600">{playerName}</span>? <br/><br/>
-                            Questa azione è irreversibile. Il sistema bloccherà l'eliminazione se l'atleta ha già disputato match ufficiali.
+                            {t('admin', 'PLAYER_DELETE_BODY', { name: playerName })}<br/><br/>
+                            {t('admin', 'PLAYER_DELETE_IRREVERSIBLE')}
                         </p>
 
                         <div className="flex justify-end gap-3">

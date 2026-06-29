@@ -6,8 +6,7 @@ import InviteManagerModal from "@/components/admin/InviteManagerModal";
 import { updateManagerByAdmin, deleteManagerByAdmin } from '@/actions/manager-actions';
 import { SubmitButton } from '@/app/admin/players/SubmitButton';
 import DeleteManagerButton from './DeleteManagerButton';
-
-export const revalidate = 0;
+import { t } from '@/lib/i18n';
 
 export default async function AdminManagersPage() {
     const supabase = await createClient();
@@ -49,7 +48,7 @@ export default async function AdminManagersPage() {
                     <BackToHomeButton />
                     <div className="flex justify-between items-end mt-2">
                         <div>
-                            <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Gestione Gestori</h1>
+                            <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">{t('admin', 'PAGE_TITLE_MANAGERS')}</h1>
                             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Area Amministrativa Federale</p>
                         </div>
                         <InviteManagerModal clubs={allClubs || []} />

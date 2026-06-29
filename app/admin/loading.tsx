@@ -1,3 +1,5 @@
+import { t } from '@/lib/i18n';
+
 export default function AdminLoading() {
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
@@ -8,9 +10,8 @@ export default function AdminLoading() {
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
 
-                {/* Testo istituzionale */}
                 <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest">
-                    Caricamento dati federali...
+                    {t('admin', 'LOADING_TEXT')}
                 </p>
             </div>
         </div>

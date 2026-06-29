@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { inviteClubManager } from '@/actions/auth-actions';
+import { t } from '@/lib/i18n';
 
 interface Club {
     id: number;
@@ -65,7 +66,7 @@ export default function InviteManagerModal({ clubs }: { clubs: Club[] }) {
                 onClick={() => setIsOpen(true)}
                 className="bg-slate-900 text-white px-4 py-2 text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-colors rounded-sm flex items-center gap-2"
             >
-                <span>➕</span> INVITA GESTORE
+                <span>➕</span> {t('admin', 'BUTTON_INVITE_MANAGER')}
             </button>
 
             {/* Overlay Modale */}
@@ -73,7 +74,7 @@ export default function InviteManagerModal({ clubs }: { clubs: Club[] }) {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div className="bg-white w-full max-w-md p-6 rounded-sm shadow-xl">
                         <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-4">
-                            <h2 className="text-lg font-black text-slate-900 uppercase tracking-tighter">Nuovo Gestore</h2>
+                            <h2 className="text-lg font-black text-slate-900 uppercase tracking-tighter">{t('form', 'MANAGER_INVITE_TITLE')}</h2>
                             <button onClick={closeModal} className="text-slate-400 hover:text-slate-700 font-bold">✕</button>
                         </div>
 

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { deleteManagerByAdmin } from '@/actions/manager-actions';
+import { t } from '@/lib/i18n';
 
 interface DeleteManagerButtonProps {
     managerId: string;
@@ -46,12 +47,11 @@ export default function DeleteManagerButton({ managerId, managerName }: DeleteMa
             {showConfirmModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                     <div className="bg-white p-6 rounded-sm shadow-2xl max-w-sm w-full border-t-4 border-red-500 animate-in zoom-in-95 duration-200">
-                        <h3 className="text-lg font-black uppercase text-slate-900 tracking-tight mb-2">
-                            Eliminare Gestore?
+                                                <h3 className="text-lg font-black uppercase text-slate-900 tracking-tight mb-2">
+                            {t('admin', 'MANAGER_DELETE_TITLE')}
                         </h3>
                         <p className="text-xs text-slate-600 mb-6 font-bold leading-relaxed uppercase tracking-wider">
-                            Sei sicuro di voler eliminare <span className="text-red-600">{managerName}</span>?<br/><br/>
-                            Il suo ruolo di gestore verrà rimosso. Potrà comunque accedere all&apos;app come giocatore standard se già registrato.
+                            {t('admin', 'MANAGER_DELETE_BODY', { name: managerName })}
                         </p>
 
                         <div className="flex justify-end gap-3">

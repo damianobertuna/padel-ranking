@@ -35,7 +35,7 @@ const dictAdmin = {
   LOG_FILTER_SEARCH_LABEL: 'Cerca nei dettagli o admin',
   LOG_FILTER_TYPE_LABEL: 'Tipo di Azione',
 
-  LOADING_TEXT: 'Caricamento dati federali...',
+  LOADING_TEXT: 'Caricamento dati...',
 } as const;
 
 export default dictAdmin;

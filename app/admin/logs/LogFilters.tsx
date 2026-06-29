@@ -2,6 +2,7 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useTransition } from 'react';
+import { t } from '@/lib/i18n';
 
 export default function LogFilters() {
     const router = useRouter();
@@ -35,7 +36,7 @@ export default function LogFilters() {
             {/* RICERCA TESTUALE */}
             <div className="w-full md:w-1/2">
                 <label htmlFor="searchLog" className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">
-                    Cerca nei dettagli o admin
+                    {t('admin', 'LOG_FILTER_SEARCH_LABEL')}
                 </label>
                 <input
                     type="text"
@@ -50,7 +51,7 @@ export default function LogFilters() {
             {/* FILTRO TIPO AZIONE */}
             <div className="w-full md:w-1/3">
                 <label htmlFor="typeFilter" className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">
-                    Tipo di Azione
+                    {t('admin', 'LOG_FILTER_TYPE_LABEL')}
                 </label>
                 <select
                     id="typeFilter"
@@ -103,3 +104,4 @@ export default function LogFilters() {
         </div>
     );
 }
+
