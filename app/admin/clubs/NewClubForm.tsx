@@ -1,6 +1,7 @@
 'use client';
 import { useState, useTransition } from 'react';
 import { createClub } from '@/actions/club-actions';
+import { t } from '@/lib/i18n';
 
 export default function NewClubForm() {
     const [name, setName] = useState('');
@@ -30,9 +31,10 @@ export default function NewClubForm() {
                 <input type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder="CITTA'" className="p-2 border border-slate-300 bg-slate-50 text-xs font-bold text-slate-900 rounded-sm focus:border-slate-900 outline-none" />
             </div>
             <button type="submit" disabled={isPending || !name.trim()} className="bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest py-3 rounded-sm disabled:opacity-50">
-                {isPending ? 'SALVATAGGIO...' : 'AGGIUNGI CIRCOLO'}
+                {isPending ? t('form', 'CLUB_ADD_SAVING') : t('admin', 'CLUB_PAGE_ADD_SUBMIT')}
             </button>
             {error && <p className="text-[9px] font-black text-red-600 uppercase">{error}</p>}
         </form>
     );
 }
+

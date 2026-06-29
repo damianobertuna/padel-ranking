@@ -6,6 +6,8 @@ import { SubmitButton } from './SubmitButton';
 import BackToHomeButton from "@/components/ui/BackToHomeButton";
 import DeletePlayerButton from './DeletePlayerButton';
 
+import { t } from '@/lib/i18n';
+
 export const revalidate = 0;
 const PLAYERS_PER_PAGE = 10;
 
@@ -109,7 +111,7 @@ export default async function AdminPlayersManagement({ searchParams }: PageProps
             <div className="max-w-4xl w-full">
                 <div className="mb-8 mt-2 border-b-2 border-slate-900 pb-4">
                     <BackToHomeButton />
-                    <h1 className="text-3xl font-black text-slate-900 mt-2 uppercase tracking-tighter">Gestione Atleti</h1>
+                    <h1 className="text-3xl font-black text-slate-900 mt-2 uppercase tracking-tighter">{t('admin', 'PAGE_TITLE_PLAYERS')}</h1>
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Area Amministrativa Federale</p>
                 </div>
 
