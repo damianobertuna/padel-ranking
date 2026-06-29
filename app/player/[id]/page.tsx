@@ -5,6 +5,7 @@ import PartnersAndNemesisWidget from '@/components/stats/PartnersAndNemesisWidge
 import GameAverageWidget from '@/components/stats/GameAverageWidget';
 import EditAvatar from '@/app/profile/EditAvatar';
 import BackToHomeButton from "@/components/ui/BackToHomeButton";
+import dictAuth from '@/lib/i18n/dict-auth';
 import Link from 'next/link';
 
 export const revalidate = 0;
@@ -98,7 +99,7 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
                         <h1 className="text-3xl font-black uppercase tracking-tighter text-slate-900">{player.first_name} {player.last_name}</h1>
                         <div className="flex gap-2 mt-2 justify-center sm:justify-start">
                             <span className="bg-slate-900 text-white text-[10px] px-2 py-1 font-black uppercase tracking-wider">{player.preferred_side}</span>
-                            <span className="bg-slate-200 text-slate-800 text-[10px] px-2 py-1 font-black uppercase tracking-wider">{player.gender === 'F' ? 'FEMMINILE' : 'MASCHILE'}</span>
+                            <span className="bg-slate-200 text-slate-800 text-[10px] px-2 py-1 font-black uppercase tracking-wider">{player.gender === 'F' ? dictAuth.OPTION_GENDER_FEMALE : dictAuth.OPTION_GENDER_MALE}</span>
                         </div>
                     </div>
                     <div className="text-center bg-slate-900 text-white p-4 w-full sm:w-32 rounded-sm">
