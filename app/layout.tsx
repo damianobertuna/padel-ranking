@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import Script from 'next/script';
+import dictAuth from '@/lib/i18n/dict-auth';
 import '@/app/globals.css';
 
 export default async function RootLayout({
@@ -59,9 +60,9 @@ export default async function RootLayout({
                             <span className="hidden sm:inline font-bold text-white text-xs truncate max-w-[120px]">
                   {currentUserPlayer?.first_name || currentUserManager?.first_name} {currentUserPlayer?.last_name || currentUserManager?.last_name}
           </span>
-                            {/* TESTO "PROFILO" per Mobile */}
+                                                        {/* TESTO "PROFILO" per Mobile */}
                             <span className="sm:hidden font-bold text-white text-[10px] uppercase tracking-widest">
-                  Profilo
+                  {dictAuth.PROFILE_TITLE}
           </span>
 
                         {/* ICONA INGRANAGGIO (appare all'hover su desktop, fissa su mobile) */}
