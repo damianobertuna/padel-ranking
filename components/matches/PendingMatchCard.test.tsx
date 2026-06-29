@@ -30,7 +30,7 @@ vi.mock('@/components/matches/ResolveMatchButton', () => ({
 }));
 
 // 2. DATI DI TEST FINTI E UTENTI MOCK
-const baseUser = { id: 10, user_id: 'user-123', first_name: 'Base', last_name: 'User', role: 'user', preferred_side: 'Both', ranking: 3.0 } as Player;
+const baseUser = { id: 10, user_id: 'user-123', first_name: 'Base', last_name: 'User', role: 'user', preferred_side: 'Both', ranking: 4.0 } as Player;
 const adminUser = { id: 99, user_id: 'admin-123', first_name: 'Admin', last_name: 'Super', role: 'admin', preferred_side: 'Both', ranking: 4.0 } as Player;
 const organizerUser = { id: 1, user_id: 'mario-123', first_name: 'Mario', last_name: 'Rossi', role: 'user', preferred_side: 'Both', ranking: 4.0 } as Player;
 const leftSideUser = { id: 11, user_id: 'lefty', first_name: 'Left', last_name: 'Player', role: 'user', preferred_side: 'Left', ranking: 3.5 } as Player;
