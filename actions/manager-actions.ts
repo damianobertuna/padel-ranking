@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { logAction } from '@/lib/audit';
+import dictAudit from '@/lib/i18n/dict-audit';
 
 export async function updateManagerProfile(formData: FormData) {
     const supabase = await createClient();
@@ -41,7 +42,7 @@ export async function updateManagerProfile(formData: FormData) {
     await logAction(
         'UPDATE_MANAGER_PROFILE',
         user.id,
-        `Il Club Manager ${firstName} ${lastName} ha aggiornato il proprio nome.`
+        `${dictAudit.LOG_MANAGER_UPDATE_OWN.replace('{name}', `${firstName} ${lastName}`)}`
     );
 
     revalidatePath('/profile');
@@ -112,7 +113,9 @@ export async function updateManagerByAdmin(formData: FormData) {
     await logAction(
         'UPDATE_MANAGER',
         managerId,
-        `Admin ${adminName} ha modificato il gestore ${targetName}${modifiche.length > 0 ? ': ' + modifiche.join('; ') : '.'}`,
+        modifiche.length > 0
+            ? `${dictAudit.LOG_ADMIN_UPDATE_MANAGER.replace('{admin}', adminName).replace('{target}', targetName).replace('{changes}', modifiche.join('; '))}`
+            : `${dictAudit.LOG_ADMIN_UPDATE_MANAGER_SIMPLE.replace('{admin}', adminName).replace('{target}', targetName)}`,
         { changes: { first_name: firstName, last_name: lastName, club_id: clubId }, previous_data: oldManager }
     );
 
@@ -171,7 +174,7 @@ export async function deleteManagerByAdmin(managerId: string) {
     await logAction(
         'DELETE_MANAGER',
         managerId,
-        `Admin ${adminName} ha eliminato il gestore ${targetName}.`
+        `${dictAudit.LOG_ADMIN_DELETE_MANAGER.replace('{admin}', adminName).replace('{target}', targetName)}`
     );
 
     revalidatePath('/admin/managers');
