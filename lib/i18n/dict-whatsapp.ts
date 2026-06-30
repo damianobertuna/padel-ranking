@@ -16,6 +16,20 @@ const dictWhatsapp = {
   SLOT_FREE: 'Slot Libero',
   COURT_INDOOR: 'Coperto',
   COURT_OUTDOOR: 'Scoperto',
+
+  // --- Finished match result sharing ---
+  BUTTON_SHARE_RESULT: '📊 CONDIVIDI RISULTATO',
+  MESSAGE_RESULT_TITLE: '*RanKING Padel - Risultato Match*',
+  LABEL_WINNER_TEAM_A: '*🏆 SQUADRA A VINCENTE 🏆*',
+  LABEL_WINNER_TEAM_B: '*🏆 SQUADRA B VINCENTE 🏆*',
+  LABEL_TEAM_A_LOST: 'SQUADRA A',
+  LABEL_TEAM_B_LOST: 'SQUADRA B',
+  LABEL_RESULT_SCORE: '*Punteggio:*',
+  LABEL_MATCH_TYPE: '*Tipo:*',
+  MATCH_TYPE_RANKED: '🔥 Classificata',
+  MATCH_TYPE_FRIENDLY: '🤝 Amichevole',
+  LABEL_RESULT_INFO: '*Dettaglio completo su:*',
 } as const;
 
 export default dictWhatsapp;
+

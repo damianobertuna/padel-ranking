@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import PendingMatchCard from '@/components/matches/PendingMatchCard';
 import SearchBar from '@/components/ui/SearchBar';
-import { Player } from "@/types";
+import { Player, Club } from "@/types";
 import { computeKingAndFanalino } from '@/lib/rankingCalc';
 import ClubSelectFilter from '@/components/clubs/ClubSelectFilter';
 import { Hand } from 'lucide-react';
@@ -29,6 +29,54 @@ function getPlayerNameWithRanking(id: number | null, playersList: Player[]) {
     if (id === null) return 'Slot Libero';
     const p = playersList?.find(player => player.id === id);
     return p ? `${p.first_name} ${p.last_name} (${p.ranking.toFixed(2)})` : 'Sconosciuto';
+}
+
+function getPlayerFullName(id: number | null, playersList: Player[]) {
+    if (id === null) return 'Slot Libero';
+    const p = playersList?.find(player => player.id === id);
+    return p ? `${p.first_name} ${p.last_name}` : 'Sconosciuto';
+}
+
+function generateWhatsAppResultLink(
+    match: any,
+    playersList: Player[],
+    clubsList: Club[],
+    winner: string | null
+): string {
+    const matchClub = clubsList.find(c => c.id === match.club_id);
+    const dateStr = new Date(match.match_date || match.updated_at).toLocaleString('it-IT', {
+        weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome'
+    });
+
+    const pA1 = getPlayerFullName(match.team_a_left_id, playersList);
+    const pA2 = getPlayerFullName(match.team_a_right_id, playersList);
+    const pB1 = getPlayerFullName(match.team_b_left_id, playersList);
+    const pB2 = getPlayerFullName(match.team_b_right_id, playersList);
+
+    const sets = (match.score || []) as Array<{team_a: number, team_b: number}>;
+    const scoreStr = sets.map(s => `${s.team_a}-${s.team_b}`).join(' / ');
+
+    const tipo = match.is_friendly ? '🤝 Amichevole' : '🔥 Classificata';
+    const clubText = matchClub ? `${matchClub.name}${matchClub.city ? ` (${matchClub.city})` : ''}` : '';
+
+    const teamALabel = winner === 'A' ? '*🏆 SQUADRA A VINCENTE 🏆*' : 'SQUADRA A';
+    const teamBLabel = winner === 'B' ? '*🏆 SQUADRA B VINCENTE 🏆*' : 'SQUADRA B';
+
+    const testo = `🎾 *RanKING Padel - Risultato Match* 🎾\n\n` +
+        `📅 *Data:* ${dateStr}\n` +
+        (clubText ? `📍 *Campo:* ${clubText}\n` : '') +
+        `📊 *Tipo:* ${tipo}\n\n` +
+        `*${teamALabel}*\n` +
+        `• ${pA1}\n` +
+        `• ${pA2}\n\n` +
+        `*${teamBLabel}*\n` +
+        `• ${pB1}\n` +
+        `• ${pB2}\n\n` +
+        `*Punteggio:* ${scoreStr}\n\n` +
+        `*Dettaglio completo su:*\n` +
+        `🔗 https://ranking-padel.vercel.app/match/${match.id}/join`;
+
+    return `https://wa.me/?text=${encodeURIComponent(testo)}`;
 }
 
 export default async function Home({ searchParams }: PageProps) {
@@ -553,7 +601,7 @@ export default async function Home({ searchParams }: PageProps) {
                                                 </div>
                                             </div>
 
-                                            <div className={`flex-1 w-full sm:w-auto p-4 flex flex-col justify-center sm:text-right ${winner === 'B' ? 'bg-emerald-50/50' : ''}`}>
+                                                                                        <div className={`flex-1 w-full sm:w-auto p-4 flex flex-col justify-center sm:text-right ${winner === 'B' ? 'bg-emerald-50/50' : ''}`}>
                                                 <div className="flex items-center sm:justify-end gap-2 mb-1.5">
                                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">TEAM B</span>
                                                     {winner === 'B' && <span className="bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-sm uppercase tracking-wider">WINNER</span>}
@@ -561,6 +609,17 @@ export default async function Home({ searchParams }: PageProps) {
                                                 <div className="text-sm font-black text-slate-900 uppercase">{getPlayerNameWithRanking(match.team_b_left_id, playersWithStats)}</div>
                                                 <div className="text-sm font-black text-slate-900 uppercase">{getPlayerNameWithRanking(match.team_b_right_id, playersWithStats)}</div>
                                             </div>
+                                        </div>
+
+                                        <div className="border-t border-slate-100 px-4 py-2 flex justify-center">
+                                            <a
+                                                href={generateWhatsAppResultLink(match, playersWithStats, clubsList, winner)}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-black py-2 px-4 rounded-sm text-[9px] uppercase tracking-wider transition-colors [-webkit-tap-highlight-color:transparent] active:scale-[0.98]"
+                                            >
+                                                📊 CONDIVIDI RISULTATO
+                                            </a>
                                         </div>
                                     </div>
                                 );
