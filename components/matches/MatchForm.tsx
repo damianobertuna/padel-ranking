@@ -186,6 +186,7 @@ export default function MatchForm({ title, submitLabel, players, clubs, initialD
 
     const isLeftAllowed = (p: Player, partner: Player | undefined) => {
         if (!satisfiesGender(p)) return false;
+        if (isFriendly) return true; // In friendly matches, bypass side restrictions
         if (p.preferred_side === 'Left' || p.preferred_side === 'Both') return true;
         if (partner?.preferred_side === 'Both') return true;
         return false;
@@ -193,6 +194,7 @@ export default function MatchForm({ title, submitLabel, players, clubs, initialD
 
     const isRightAllowed = (p: Player, partner: Player | undefined) => {
         if (!satisfiesGender(p)) return false;
+        if (isFriendly) return true; // In friendly matches, bypass side restrictions
         if (p.preferred_side === 'Right' || p.preferred_side === 'Both') return true;
         if (partner?.preferred_side === 'Both') return true;
         return false;

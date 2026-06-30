@@ -111,7 +111,7 @@ describe('MatchForm Component (Unificato)', () => {
         expect(screen.getByRole('button', { name: 'Crea' }).hasAttribute('disabled')).toBe(true);
     });
 
-    it('NON dovrebbe bloccare il form per divario tecnico se impostato su AMICHEVOLE', () => {
+        it('NON dovrebbe bloccare il form per divario tecnico se impostato su AMICHEVOLE', () => {
         render(<MatchForm title="Nuova Partita" submitLabel="Crea" players={mockPlayers} clubs={mockClubs} onSubmit={mockOnSubmit} />);
 
         // Attiviamo la modalità Amichevole
@@ -131,5 +131,100 @@ describe('MatchForm Component (Unificato)', () => {
         // L'errore non deve apparire e il bottone deve rimanere abilitato
         expect(screen.queryByText(/ERRORE: DIVARIO TECNICO > 0.25/i)).toBeNull();
         expect(screen.getByRole('button', { name: 'Crea' }).hasAttribute('disabled')).toBe(false);
+    });
+
+    it('in modalità AMICHEVOLE, dovrebbe mostrare un giocatore SX anche nel dropdown DX', () => {
+        render(<MatchForm title="Nuova Partita" submitLabel="Crea" players={mockPlayers} clubs={mockClubs} onSubmit={mockOnSubmit} />);
+
+        // Attiviamo amichevole
+        fireEvent.click(screen.getByText('🤝 Amichevole'));
+
+        // Apriamo il dropdown DX del Team A
+        const slotsDX = screen.getAllByText('GIOCATORE DX');
+        fireEvent.click(slotsDX[0]);
+
+        // Mario Rossi (Left) deve apparire nel menu DX
+        expect(screen.getByText(/Rossi Mario/i)).toBeDefined();
+    });
+
+    it('in modalità AMICHEVOLE, dovrebbe mostrare un giocatore DX anche nel dropdown SX', () => {
+        render(<MatchForm title="Nuova Partita" submitLabel="Crea" players={mockPlayers} clubs={mockClubs} onSubmit={mockOnSubmit} />);
+
+        // Attiviamo amichevole
+        fireEvent.click(screen.getByText('🤝 Amichevole'));
+
+        // Apriamo il dropdown SX del Team A
+        const slotsSX = screen.getAllByText('GIOCATORE SX');
+        fireEvent.click(slotsSX[0]);
+
+        // Luigi Verdi (Right) deve apparire nel menu SX
+        expect(screen.getByText(/Verdi Luigi/i)).toBeDefined();
+    });
+
+    it('in modalità CLASSIFICATA, dovrebbe nascondere un giocatore SX dal dropdown DX', () => {
+        render(<MatchForm title="Nuova Partita" submitLabel="Crea" players={mockPlayers} clubs={mockClubs} onSubmit={mockOnSubmit} />);
+
+        // Modalità classificata è il default
+        const slotsDX = screen.getAllByText('GIOCATORE DX');
+        fireEvent.click(slotsDX[0]);
+
+        // Mario Rossi (Left) NON deve apparire nel menu DX
+        expect(screen.queryByText(/Rossi Mario/i)).toBeNull();
+    });
+
+        it('in modalità CLASSIFICATA, dovrebbe nascondere un giocatore DX dal dropdown SX', () => {
+        render(<MatchForm title="Nuova Partita" submitLabel="Crea" players={mockPlayers} clubs={mockClubs} onSubmit={mockOnSubmit} />);
+
+        // Modalità classificata è il default
+        const slotsSX = screen.getAllByText('GIOCATORE SX');
+        fireEvent.click(slotsSX[0]);
+
+        // Luigi Verdi (Right) NON deve apparire nel menu SX
+        expect(screen.queryByText(/Verdi Luigi/i)).toBeNull();
+    });
+
+    it('in modalità CLASSIFICATA, un giocatore MIX (Both) dovrebbe apparire sia nel dropdown SX che DX', () => {
+        render(<MatchForm title="Nuova Partita" submitLabel="Crea" players={mockPlayers} clubs={mockClubs} onSubmit={mockOnSubmit} />);
+
+        // Apri SX dropdown: Both deve essere visibile
+        const slotsSX = screen.getAllByText('GIOCATORE SX');
+        fireEvent.click(slotsSX[0]);
+        expect(screen.getByText(/Franco Pippo/i)).toBeDefined();
+
+        // Chiudi e apri DX dropdown: Both deve essere visibile
+        fireEvent.click(slotsSX[0]); // chiude
+        const slotsDX = screen.getAllByText('GIOCATORE DX');
+        fireEvent.click(slotsDX[0]);
+        expect(screen.getByText(/Franco Pippo/i)).toBeDefined();
+    });
+
+    it('in modalità CLASSIFICATA, un giocatore DX (Right) dovrebbe apparire nel dropdown SX se il partner è MIX (Both)', () => {
+        render(<MatchForm title="Nuova Partita" submitLabel="Crea" players={mockPlayers} clubs={mockClubs} onSubmit={mockOnSubmit} />);
+
+        const slotsSX = screen.getAllByText('GIOCATORE SX');
+
+        // Prima selezioniamo Pippo Franco (Both) nel DX dello stesso team
+        const slotsDX = screen.getAllByText('GIOCATORE DX');
+        fireEvent.click(slotsDX[0]);
+        fireEvent.click(screen.getByText(/Franco Pippo/i));
+
+        // Ora apriamo SX dello stesso team: Luigi Verdi (Right) deve apparire perché il partner è Both
+        fireEvent.click(slotsSX[0]);
+        expect(screen.getByText(/Verdi Luigi/i)).toBeDefined();
+    });
+
+    it('in modalità CLASSIFICATA, un giocatore SX (Left) dovrebbe apparire nel dropdown DX se il partner è MIX (Both)', () => {
+        render(<MatchForm title="Nuova Partita" submitLabel="Crea" players={mockPlayers} clubs={mockClubs} onSubmit={mockOnSubmit} />);
+
+        const slotsSX = screen.getAllByText('GIOCATORE SX');
+        const slotsDX = screen.getAllByText('GIOCATORE DX');
+
+        // Prima selezioniamo Pippo Franco (Both) nel SX dello stesso team
+        fireEvent.click(slotsSX[0]);
+        fireEvent.click(screen.getByText(/Franco Pippo/i));
+
+        // Ora apriamo DX dello stesso team: Mario Rossi (Left) deve apparire perché il partner è Both
+        fireEvent.click(slotsDX[0]);
+        expect(screen.getByText(/Rossi Mario/i)).toBeDefined();
     });
 });
