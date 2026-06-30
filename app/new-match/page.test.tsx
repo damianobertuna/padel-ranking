@@ -102,6 +102,36 @@ describe('CreateMatchForm Component (Page Integration)', () => {
         expect(screen.getByText(/ERRORE: DIVARIO TECNICO > 0.25/i)).toBeDefined();
     });
 
+    it('in modalità AMICHEVOLE, un giocatore SX dovrebbe apparire anche nel dropdown DX', async () => {
+        render(<CreateMatchPage />);
+        await screen.findByText('Nuova Partita');
+
+        // Passa ad amichevole
+        fireEvent.click(screen.getByText('🤝 Amichevole'));
+
+        // Apri dropdown DX del Team A
+        const slotsDX = screen.getAllByText('GIOCATORE DX');
+        fireEvent.click(slotsDX[0]);
+
+        // Mario Rossi (Left) deve essere visibile
+        expect(screen.getByText(/Rossi Mario/i)).toBeDefined();
+    });
+
+    it('in modalità AMICHEVOLE, un giocatore DX dovrebbe apparire anche nel dropdown SX', async () => {
+        render(<CreateMatchPage />);
+        await screen.findByText('Nuova Partita');
+
+        // Passa ad amichevole
+        fireEvent.click(screen.getByText('🤝 Amichevole'));
+
+        // Apri dropdown SX del Team A
+        const slotsSX = screen.getAllByText('GIOCATORE SX');
+        fireEvent.click(slotsSX[0]);
+
+        // Luigi Verdi (Right) deve essere visibile
+        expect(screen.getByText(/Verdi Luigi/i)).toBeDefined();
+    });
+
     it('dovrebbe inviare i dati corretti alla Server Action', async () => {
         render(<CreateMatchPage />);
         await screen.findByText('Nuova Partita');
