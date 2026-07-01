@@ -4,6 +4,7 @@ import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { logAction } from "@/lib/audit";
 import { computeKingAndFanalino } from "@/lib/rankingCalc";
+import { sendWhatsAppNotification } from '@/lib/whatsapp';
 
 // Interfaccia per la struttura del set
 export interface SetScore {
@@ -314,7 +315,7 @@ export async function resolveMatchWithRanking(data: {
     try {
         console.log("🚀 Server Action avviata per Risoluzione Match ID:", data.matchId);
 
-                // 1. Controllo Autenticazione ed Identità
+        // 1. Controllo Autenticazione ed Identità
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("Utente non autenticato");
 
@@ -340,7 +341,7 @@ export async function resolveMatchWithRanking(data: {
         }
         // ----------------------------------------
 
-                // 3. Validazione Score e Calcolo Vincitore
+        // 3. Validazione Score e Calcolo Vincitore
         const { finalWinningTeam, stringaPunteggio } = await evaluateMatchScore(data.score);
 
         // 4. Recupero e strutturazione Atleti
@@ -431,6 +432,25 @@ export async function resolveMatchWithRanking(data: {
         if (logError) console.error("❌ ERRORE SCRITTURA LOG RISOLUZIONE MATCH:", logError.message);
 
         console.log("✅ Server Action completata con successo!");
+
+        try {
+            // Prepariamo un messaggio formattato con emoji in base all'esito
+            const tipoPartitaText = match.is_friendly ? "🤝 AMICHEVOLE" : "🔥 MATCH CLASSIFICATO";
+            const whatsappMessage = `🎾 *RISULTATO REGISTRATO* 🎾\n\n` +
+                                  `🏆 *${esitoDescrizione}*\n` +
+                                  `📊 *Set:* ${stringaPunteggio}\n` +
+                                  `⚙️ *Tipo:* ${tipoPartitaText}\n\n` +
+                                  (match.is_friendly ? `Nessuna variazione di ranking.` : `📈 *Variazioni Elo:*\n${rankingLogText}`) +
+                                  `\n\nControlla le classifiche aggiornate nell'app! 🏆` +
+                                  `🔗 https://padel-ranking-plum.vercel.app/match/${data.matchId.slice(0, 8)}/join`;;
+            
+            // Invia in modo asincrono (non blocchiamo l'UI se il bot ci mette qualche decimo di secondo a rispondere)
+            sendWhatsAppNotification(whatsappMessage).then(res => {
+                if(!res.success) console.warn("Notifica WhatsApp fallita:", res.error);
+            });
+        } catch (waError) {
+             console.error("Errore try-catch notifica WhatsApp:", waError);
+        }
 
         // 9. Pulizia Cache
         revalidatePath('/');
@@ -558,24 +578,76 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
         }
     });
 
-        if (modifiche.length > 0) {
+    if (modifiche.length > 0) {
         const operatore = identity.displayName;
 
-        let qualifica = "Il Giocatore";
-        if (isAdmin) qualifica = "L'Admin";
-        else if (isManager) qualifica = "Il Club Manager";
-        else if (isOrganizer) qualifica = "L'Organizzatore";
-
+        // 1. Logica Audit
+        let qualifica = isAdmin ? "L'Admin" : (isManager ? "Il Club Manager" : (isOrganizer ? "L'Organizzatore" : "Il Giocatore"));
         const tipoPartita = oldMatch.is_friendly ? 'Amichevole' : 'Classificata';
-        await logAction(
-            'MATCH_UPDATED',
-            matchId,
-            `[Match #${matchId.slice(0, 8)} - ${tipoPartita}] ${qualifica} ${operatore} ha modificato il match: ${modifiche.join('; ')}`,
-            {
-                previous_data: oldMatch,
-                new_data: updatedFields
-            }
-        );
+        
+        await logAction('MATCH_UPDATED', matchId, `[Match #${matchId.slice(0, 8)} - ${tipoPartita}] ${qualifica} ${operatore} ha modificato: ${modifiche.join('; ')}`, {
+            previous_data: oldMatch,
+            new_data: updatedFields
+        });
+
+        // 2. Notifica WhatsApp
+        try {
+            // 1. Recupero dati completi con JOIN per evitare gli "undefined"
+            const { data: matchData, error: fetchError } = await supabase
+                .from('matches')
+                .select(`
+                    *,
+                    club:clubs(name),
+                    p_a_sx:players!team_a_left_id(first_name, last_name, ranking),
+                    p_a_dx:players!team_a_right_id(first_name, last_name, ranking),
+                    p_b_sx:players!team_b_left_id(first_name, last_name, ranking),
+                    p_b_dx:players!team_b_right_id(first_name, last_name, ranking)
+                `)
+                .eq('id', matchId)
+                .single();
+
+            if (fetchError || !matchData) throw new Error("Errore recupero dati per notifica");
+
+            // Helper per formattare giocatore e link mappe
+            const formatP = (p: any) => p ? `${p.first_name} ${p.last_name} (${p.ranking?.toFixed(2) ?? '-'})` : 'Da definire (-)';
+            const clubName = matchData.club?.name || "Campo non specificato";
+            const d = new Date(matchData.match_date);
+
+            // Mappatura leggibile per il dettaglio modifiche
+            const labelMap: Record<string, string> = {
+                'team_a_left_id': 'Squadra A [SX]', 'team_a_right_id': 'Squadra A [DX]',
+                'team_b_left_id': 'Squadra B [SX]', 'team_b_right_id': 'Squadra B [DX]',
+                'match_date': 'Data/Ora', 'club_id': 'Campo', 'is_friendly': 'Regolamento'
+            };
+
+            const humanReadableModifiche = modifiche.map(m => {
+                const [key, val] = m.split(': ');
+                return `• ${labelMap[key] || key}: ${val}`;
+            }).join('\n');
+
+            const whatsappMessage = 
+                `🎾 *RanKING Padel - Aggiornamento Match* 🎾\n\n` +
+                `⚠️ *Match #${matchId.slice(0, 8)} modificato da ${operatore}*\n\n` +
+                `*📝 Dettaglio modifiche:*\n${humanReadableModifiche}\n\n` +
+                `📅 Data: ${d.toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short' })}, ${d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}\n` +
+                `📍 Campo: ${clubName}\n` +
+                `🏟️ Campo: ${matchData.court_type === 'indoor' ? 'Coperto 🌧️' : 'Scoperto ☀️'}\n` +
+                `🗺️ Posizione: https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(clubName)}\n` +
+                `📊 Livello: ${matchData.min_level ?? '-'} - ${matchData.max_level ?? '-'}\n\n` +
+                `👥 *SQUADRA A:*\n` +
+                `* [SX] ${formatP(matchData.p_a_sx)}\n` +
+                `* [DX] ${formatP(matchData.p_a_dx)}\n\n` +
+                `👥 *SQUADRA B:*\n` +
+                `* [SX] ${formatP(matchData.p_b_sx)}\n` +
+                `* [DX] ${formatP(matchData.p_b_dx)}\n\n` +
+                `👉 *Tutte le info qui:*\n🔗 https://padel-ranking-plum.vercel.app/match/${matchId}/join`;
+
+            sendWhatsAppNotification(whatsappMessage).then(res => {
+                if (!res.success) console.warn("Notifica WhatsApp fallita:", res.error);
+            });
+        } catch (waError) {
+            console.error("Errore notifica WhatsApp:", waError);
+        }
     }
 
     revalidatePath('/');
