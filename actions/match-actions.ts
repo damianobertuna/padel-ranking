@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { logAction } from "@/lib/audit";
 import { computeKingAndFanalino } from "@/lib/rankingCalc";
 import { sendWhatsAppNotification } from '@/lib/whatsapp';
-import { buildResultMessage, buildUpdateMessage } from '@/lib/whatsapp-messages';
+import { buildResultMessage, buildUpdateMessage, PlayerBrief } from '@/lib/whatsapp-messages';
 
 // Interfaccia per la struttura del set
 export interface SetScore {
@@ -531,18 +531,39 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
 
     const modifiche: string[] = [];
 
-    if (updatedFields.match_type !== undefined && updatedFields.match_type !== oldMatch.match_type) {
-        modifiche.push(`Tipo match: da ${oldMatch.match_type} a ${updatedFields.match_type}`);
+        if (updatedFields.match_type !== undefined && updatedFields.match_type !== oldMatch.match_type) {
+        const label = (t: string) => t === 'male' ? 'Maschile' : t === 'female' ? 'Femminile' : t === 'mixed' ? 'Misto' : t;
+        modifiche.push(`Tipo match: da ${label(oldMatch.match_type)} a ${label(updatedFields.match_type)}`);
     }
 
-    if (updatedFields.club_id !== undefined && updatedFields.club_id !== oldMatch.club_id) {
-        const oldClubText = oldMatch.club_id ? `Club #${oldMatch.club_id}` : 'Nessuno';
-        const newClubText = updatedFields.club_id ? `Club #${updatedFields.club_id}` : 'Nessuno';
-        modifiche.push(`Campo: da ${oldClubText} a ${newClubText}`);
+        if (updatedFields.club_id !== undefined && updatedFields.club_id !== oldMatch.club_id) {
+        // Resolve club names
+        const clubIds = [oldMatch.club_id, updatedFields.club_id].filter((id): id is number => id !== null);
+        let clubNames: Record<number, string> = {};
+        if (clubIds.length > 0) {
+            const { data: clubs } = await supabase.from('clubs').select('id, name').in('id', clubIds);
+            if (clubs) clubs.forEach(c => { clubNames[c.id] = c.name; });
+        }
+        const name = (id: number | null) => id === null ? 'Nessuno' : clubNames[id] || `Club #${id}`;
+        modifiche.push(`Campo: da ${name(oldMatch.club_id)} a ${name(updatedFields.club_id)}`);
     }
 
     if (updatedFields.is_friendly !== undefined && updatedFields.is_friendly !== oldMatch.is_friendly) {
         modifiche.push(`Regolamento: da ${oldMatch.is_friendly ? 'Amichevole' : 'Classificata'} a ${updatedFields.is_friendly ? 'Amichevole' : 'Classificata'}`);
+    }
+
+    if (updatedFields.court_type !== undefined && updatedFields.court_type !== oldMatch.court_type) {
+        const oldCourt = oldMatch.court_type === 'indoor' ? 'Coperto' : oldMatch.court_type === 'outdoor' ? 'Scoperto' : 'Non specificato';
+        const newCourt = updatedFields.court_type === 'indoor' ? 'Coperto' : 'Scoperto';
+        modifiche.push(`Tipo campo: da ${oldCourt} a ${newCourt}`);
+    }
+
+    if (updatedFields.match_date !== undefined) {
+        const normalize = (d: string | null) => d ? new Date(d).getTime() : null;
+        if (normalize(updatedFields.match_date) !== normalize(oldMatch.match_date)) {
+            const fmt = (d: string | null) => d ? new Date(d).toLocaleString('it-IT', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Non specificata';
+            modifiche.push(`Data/Ora: da ${fmt(oldMatch.match_date)} a ${fmt(updatedFields.match_date)}`);
+        }
     }
 
     const slotKeys = ['team_a_left_id', 'team_a_right_id', 'team_b_left_id', 'team_b_right_id'] as const;
@@ -589,30 +610,41 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
             new_data: updatedFields
         });
 
-        // 2. Notifica WhatsApp
+                // 2. Notifica WhatsApp
         try {
             const { data: matchData, error: fetchError } = await supabase
                 .from('matches')
                 .select(`
                     *,
-                    club:clubs(name, city),
-                    p_a_sx:players!team_a_left_id(first_name, last_name, ranking),
-                    p_a_dx:players!team_a_right_id(first_name, last_name, ranking),
-                    p_b_sx:players!team_b_left_id(first_name, last_name, ranking),
-                    p_b_dx:players!team_b_right_id(first_name, last_name, ranking)
+                    club:clubs(name, city)
                 `)
                 .eq('id', matchId)
                 .single();
 
             if (fetchError || !matchData) throw new Error("Errore recupero dati per notifica");
 
-            const players = [matchData.p_a_sx, matchData.p_a_dx, matchData.p_b_sx, matchData.p_b_dx]
-                .filter((p): p is NonNullable<typeof p> => p !== null);
+            // Fetch players explicitly by ID — avoids unreliable Supabase self-join syntax
+            const playerIdsInMatch = [
+                matchData.team_a_left_id,
+                matchData.team_a_right_id,
+                matchData.team_b_left_id,
+                matchData.team_b_right_id
+            ].filter((id): id is number => id !== null);
+
+            let players: PlayerBrief[] = [];
+            if (playerIdsInMatch.length > 0) {
+                const { data: fetchedPlayers } = await supabase
+                    .from('players')
+                    .select('id, first_name, last_name, ranking, preferred_side')
+                    .in('id', playerIdsInMatch);
+                if (fetchedPlayers) players = fetchedPlayers;
+            }
 
             const labelMap: Record<string, string> = {
                 team_a_left_id: 'Squadra A [SX]', team_a_right_id: 'Squadra A [DX]',
                 team_b_left_id: 'Squadra B [SX]', team_b_right_id: 'Squadra B [DX]',
-                match_date: 'Data/Ora', club_id: 'Campo', is_friendly: 'Regolamento'
+                match_date: 'Data/Ora', club_id: 'Campo', is_friendly: 'Regolamento',
+                court_type: 'Tipo campo', match_type: 'Tipo match'
             };
 
             const humanReadableChanges = modifiche.map(m => {
