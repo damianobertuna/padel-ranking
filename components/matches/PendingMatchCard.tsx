@@ -7,6 +7,7 @@ import ResolveMatchButton from '@/components/matches/ResolveMatchButton';
 import { useRouter } from "next/navigation";
 import { Match, PendingMatchCardProps, Club } from '@/types';
 import { leaveMatchAction, joinMatchAction } from '@/actions/match-actions';
+import { buildSummonMessage } from '@/lib/whatsapp-messages';
 
 export default function PendingMatchCard({
                                              match,
@@ -118,66 +119,11 @@ export default function PendingMatchCard({
     }
     // ---------------------------------------------
 
-    const generaLinkWhatsAppLocal = (m: Match) => {
-        const getPlayerObj = (id: number | null) => rawPlayers.find(player => player.id === id) || null;
-
-        const pA1 = getPlayerObj(m.team_a_left_id);
-        const pA2 = getPlayerObj(m.team_a_right_id);
-        const pB1 = getPlayerObj(m.team_b_left_id);
-        const pB2 = getPlayerObj(m.team_b_right_id);
-
-        let labelA1 = "[SX]";
-        let labelA2 = "[DX]";
-
-        if (pA1 && !pA2) {
-            labelA2 = pA1.preferred_side === 'Both' ? "[SX/DX]" : "[DX]";
-        } else if (!pA1 && pA2) {
-            labelA1 = pA2.preferred_side === 'Both' ? "[SX/DX]" : "[SX]";
-        }
-
-        let labelB1 = "[SX]";
-        let labelB2 = "[DX]";
-
-        if (pB1 && !pB2) {
-            labelB2 = pB1.preferred_side === 'Both' ? "[SX/DX]" : "[DX]";
-        } else if (!pB1 && pB2) {
-            labelB1 = pB2.preferred_side === 'Both' ? "[SX/DX]" : "[SX]";
-        }
-
-        const dataFormattata = new Date(m.match_date || m.created_at).toLocaleString('it-IT', {
-            weekday: 'short',
-            day: '2-digit',
-            month: 'short',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-
-        const clubText = matchClub ? `${matchClub.name}${matchClub.city ? ` (${matchClub.city})` : ''}` : 'Da definire';
-
-        const mapsUrl = matchClub
-            ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(matchClub.name + ' ' + (matchClub.city || ''))}`
-            : null;
-
-        const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-        const matchLink = `${baseUrl}/match/${m.id}/join`;
-
-                const testo = `🎾 *RanKING Padel - Convocazione Match* 🎾\n\n` +
-            `📅 *Data:* ${dataFormattata}\n` +
-            `📍 *Campo:* ${clubText}\n` +
-            `🏟️ *Campo:* ${m.court_type === 'indoor' ? 'Coperto 🌧️' : 'Scoperto ☀️'}\n` +
-            (mapsUrl ? `🗺️ *Posizione:* ${mapsUrl}\n` : '') +
-            `📊 *Livello Attuale:* ${levelText}\n\n` +
-            `👥 *SQUADRA A:*\n` +
-            `• ${pA1 ? '[SX]' : labelA1} ${pA1 ? `${pA1.first_name} ${pA1.last_name}` : 'Slot Libero'} (${pA1 ? pA1.ranking.toFixed(2) : '0.00'})\n` +
-            `• ${pA2 ? '[DX]' : labelA2} ${pA2 ? `${pA2.first_name} ${pA2.last_name}` : 'Slot Libero'} (${pA2 ? pA2.ranking.toFixed(2) : '0.00'})\n\n` +
-            `👥 *SQUADRA B:*\n` +
-            `• ${pB1 ? '[SX]' : labelB1} ${pB1 ? `${pB1.first_name} ${pB1.last_name}` : 'Slot Libero'} (${pB1 ? pB1.ranking.toFixed(2) : '0.00'})\n` +
-            `• ${pB2 ? '[DX]' : labelB2} ${pB2 ? `${pB2.first_name} ${pB2.last_name}` : 'Slot Libero'} (${pB2 ? pB2.ranking.toFixed(2) : '0.00'})\n\n` +
-            `👉 *Tutte le info e gestione match qui:*\n` +
-            `🔗 ${matchLink}`;
-
-        return `https://wa.me/?text=${encodeURIComponent(testo)}`;
-    };
+        const generaLinkWhatsAppLocal = (m: Match) => {
+            const testo = buildSummonMessage(m, rawPlayers, matchClub);
+            const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+            return `https://wa.me/?text=${encodeURIComponent(testo)}`;
+        };
 
     const renderPlayerSlot = (id: number | null, sideLabel: string) => {
         if (!id) return (
