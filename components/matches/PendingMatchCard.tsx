@@ -119,11 +119,11 @@ export default function PendingMatchCard({
     }
     // ---------------------------------------------
 
-        const generaLinkWhatsAppLocal = (m: Match) => {
-            const testo = buildSummonMessage(m, rawPlayers, matchClub);
-            const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-            return `https://wa.me/?text=${encodeURIComponent(testo)}`;
-        };
+    const generaLinkWhatsAppLocal = (m: Match) => {
+        const testo = buildSummonMessage(m, rawPlayers, matchClub);
+        const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+        return `https://wa.me/?text=${encodeURIComponent(testo)}`;
+    };
 
     const renderPlayerSlot = (id: number | null, sideLabel: string) => {
         if (!id) return (

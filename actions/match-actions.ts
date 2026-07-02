@@ -434,7 +434,7 @@ export async function resolveMatchWithRanking(data: {
 
         console.log("✅ Server Action completata con successo!");
 
-                try {
+        try {
             const whatsappMessage = buildResultMessage(
                 match,
                 nomeTeamA,
@@ -531,12 +531,12 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
 
     const modifiche: string[] = [];
 
-        if (updatedFields.match_type !== undefined && updatedFields.match_type !== oldMatch.match_type) {
+    if (updatedFields.match_type !== undefined && updatedFields.match_type !== oldMatch.match_type) {
         const label = (t: string) => t === 'male' ? 'Maschile' : t === 'female' ? 'Femminile' : t === 'mixed' ? 'Misto' : t;
         modifiche.push(`Tipo match: da ${label(oldMatch.match_type)} a ${label(updatedFields.match_type)}`);
     }
 
-        if (updatedFields.club_id !== undefined && updatedFields.club_id !== oldMatch.club_id) {
+    if (updatedFields.club_id !== undefined && updatedFields.club_id !== oldMatch.club_id) {
         // Resolve club names
         const clubIds = [oldMatch.club_id, updatedFields.club_id].filter((id): id is number => id !== null);
         let clubNames: Record<number, string> = {};
@@ -610,7 +610,7 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
             new_data: updatedFields
         });
 
-                // 2. Notifica WhatsApp
+        // 2. Notifica WhatsApp
         try {
             const { data: matchData, error: fetchError } = await supabase
                 .from('matches')
