@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { logAction } from "@/lib/audit";
 import { computeKingAndFanalino } from "@/lib/rankingCalc";
 import { sendWhatsAppNotification } from '@/lib/whatsapp';
+import { buildResultMessage, buildUpdateMessage, PlayerBrief } from '@/lib/whatsapp-messages';
 
 // Interfaccia per la struttura del set
 export interface SetScore {
@@ -434,22 +435,20 @@ export async function resolveMatchWithRanking(data: {
         console.log("✅ Server Action completata con successo!");
 
         try {
-            // Prepariamo un messaggio formattato con emoji in base all'esito
-            const tipoPartitaText = match.is_friendly ? "🤝 AMICHEVOLE" : "🔥 MATCH CLASSIFICATO";
-            const whatsappMessage = `🎾 *RISULTATO REGISTRATO* 🎾\n\n` +
-                                  `🏆 *${esitoDescrizione}*\n` +
-                                  `📊 *Set:* ${stringaPunteggio}\n` +
-                                  `⚙️ *Tipo:* ${tipoPartitaText}\n\n` +
-                                  (match.is_friendly ? `Nessuna variazione di ranking.` : `📈 *Variazioni Elo:*\n${rankingLogText}`) +
-                                  `\n\nControlla le classifiche aggiornate nell'app! 🏆` +
-                                  `🔗 https://padel-ranking-plum.vercel.app/match/${data.matchId.slice(0, 8)}/join`;;
-            
-            // Invia in modo asincrono (non blocchiamo l'UI se il bot ci mette qualche decimo di secondo a rispondere)
+            const whatsappMessage = buildResultMessage(
+                match,
+                nomeTeamA,
+                nomeTeamB,
+                finalWinningTeam,
+                stringaPunteggio,
+                { teamADelta, teamBDelta },
+                playerRankingDetails
+            );
             sendWhatsAppNotification(whatsappMessage).then(res => {
-                if(!res.success) console.warn("Notifica WhatsApp fallita:", res.error);
+                if (!res.success) console.warn("Notifica WhatsApp fallita:", res.error);
             });
         } catch (waError) {
-             console.error("Errore try-catch notifica WhatsApp:", waError);
+            console.error("Errore notifica WhatsApp:", waError);
         }
 
         // 9. Pulizia Cache
@@ -533,17 +532,38 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
     const modifiche: string[] = [];
 
     if (updatedFields.match_type !== undefined && updatedFields.match_type !== oldMatch.match_type) {
-        modifiche.push(`Tipo match: da ${oldMatch.match_type} a ${updatedFields.match_type}`);
+        const label = (t: string) => t === 'male' ? 'Maschile' : t === 'female' ? 'Femminile' : t === 'mixed' ? 'Misto' : t;
+        modifiche.push(`Tipo match: da ${label(oldMatch.match_type)} a ${label(updatedFields.match_type)}`);
     }
 
     if (updatedFields.club_id !== undefined && updatedFields.club_id !== oldMatch.club_id) {
-        const oldClubText = oldMatch.club_id ? `Club #${oldMatch.club_id}` : 'Nessuno';
-        const newClubText = updatedFields.club_id ? `Club #${updatedFields.club_id}` : 'Nessuno';
-        modifiche.push(`Campo: da ${oldClubText} a ${newClubText}`);
+        // Resolve club names
+        const clubIds = [oldMatch.club_id, updatedFields.club_id].filter((id): id is number => id !== null);
+        let clubNames: Record<number, string> = {};
+        if (clubIds.length > 0) {
+            const { data: clubs } = await supabase.from('clubs').select('id, name').in('id', clubIds);
+            if (clubs) clubs.forEach(c => { clubNames[c.id] = c.name; });
+        }
+        const name = (id: number | null) => id === null ? 'Nessuno' : clubNames[id] || `Club #${id}`;
+        modifiche.push(`Campo: da ${name(oldMatch.club_id)} a ${name(updatedFields.club_id)}`);
     }
 
     if (updatedFields.is_friendly !== undefined && updatedFields.is_friendly !== oldMatch.is_friendly) {
         modifiche.push(`Regolamento: da ${oldMatch.is_friendly ? 'Amichevole' : 'Classificata'} a ${updatedFields.is_friendly ? 'Amichevole' : 'Classificata'}`);
+    }
+
+    if (updatedFields.court_type !== undefined && updatedFields.court_type !== oldMatch.court_type) {
+        const oldCourt = oldMatch.court_type === 'indoor' ? 'Coperto' : oldMatch.court_type === 'outdoor' ? 'Scoperto' : 'Non specificato';
+        const newCourt = updatedFields.court_type === 'indoor' ? 'Coperto' : 'Scoperto';
+        modifiche.push(`Tipo campo: da ${oldCourt} a ${newCourt}`);
+    }
+
+    if (updatedFields.match_date !== undefined) {
+        const normalize = (d: string | null) => d ? new Date(d).getTime() : null;
+        if (normalize(updatedFields.match_date) !== normalize(oldMatch.match_date)) {
+            const fmt = (d: string | null) => d ? new Date(d).toLocaleString('it-IT', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Non specificata';
+            modifiche.push(`Data/Ora: da ${fmt(oldMatch.match_date)} a ${fmt(updatedFields.match_date)}`);
+        }
     }
 
     const slotKeys = ['team_a_left_id', 'team_a_right_id', 'team_b_left_id', 'team_b_right_id'] as const;
@@ -592,55 +612,53 @@ export async function updateMatchPlayers(matchId: string, updatedFields: {
 
         // 2. Notifica WhatsApp
         try {
-            // 1. Recupero dati completi con JOIN per evitare gli "undefined"
             const { data: matchData, error: fetchError } = await supabase
                 .from('matches')
                 .select(`
                     *,
-                    club:clubs(name),
-                    p_a_sx:players!team_a_left_id(first_name, last_name, ranking),
-                    p_a_dx:players!team_a_right_id(first_name, last_name, ranking),
-                    p_b_sx:players!team_b_left_id(first_name, last_name, ranking),
-                    p_b_dx:players!team_b_right_id(first_name, last_name, ranking)
+                    club:clubs(name, city)
                 `)
                 .eq('id', matchId)
                 .single();
 
             if (fetchError || !matchData) throw new Error("Errore recupero dati per notifica");
 
-            // Helper per formattare giocatore e link mappe
-            const formatP = (p: any) => p ? `${p.first_name} ${p.last_name} (${p.ranking?.toFixed(2) ?? '-'})` : 'Da definire (-)';
-            const clubName = matchData.club?.name || "Campo non specificato";
-            const d = new Date(matchData.match_date);
+            // Fetch players explicitly by ID — avoids unreliable Supabase self-join syntax
+            const playerIdsInMatch = [
+                matchData.team_a_left_id,
+                matchData.team_a_right_id,
+                matchData.team_b_left_id,
+                matchData.team_b_right_id
+            ].filter((id): id is number => id !== null);
 
-            // Mappatura leggibile per il dettaglio modifiche
+            let players: PlayerBrief[] = [];
+            if (playerIdsInMatch.length > 0) {
+                const { data: fetchedPlayers } = await supabase
+                    .from('players')
+                    .select('id, first_name, last_name, ranking, preferred_side')
+                    .in('id', playerIdsInMatch);
+                if (fetchedPlayers) players = fetchedPlayers;
+            }
+
             const labelMap: Record<string, string> = {
-                'team_a_left_id': 'Squadra A [SX]', 'team_a_right_id': 'Squadra A [DX]',
-                'team_b_left_id': 'Squadra B [SX]', 'team_b_right_id': 'Squadra B [DX]',
-                'match_date': 'Data/Ora', 'club_id': 'Campo', 'is_friendly': 'Regolamento'
+                team_a_left_id: 'Squadra A [SX]', team_a_right_id: 'Squadra A [DX]',
+                team_b_left_id: 'Squadra B [SX]', team_b_right_id: 'Squadra B [DX]',
+                match_date: 'Data/Ora', club_id: 'Campo', is_friendly: 'Regolamento',
+                court_type: 'Tipo campo', match_type: 'Tipo match'
             };
 
-            const humanReadableModifiche = modifiche.map(m => {
-                const [key, val] = m.split(': ');
-                return `• ${labelMap[key] || key}: ${val}`;
-            }).join('\n');
+            const humanReadableChanges = modifiche.map(m => {
+                const [key, ...rest] = m.split(': ');
+                return `${labelMap[key] || key}: ${rest.join(': ')}`;
+            });
 
-            const whatsappMessage = 
-                `🎾 *RanKING Padel - Aggiornamento Match* 🎾\n\n` +
-                `⚠️ *Match #${matchId.slice(0, 8)} modificato da ${operatore}*\n\n` +
-                `*📝 Dettaglio modifiche:*\n${humanReadableModifiche}\n\n` +
-                `📅 Data: ${d.toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short' })}, ${d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}\n` +
-                `📍 Campo: ${clubName}\n` +
-                `🏟️ Campo: ${matchData.court_type === 'indoor' ? 'Coperto 🌧️' : 'Scoperto ☀️'}\n` +
-                `🗺️ Posizione: https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(clubName)}\n` +
-                `📊 Livello: ${matchData.min_level ?? '-'} - ${matchData.max_level ?? '-'}\n\n` +
-                `👥 *SQUADRA A:*\n` +
-                `* [SX] ${formatP(matchData.p_a_sx)}\n` +
-                `* [DX] ${formatP(matchData.p_a_dx)}\n\n` +
-                `👥 *SQUADRA B:*\n` +
-                `* [SX] ${formatP(matchData.p_b_sx)}\n` +
-                `* [DX] ${formatP(matchData.p_b_dx)}\n\n` +
-                `👉 *Tutte le info qui:*\n🔗 https://padel-ranking-plum.vercel.app/match/${matchId}/join`;
+            const whatsappMessage = buildUpdateMessage(
+                matchData,
+                players,
+                matchData.club,
+                humanReadableChanges,
+                operatore
+            );
 
             sendWhatsAppNotification(whatsappMessage).then(res => {
                 if (!res.success) console.warn("Notifica WhatsApp fallita:", res.error);
