@@ -5,6 +5,7 @@ import SearchBar from '@/components/ui/SearchBar';
 import { Player, Club } from "@/types";
 import { computeKingAndFanalino } from '@/lib/rankingCalc';
 import ClubSelectFilter from '@/components/clubs/ClubSelectFilter';
+import TabNavigation from '@/components/ui/TabNavigation';
 import { Hand } from 'lucide-react';
 
 const MATCHES_PER_PAGE = 5;
@@ -337,29 +338,14 @@ export default async function Home({ searchParams }: PageProps) {
         <main className="bg-slate-50 flex flex-col items-center text-slate-900 mt-2">
             <div className="max-w-4xl w-full px-4 sm:px-8">
                 {/* NAVIGAZIONE TAB PRINCIPALI */}
-                <div className="flex w-full mb-6 border-b border-slate-300">
-                    <Link
-                        href={`/?tab=ranking&${urlState}`}
-                        scroll={false}
-                        className={`flex-1 text-center py-3 text-sm font-black uppercase tracking-wider transition-colors ${currentTab === 'ranking' ? 'border-b-4 border-blue-600 text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}
-                    >
-                        Rankings
-                    </Link>
-                    <Link
-                        href={`/?tab=pending&${urlState}`}
-                        scroll={false}
-                        className={`flex-1 text-center py-3 text-sm font-black uppercase tracking-wider transition-colors ${currentTab === 'pending' ? 'border-b-4 border-blue-600 text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}
-                    >
-                        Match <span className="ml-1 opacity-70">({filteredPendingMatches.length})</span>
-                    </Link>
-                    <Link
-                        href={`/?tab=completed&${urlState}`}
-                        scroll={false}
-                        className={`flex-1 text-center py-3 text-sm font-black uppercase tracking-wider transition-colors ${currentTab === 'completed' ? 'border-b-4 border-blue-600 text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}
-                    >
-                        Risultati
-                    </Link>
-                </div>
+                <TabNavigation
+                    tabs={[
+                        { key: 'ranking', label: 'Rankings' },
+                        { key: 'pending', label: 'Match', badge: filteredPendingMatches.length },
+                        { key: 'completed', label: 'Risultati' },
+                    ]}
+                    activeTab={currentTab}
+                />
 
                 {/* =========================================
                     TAB 1: CLASSIFICA GIOCATORI
