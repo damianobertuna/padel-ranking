@@ -6,15 +6,23 @@ import { useRouter } from 'next/navigation';
 interface BackToHomeButtonProps {
     tab?: 'ranking' | 'pending' | 'completed';
     label?: string;
+    playerPage?: number;
 }
 
-export default function BackToHomeButton({ tab = 'ranking', label }: BackToHomeButtonProps) {
+export default function BackToHomeButton({ tab = 'ranking', label, playerPage }: BackToHomeButtonProps) {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
 
     const handleNavigation = () => {
         startTransition(() => {
-            const url = tab && tab !== 'ranking' ? `/?tab=${tab}` : '/';
+            let url = '/';
+            if (tab === 'pending') {
+                url = '/?tab=pending';
+            } else if (tab === 'completed') {
+                url = '/?tab=completed';
+            } else if (playerPage && playerPage > 1) {
+                url = `/?playerPage=${playerPage}`;
+            }
             router.push(url);
         });
     };
