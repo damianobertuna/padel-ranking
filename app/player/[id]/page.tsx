@@ -13,7 +13,7 @@ const MATCHES_PER_PAGE = 5;
 
 interface PageProps {
     params: Promise<{ id: string }>;
-    searchParams: Promise<{ page?: string }>;
+    searchParams: Promise<{ page?: string; playerPage?: string }>;
 }
 
 export default async function PlayerProfile({ params, searchParams }: PageProps) {
@@ -21,6 +21,7 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
     const playerId = parseInt(playerIdStr);
     const resolvedSearchParams = await searchParams;
     const currentPage = parseInt(resolvedSearchParams.page || '1', 10) || 1;
+    const rankingPlayerPage = parseInt(resolvedSearchParams.playerPage || '1', 10) || 1;
 
     const supabase = await createClient();
 
@@ -69,7 +70,7 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
     return (
         <main className="min-h-screen bg-slate-50 p-4 sm:p-8 flex flex-col items-center">
             <div className="max-w-5xl w-full">
-                <div className="mb-6"><BackToHomeButton /></div>
+                <div className="mb-6"><BackToHomeButton playerPage={rankingPlayerPage} /></div>
 
                 {/* Header Profilo */}
                 <div className="bg-white p-6 border border-slate-200 shadow-sm mb-6 flex flex-col sm:flex-row items-center gap-6 rounded-sm">
