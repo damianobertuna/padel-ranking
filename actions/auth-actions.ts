@@ -13,7 +13,7 @@ async function resolveUserIdentity(supabase: any, player: any, roleData: any, us
 
     // 1. Priorità massima: Admin
     if (isAdmin) {
-                return {
+        return {
             qualifica: dictAudit.LABEL_QUALIFICA_ADMIN,
             operatore: player ? `${player.first_name} ${player.last_name}` : dictAudit.LOG_AMBIGUOUS
         };
@@ -21,7 +21,7 @@ async function resolveUserIdentity(supabase: any, player: any, roleData: any, us
 
     // 2. Profilo Giocatore standard
     if (player) {
-                return {
+        return {
             qualifica: dictAudit.LABEL_QUALIFICA_PLAYER,
             operatore: `${player.first_name} ${player.last_name}`
         };
@@ -40,7 +40,7 @@ async function resolveUserIdentity(supabase: any, player: any, roleData: any, us
                 operatore = `${manager.first_name} ${manager.last_name}`.trim();
             }
         }
-                return {
+        return {
             qualifica: dictAudit.LABEL_QUALIFICA_MANAGER_FULL,
             operatore
         };
