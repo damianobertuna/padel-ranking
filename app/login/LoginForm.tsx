@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { logUserLogin, logUserRegistration } from '@/actions/auth-actions';
 import AvatarUpload from '@/components/players/AvatarUpload';
 import BackToHomeButton from "@/components/ui/BackToHomeButton";
+import dictAuth from '@/lib/i18n/dict-auth';
 
 export default function LoginForm() {
     const supabase = createClient();
@@ -68,8 +69,8 @@ export default function LoginForm() {
             <div className="max-w-lg w-full bg-white border border-slate-200 shadow-sm p-8 rounded-sm">
 
                 <div className="flex border-b border-slate-900 mb-8">
-                    <button type="button" className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest ${!isSignUp ? 'bg-slate-900 text-white' : 'text-slate-500'}`} onClick={() => setIsSignUp(false)}>Login</button>
-                    <button type="button" className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest ${isSignUp ? 'bg-slate-900 text-white' : 'text-slate-500'}`} onClick={() => setIsSignUp(true)}>Registrati</button>
+                                        <button type="button" className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest ${!isSignUp ? 'bg-slate-900 text-white' : 'text-slate-500'}`} onClick={() => setIsSignUp(false)}>{dictAuth.TAB_LOGIN}</button>
+                    <button type="button" className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest ${isSignUp ? 'bg-slate-900 text-white' : 'text-slate-500'}`} onClick={() => setIsSignUp(true)}>{dictAuth.TAB_REGISTER}</button>
                 </div>
 
                 {error && <div className="p-3 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest mb-4">{error}</div>}
@@ -80,24 +81,24 @@ export default function LoginForm() {
                             <div className="flex items-center gap-4">
                                 <AvatarUpload currentAvatarUrl={avatarUrl} onUploadSuccess={setAvatarUrl} />
                                 <div className="flex-1">
-                                    <input type="text" placeholder="NOME" className="w-full p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm mb-2" value={firstName} onChange={e => setFirstName(e.target.value)} required />
-                                    <input type="text" placeholder="COGNOME" className="w-full p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm" value={lastName} onChange={e => setLastName(e.target.value)} required />
+                                                                        <input type="text" placeholder={dictAuth.PLACEHOLDER_NAME} className="w-full p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm mb-2" value={firstName} onChange={e => setFirstName(e.target.value)} required />
+                                    <input type="text" placeholder={dictAuth.PLACEHOLDER_SURNAME} className="w-full p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm" value={lastName} onChange={e => setLastName(e.target.value)} required />
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
-                                <select className="p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm" value={gender} onChange={e => setGender(e.target.value as 'M' | 'F')}><option value="M">MASCHILE</option><option value="F">FEMMINILE</option></select>
-                                <input type="tel" placeholder="TELEFONO" className="p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm" value={phone} onChange={e => setPhone(e.target.value)} required />
+                                                                <select className="p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm" value={gender} onChange={e => setGender(e.target.value as 'M' | 'F')}><option value="M">{dictAuth.OPTION_GENDER_MALE}</option><option value="F">{dictAuth.OPTION_GENDER_FEMALE}</option></select>
+                                <input type="tel" placeholder={dictAuth.PLACEHOLDER_PHONE} className="p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm" value={phone} onChange={e => setPhone(e.target.value)} required />
                             </div>
-                            <input type="number" step="0.01" placeholder="RANKING INIZIALE" className="w-full p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm" value={initialRanking} onChange={e => setInitialRanking(e.target.value)} />
+                            <input type="number" step="0.01" placeholder={dictAuth.PLACEHOLDER_RANKING} className="w-full p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm" value={initialRanking} onChange={e => setInitialRanking(e.target.value)} />
                             <div className="grid grid-cols-2 gap-2">
-                                <select className="p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm" value={preferredSide} onChange={e => setPreferredSide(e.target.value)}><option value="Left">LATO SX</option><option value="Right">LATO DX</option><option value="Both">BOTH</option></select>
-                                <select className="p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm" value={dominantHand} onChange={e => setDominantHand(e.target.value)}><option value="Destro">DESTRO</option><option value="Mancino">MANCINO</option></select>
+                                                                <select className="p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm" value={preferredSide} onChange={e => setPreferredSide(e.target.value)}><option value="Left">{dictAuth.OPTION_SIDE_LEFT}</option><option value="Right">{dictAuth.OPTION_SIDE_RIGHT}</option><option value="Both">{dictAuth.OPTION_SIDE_BOTH}</option></select>
+                                <select className="p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm" value={dominantHand} onChange={e => setDominantHand(e.target.value)}><option value="Destro">{dictAuth.OPTION_HAND_RIGHT}</option><option value="Mancino">{dictAuth.OPTION_HAND_LEFT}</option></select>
                             </div>
                         </div>
                     )}
 
-                    <input type="email" placeholder="EMAIL" className="w-full p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm" value={email} onChange={e => setEmail(e.target.value)} required />
-                    <input type="password" placeholder="PASSWORD" className="w-full p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm" value={password} onChange={e => setPassword(e.target.value)} required />
+                                        <input type="email" placeholder={dictAuth.PLACEHOLDER_EMAIL} className="w-full p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm" value={email} onChange={e => setEmail(e.target.value)} required />
+                    <input type="password" placeholder={dictAuth.PLACEHOLDER_PASSWORD} className="w-full p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm" value={password} onChange={e => setPassword(e.target.value)} required />
 
                     {/* CHECKBOX PRIVACY POLICY (Mostrata SOLO durante la registrazione) */}
                     {isSignUp && (
@@ -114,17 +115,17 @@ export default function LoginForm() {
                                 />
                             </div>
                             <div className="text-[10px] sm:text-xs text-slate-500 leading-tight">
-                                <label htmlFor="privacy" className="font-medium cursor-pointer">
-                                    Ho letto e accetto la{' '}
+                                                                <label htmlFor="privacy" className="font-medium cursor-pointer">
+                                    {dictAuth.PRIVACY_CHECKBOX_LABEL}
                                 </label>
                                 <a
                                     href="https://www.iubenda.com/privacy-policy/89843982"
                                     className="iubenda-white iubenda-noiframe iubenda-embed font-bold text-slate-900 hover:text-blue-600 underline decoration-slate-300 hover:decoration-blue-600 transition-colors"
-                                    title="Privacy Policy"
+                                    title={dictAuth.PRIVACY_POLICY_LINK}
                                 >
-                                    Privacy Policy
+                                    {dictAuth.PRIVACY_POLICY_LINK}
                                 </a>
-                                {' '}e acconsento al trattamento dei miei dati personali per la gestione del servizio.
+                                {' '}{dictAuth.PRIVACY_CONSENT}
                             </div>
                         </div>
                     )}
@@ -134,7 +135,7 @@ export default function LoginForm() {
                         disabled={isButtonDisabled}
                         className="w-full bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest py-4 rounded-sm hover:bg-black disabled:opacity-50 transition-colors"
                     >
-                        {loading ? 'ELABORAZIONE...' : isSignUp ? 'REGISTRATI' : 'ACCEDI'}
+                        {loading ? dictAuth.BUTTON_PROCESSING : isSignUp ? dictAuth.BUTTON_REGISTER : dictAuth.BUTTON_LOGIN}
                     </button>
                 </form>
             </div>

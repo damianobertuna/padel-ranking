@@ -3,6 +3,7 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { logAction } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
+import dictAudit from "@/lib/i18n/dict-audit";
 
 // ============================================================================
 // HELPER: Logica pura per la risoluzione dell'identità utente
@@ -13,15 +14,15 @@ async function resolveUserIdentity(supabase: any, player: any, roleData: any, us
     // 1. Priorità massima: Admin
     if (isAdmin) {
         return {
-            qualifica: "L'admin",
-            operatore: player ? `${player.first_name} ${player.last_name}` : "Amministratore"
+            qualifica: dictAudit.LABEL_QUALIFICA_ADMIN,
+            operatore: player ? `${player.first_name} ${player.last_name}` : dictAudit.LOG_AMBIGUOUS
         };
     }
 
     // 2. Profilo Giocatore standard
     if (player) {
         return {
-            qualifica: "Il giocatore",
+            qualifica: dictAudit.LABEL_QUALIFICA_PLAYER,
             operatore: `${player.first_name} ${player.last_name}`
         };
     }
@@ -40,13 +41,13 @@ async function resolveUserIdentity(supabase: any, player: any, roleData: any, us
             }
         }
         return {
-            qualifica: "Il Club Manager",
+            qualifica: dictAudit.LABEL_QUALIFICA_MANAGER_FULL,
             operatore
         };
     }
 
     // Fallback
-    return { qualifica: "L'utente", operatore: "Utente Sconosciuto" };
+    return { qualifica: "L'utente", operatore: dictAudit.LOG_UNKNOWN_USER };
 }
 
 // ============================================================================

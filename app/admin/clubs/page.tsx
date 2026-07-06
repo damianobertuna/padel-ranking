@@ -6,6 +6,7 @@ import DeleteClubButton from './DeleteClubButton';
 import { Club } from '@/types';
 import BackToHomeButton from "@/components/ui/BackToHomeButton";
 import InviteManagerModal from "@/components/admin/InviteManagerModal";
+import { t } from '@/lib/i18n';
 
 export const revalidate = 0;
 const CLUBS_PER_PAGE = 10;
@@ -108,7 +109,7 @@ export default async function AdminClubsPage({ searchParams }: PageProps) {
 
                     <div className="flex justify-between items-end mt-2">
                         <div>
-                            <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Gestione Circoli</h1>
+                            <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">{t('admin', 'PAGE_TITLE_CLUBS')}</h1>
                             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Area Amministrativa Federale</p>
                         </div>
 
@@ -135,7 +136,7 @@ export default async function AdminClubsPage({ searchParams }: PageProps) {
                             ))}
                         </ul>
                     ) : (
-                        <div className="p-8 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Nessun circolo registrato</div>
+                        <div className="p-8 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin', 'CLUB_NO_RECORDS')}</div>
                     )}
                 </div>
 

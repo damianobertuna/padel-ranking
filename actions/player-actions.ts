@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { logAction } from '@/lib/audit';
+import dictAudit from '@/lib/i18n/dict-audit';
 
 export async function updatePlayerByAdmin(formData: FormData) {
     const supabase = await createClient();
@@ -73,8 +74,8 @@ export async function updatePlayerByAdmin(formData: FormData) {
         if (oldPlayer.role !== role) modifiche.push(`Ruolo: da ${oldPlayer.role} a ${role}`);
 
         const dettagliLog = modifiche.length > 0
-            ? `Admin ${adminFullName} ha modificato ${targetFullName}: ${modifiche.join('; ')}`
-            : `Admin ${adminFullName} ha salvato il profilo di ${targetFullName} senza modifiche.`;
+            ? `${dictAudit.LOG_ADMIN_UPDATE_PLAYER.replace('{admin}', adminFullName).replace('{target}', targetFullName).replace('{changes}', modifiche.join('; '))}`
+            : `${dictAudit.LOG_ADMIN_SAVED_PLAYER.replace('{admin}', adminFullName).replace('{target}', targetFullName)}`;
 
         await logAction(
             'UPDATE_PLAYER',
@@ -138,7 +139,7 @@ export async function deletePlayerByAdmin(playerId: number) {
     await logAction(
         'DELETE_PLAYER',
         playerId,
-        `Admin ${adminFullName} ha eliminato definitivamente il giocatore ${targetFullName}.`
+        `${dictAudit.LOG_ADMIN_DELETE_PLAYER.replace('{admin}', adminFullName).replace('{target}', targetFullName)}`
     );
 
     revalidatePath('/');
@@ -220,7 +221,7 @@ export async function updateOwnProfile(formData: FormData) {
     await logAction(
         'UPDATE_OWN_PROFILE',
         playerId,
-        `Il giocatore ${firstName} ${lastName} ha aggiornato autonomamente i propri dati personali.`
+        `${dictAudit.LOG_PLAYER_UPDATE_OWN.replace('{name}', `${firstName} ${lastName}`)}`
     );
 
     revalidatePath(`/profile`);
@@ -260,7 +261,7 @@ export async function updatePlayerAvatar(playerId: number, newAvatarUrl: string)
     await logAction(
         'UPDATE_AVATAR',
         playerId,
-        `Il giocatore ${currentUserPlayer.first_name} ${currentUserPlayer.last_name} ha aggiornato la propria foto profilo.`
+        `${dictAudit.LOG_PLAYER_UPDATE_AVATAR.replace('{name}', `${currentUserPlayer.first_name} ${currentUserPlayer.last_name}`)}`
     );
 
     // 5. Pulisce la cache di Next.js per mostrare subito la nuova immagine
