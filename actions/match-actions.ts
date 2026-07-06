@@ -1,4 +1,4 @@
-'use server';
+﻿'use server';
 
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -348,14 +348,26 @@ export async function resolveMatchWithRanking(data: {
 
         // 4. Recupero e strutturazione Atleti
         const playerIds = [match.team_a_left_id, match.team_a_right_id, match.team_b_left_id, match.team_b_right_id];
-        const { data: playersInMatch } = await supabase.from('players').select('*').in('id', playerIds);
+        const registeredPlayerIds = playerIds.filter((id): id is number => id !== null);
+        const { data: playersInMatch } = await supabase.from('players').select('*').in('id', registeredPlayerIds);
 
-        if (!playersInMatch || playersInMatch.length !== 4) {
-            throw new Error("Impossibile risolvere: la partita non ha 4 giocatori validi.");
+        const registeredCount = registeredPlayerIds.length;
+
+        if (match.is_friendly) {
+            // Friendly matches: allow 3 registered players (1 guest slot = null)
+            if (registeredCount < 3) {
+                throw new Error("Le partite amichevoli richiedono almeno 3 giocatori registrati per chiudere il risultato (1 ospite consentito).");
+            }
+        } else {
+            // Ranked matches: strict 4 real players required
+            if (!playersInMatch || playersInMatch.length !== 4) {
+                throw new Error("Impossibile risolvere: la partita non ha 4 giocatori validi.");
+            }
         }
 
-        const teamA = playersInMatch.filter(p => p.id === match.team_a_left_id || p.id === match.team_a_right_id);
-        const teamB = playersInMatch.filter(p => p.id === match.team_b_left_id || p.id === match.team_b_right_id);
+        // Build team arrays from available registered players only
+        const teamA = playersInMatch?.filter(p => p.id === match.team_a_left_id || p.id === match.team_a_right_id) ?? [];
+        const teamB = playersInMatch?.filter(p => p.id === match.team_b_left_id || p.id === match.team_b_right_id) ?? [];
 
         // 5. Calcolo Delta ELO
         let teamADelta = 0;
@@ -370,19 +382,24 @@ export async function resolveMatchWithRanking(data: {
         }
 
         // 6. PREPARAZIONE SNAPSHOT RANKING
-        const safeAdd = (rank: number, delta: number) => parseFloat((rank + delta).toFixed(2));
+        // For friendly matches with < 4 registered players, skip ranking snapshot
+        let playerRankingDetails: any[] = [];
+        let rankingLogText = '';
 
-        const playerRankingDetails = [
-            { id: teamA[0].id, name: `${teamA[0].first_name} ${teamA[0].last_name}`, old_ranking: teamA[0].ranking, new_ranking: safeAdd(teamA[0].ranking, teamADelta), delta: teamADelta },
-            { id: teamA[1].id, name: `${teamA[1].first_name} ${teamA[1].last_name}`, old_ranking: teamA[1].ranking, new_ranking: safeAdd(teamA[1].ranking, teamADelta), delta: teamADelta },
-            { id: teamB[0].id, name: `${teamB[0].first_name} ${teamB[0].last_name}`, old_ranking: teamB[0].ranking, new_ranking: safeAdd(teamB[0].ranking, teamBDelta), delta: teamBDelta },
-            { id: teamB[1].id, name: `${teamB[1].first_name} ${teamB[1].last_name}`, old_ranking: teamB[1].ranking, new_ranking: safeAdd(teamB[1].ranking, teamBDelta), delta: teamBDelta }
-        ];
+        if (!match.is_friendly) {
+            const safeAdd = (rank: number, delta: number) => parseFloat((rank + delta).toFixed(2));
 
-        const rankingLogText = playerRankingDetails
-            .map(p => `${p.name} (${p.old_ranking.toFixed(2)} ➡️ ${p.new_ranking.toFixed(2)})`)
-            .join(' | ');
+            playerRankingDetails = [
+                { id: teamA[0].id, name: `${teamA[0].first_name} ${teamA[0].last_name}`, old_ranking: teamA[0].ranking, new_ranking: safeAdd(teamA[0].ranking, teamADelta), delta: teamADelta },
+                { id: teamA[1].id, name: `${teamA[1].first_name} ${teamA[1].last_name}`, old_ranking: teamA[1].ranking, new_ranking: safeAdd(teamA[1].ranking, teamADelta), delta: teamADelta },
+                { id: teamB[0].id, name: `${teamB[0].first_name} ${teamB[0].last_name}`, old_ranking: teamB[0].ranking, new_ranking: safeAdd(teamB[0].ranking, teamBDelta), delta: teamBDelta },
+                { id: teamB[1].id, name: `${teamB[1].first_name} ${teamB[1].last_name}`, old_ranking: teamB[1].ranking, new_ranking: safeAdd(teamB[1].ranking, teamBDelta), delta: teamBDelta }
+            ];
 
+            rankingLogText = playerRankingDetails
+                .map(p => `${p.name} (${p.old_ranking.toFixed(2)} -> ${p.new_ranking.toFixed(2)})`)
+                .join(' | ');
+        }
         // 7. AGGIORNAMENTO DATABASE
         const { error: matchError } = await supabaseAdmin
             .from('matches')
@@ -406,8 +423,16 @@ export async function resolveMatchWithRanking(data: {
         }
 
         // 8. AUDIT LOG
-        const nomeTeamA = `${teamA[0].first_name} ${teamA[0].last_name} / ${teamA[1].first_name} ${teamA[1].last_name}`;
-        const nomeTeamB = `${teamB[0].first_name} ${teamB[0].last_name} / ${teamB[1].first_name} ${teamB[1].last_name}`;
+        const buildTeamName = (players: any[]) =>
+            players.length >= 2
+                ? `${players[0].first_name} ${players[0].last_name} / ${players[1].first_name} ${players[1].last_name}`
+                : players.length === 1
+                ? `${players[0].first_name} ${players[0].last_name} / OSPITE`
+                : `N.D. / N.D.`;
+
+        const nomeTeamA = buildTeamName(teamA);
+        const nomeTeamB = buildTeamName(teamB);
+
 
         const esitoDescrizione = finalWinningTeam === 'A'
             ? `Vince il Team A (${nomeTeamA}) contro il Team B (${nomeTeamB})`

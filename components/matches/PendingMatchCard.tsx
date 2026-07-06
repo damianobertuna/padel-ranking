@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useTransition } from 'react';
 import { canUserResolveMatch } from '@/lib/matchRules';
@@ -44,7 +44,7 @@ export default function PendingMatchCard({
         const minLvl = Math.min(...activeRankings);
         const maxLvl = Math.max(...activeRankings);
 
-        const isMatchComplete = activeRankings.length === 4;
+        const isMatchComplete = activeRankings.length === 4 || (match.is_friendly && activeRankings.length === 3);
 
         if (isMatchComplete) {
             levelLabel = 'LIVELLO MATCH:';
@@ -58,7 +58,7 @@ export default function PendingMatchCard({
     }
 
     // --- LOGICA DI DOMINIO E RUOLI ---
-    const isMatchComplete = Boolean(match.team_a_left_id && match.team_a_right_id && match.team_b_left_id && match.team_b_right_id);
+    const isMatchComplete = Boolean(match.team_a_left_id && match.team_a_right_id && match.team_b_left_id && match.team_b_right_id) || (match.is_friendly && [match.team_a_left_id, match.team_a_right_id, match.team_b_left_id, match.team_b_right_id].filter((id): id is number => id !== null && id !== undefined).length === 3);
     const isUserInMatch = currentUserPlayer && currentUserPlayer.id != null && activePlayerIds.includes(currentUserPlayer.id);
     const isAdmin = currentUserPlayer?.role === 'admin';
     const isOrganizer = currentUserPlayer?.id === match.organizer_id;
@@ -126,11 +126,14 @@ export default function PendingMatchCard({
     };
 
     const renderPlayerSlot = (id: number | null, sideLabel: string) => {
-        if (!id) return (
-            <div className="py-1.5 px-2 bg-slate-100 border border-dashed border-slate-300 rounded-sm">
-                <span className="text-[10px] text-slate-500 font-black tracking-widest uppercase">➕ SLOT LIBERO ({sideLabel})</span>
-            </div>
-        );
+        if (!id) {
+            const label = match.is_friendly ? `OSPITE (${sideLabel})` : `SLOT LIBERO (${sideLabel})`;
+            return (
+                <div className="py-1.5 px-2 bg-slate-100 border border-dashed border-slate-300 rounded-sm">
+                    <span className="text-[10px] text-slate-500 font-black tracking-widest uppercase">{label}</span>
+                </div>
+            );
+        }
 
         const p = rawPlayers.find(player => player.id === id);
         const titleInfo = p && playerTitles ? playerTitles[p.id] : null;
