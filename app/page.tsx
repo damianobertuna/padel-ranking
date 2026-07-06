@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+﻿import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import PendingMatchCard from '@/components/matches/PendingMatchCard';
 import SearchBar from '@/components/ui/SearchBar';
@@ -26,14 +26,14 @@ interface PageProps {
     }>;
 }
 
-function getPlayerNameWithRanking(id: number | null, playersList: Player[]) {
-    if (id === null) return 'Slot Libero';
+function getPlayerNameWithRanking(id: number | null, playersList: Player[], isFriendly?: boolean) {
+    if (id === null) return isFriendly ? 'Ospite' : 'Slot Libero';
     const p = playersList?.find(player => player.id === id);
     return p ? `${p.first_name} ${p.last_name} (${p.ranking.toFixed(2)})` : 'Sconosciuto';
 }
 
-function getPlayerFullName(id: number | null, playersList: Player[]) {
-    if (id === null) return 'Slot Libero';
+function getPlayerFullName(id: number | null, playersList: Player[], isFriendly?: boolean) {
+    if (id === null) return isFriendly ? 'Ospite' : 'Slot Libero';
     const p = playersList?.find(player => player.id === id);
     return p ? `${p.first_name} ${p.last_name}` : 'Sconosciuto';
 }
@@ -49,10 +49,10 @@ function generateWhatsAppResultLink(
         weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome'
     });
 
-    const pA1 = getPlayerFullName(match.team_a_left_id, playersList);
-    const pA2 = getPlayerFullName(match.team_a_right_id, playersList);
-    const pB1 = getPlayerFullName(match.team_b_left_id, playersList);
-    const pB2 = getPlayerFullName(match.team_b_right_id, playersList);
+    const pA1 = getPlayerFullName(match.team_a_left_id, playersList, match.is_friendly);
+    const pA2 = getPlayerFullName(match.team_a_right_id, playersList, match.is_friendly);
+    const pB1 = getPlayerFullName(match.team_b_left_id, playersList, match.is_friendly);
+    const pB2 = getPlayerFullName(match.team_b_right_id, playersList, match.is_friendly);
 
     const sets = (match.score || []) as Array<{team_a: number, team_b: number}>;
     const scoreStr = sets.map(s => `${s.team_a}-${s.team_b}`).join(' / ');
@@ -201,7 +201,7 @@ export default async function Home({ searchParams }: PageProps) {
     const filteredPendingMatches = (pendingMatches || []).filter(match => {
         const playerIds = [match.team_a_left_id, match.team_a_right_id, match.team_b_left_id, match.team_b_right_id];
         const activeCount = playerIds.filter(Boolean).length;
-        const isMatchComplete = activeCount === 4;
+        const isMatchComplete = activeCount === 4 || (match.is_friendly && activeCount === 3);
         const isUserInMatch = currentUserPlayer?.id ? playerIds.includes(currentUserPlayer.id) : false;
         const isExpired = match.match_date ? new Date(match.match_date) < new Date() : false;
 
@@ -573,8 +573,8 @@ export default async function Home({ searchParams }: PageProps) {
                                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">TEAM A</span>
                                                     {winner === 'A' && <span className="bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-sm uppercase tracking-wider">WINNER</span>}
                                                 </div>
-                                                <div className="text-sm font-black text-slate-900 uppercase">{getPlayerNameWithRanking(match.team_a_left_id, playersWithStats)}</div>
-                                                <div className="text-sm font-black text-slate-900 uppercase">{getPlayerNameWithRanking(match.team_a_right_id, playersWithStats)}</div>
+                                                <div className="text-sm font-black text-slate-900 uppercase">{getPlayerNameWithRanking(match.team_a_left_id, playersWithStats, match.is_friendly)}</div>
+                                                <div className="text-sm font-black text-slate-900 uppercase">{getPlayerNameWithRanking(match.team_a_right_id, playersWithStats, match.is_friendly)}</div>
                                             </div>
 
                                             <div className="px-6 py-4 flex items-center justify-center border-y sm:border-y-0 sm:border-x border-slate-100 bg-slate-50 w-full sm:w-auto">
@@ -592,8 +592,8 @@ export default async function Home({ searchParams }: PageProps) {
                                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">TEAM B</span>
                                                     {winner === 'B' && <span className="bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-sm uppercase tracking-wider">WINNER</span>}
                                                 </div>
-                                                <div className="text-sm font-black text-slate-900 uppercase">{getPlayerNameWithRanking(match.team_b_left_id, playersWithStats)}</div>
-                                                <div className="text-sm font-black text-slate-900 uppercase">{getPlayerNameWithRanking(match.team_b_right_id, playersWithStats)}</div>
+                                                <div className="text-sm font-black text-slate-900 uppercase">{getPlayerNameWithRanking(match.team_b_left_id, playersWithStats, match.is_friendly)}</div>
+                                                <div className="text-sm font-black text-slate-900 uppercase">{getPlayerNameWithRanking(match.team_b_right_id, playersWithStats, match.is_friendly)}</div>
                                             </div>
                                         </div>
 

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
@@ -93,7 +93,8 @@ export default function ResolveMatch() {
         fetchData();
     }, [matchId, supabase]);
 
-        const getPlayerName = (id: number | null) => {
+    const getPlayerName = (id: number | null) => {
+        if (id === null) return 'OSPITE';
         const p = players.find(pl => pl.id === id);
         if (!p || !p.last_name || !p.first_name) return 'N.D.';
         return `${p.last_name.toUpperCase()} ${p.first_name[0]}.`;
