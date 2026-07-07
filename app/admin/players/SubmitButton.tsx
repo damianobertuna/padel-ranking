@@ -1,6 +1,7 @@
 'use client';
 
 import { useFormStatus } from 'react-dom';
+import { t } from '@/lib/i18n';
 
 export function SubmitButton() {
     const { pending } = useFormStatus();
@@ -20,7 +21,7 @@ export function SubmitButton() {
                     <span>...</span>
                 </>
             ) : (
-                'SALVA'
+                t('ui', 'SALVA')
             )}
         </button>
     );

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { deletePlayerByAdmin } from '@/actions/player-actions';
 import { t } from '@/lib/i18n';
+import dictError from '@/lib/i18n/dict-error';
 
 interface DeletePlayerButtonProps {
     playerId: number;
@@ -18,8 +19,8 @@ export default function DeletePlayerButton({ playerId, playerName }: DeletePlaye
         setIsDeleting(true);        // Mostra il caricamento sul cestino
         try {
             await deletePlayerByAdmin(playerId);
-            // Mostriamo una notifica di successo non invasiva (puoi anche usare una libreria toast se l'hai installata)
-            alert(`Giocatore ${playerName} eliminato con successo.`);
+            // Mostriamo una notifica di successo non invasiva
+            alert(dictError.PLAYER_DELETE_ADMIN_SUCCESS.replace('{name}', playerName));
         } catch (error: any) {
             alert(error.message); // Errore se ha già giocato partite
         } finally {
@@ -34,7 +35,7 @@ export default function DeletePlayerButton({ playerId, playerName }: DeletePlaye
                 onClick={() => setShowConfirmModal(true)}
                 disabled={isDeleting}
                 className="h-[42px] w-[42px] flex shrink-0 items-center justify-center bg-red-100 text-red-600 hover:bg-red-600 hover:text-white rounded-sm transition-colors disabled:opacity-50 outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
-                title={`Elimina ${playerName}`}
+                title={`${t('ui', 'ELIMINA')} ${playerName}`}
             >
                 {isDeleting ? (
                     <span className="text-xs font-black animate-pulse">...</span>
@@ -49,7 +50,7 @@ export default function DeletePlayerButton({ playerId, playerName }: DeletePlaye
             {showConfirmModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                     <div className="bg-white p-6 rounded-sm shadow-2xl max-w-sm w-full border-t-4 border-red-500 animate-in zoom-in-95 duration-200">
-                                                <h3 className="text-lg font-black uppercase text-slate-900 tracking-tight mb-2">
+                        <h3 className="text-lg font-black uppercase text-slate-900 tracking-tight mb-2">
                             {t('admin', 'PLAYER_DELETE_TITLE')}
                         </h3>
                         <p className="text-xs text-slate-600 mb-6 font-bold leading-relaxed uppercase tracking-wider">
@@ -63,14 +64,14 @@ export default function DeletePlayerButton({ playerId, playerName }: DeletePlaye
                                 onClick={() => setShowConfirmModal(false)}
                                 className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-100 rounded-sm transition-colors"
                             >
-                                Annulla
+                                {t('ui', 'CANCEL')}
                             </button>
                             <button
                                 type="button"
                                 onClick={executeDelete}
                                 className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest bg-red-600 text-white hover:bg-red-700 rounded-sm transition-colors shadow-sm"
                             >
-                                Sì, Elimina
+                                {t('ui', 'CONFIRM_DELETE')}
                             </button>
                         </div>
                     </div>
