@@ -213,6 +213,10 @@ describe('Logica Match Scaduti', () => {
         { id: 10, ranking: 3.00, first_name: 'Base', last_name: 'User', preferred_side: 'Both' }
     ] as any;
 
+    afterEach(() => {
+        cleanup();
+    });
+
     it('NON dovrebbe mostrare i bottoni d\'azione se il match è scaduto per un utente standard', () => {
         const expiredMatch = { ...openMatch, match_date: pastDate };
 
@@ -223,7 +227,7 @@ describe('Logica Match Scaduti', () => {
         expect(actionBtn).toBeNull(); // Deve essere rimosso per l'utente normale
     });
 
-    it('dovrebbe CONTINUARE a mostrare il bottone MODIFICA MATCH se l\'utente è ADMIN, anche per match scaduti', () => {
+        it('dovrebbe CONTINUARE a mostrare il bottone MODIFICA MATCH se l\'utente è ADMIN, anche per match scaduti', () => {
         const expiredMatch = { ...openMatch, match_date: pastDate };
 
         render(<PendingMatchCard match={expiredMatch} rawPlayers={mockRawPlayers} currentUserPlayer={adminUser} />);
@@ -231,5 +235,67 @@ describe('Logica Match Scaduti', () => {
         // L'admin scavalca le regole temporali e mantiene l'accesso al match
         const actionBtn = screen.getByRole('button', { name: /MODIFICA MATCH/i });
         expect(actionBtn).toBeDefined();
+    });
+});
+
+describe('Amichevoli con Ospite (3 giocatori + 1 Ospite)', () => {
+    const mockPlayersFriendly = [
+        { id: 1, first_name: 'Mario', last_name: 'Rossi', ranking: 4.0, preferred_side: 'Left', role: 'user' },
+        { id: 2, first_name: 'Luigi', last_name: 'Verdi', ranking: 3.5, preferred_side: 'Right', role: 'user' },
+        { id: 3, first_name: 'Anna', last_name: 'Neri', ranking: 3.8, preferred_side: 'Both', role: 'user' },
+    ];
+
+    const friendlyMatchWithGuest = {
+        id: 'match-friendly-guest',
+        status: 'pending',
+        match_date: futureDate,
+        created_at: new Date().toISOString(),
+        team_a_left_id: 1,
+        team_a_right_id: 2,
+        team_b_left_id: 3,
+        team_b_right_id: null, // OSPITE
+        club_id: 100,
+        organizer_id: 1,
+        is_friendly: true
+    } as Match;
+
+    const friendlyMatchTooFew = {
+        ...friendlyMatchWithGuest,
+        id: 'match-friendly-too-few',
+        team_a_left_id: 1,
+        team_a_right_id: null, // OSPITE
+        team_b_left_id: null, // OSPITE
+        team_b_right_id: null, // OSPITE
+    } as Match;
+
+    afterEach(() => {
+        cleanup();
+    });
+
+    it('dovrebbe mostrare MATCH PRONTO per amichevole con 3 giocatori + 1 ospite', () => {
+        render(<PendingMatchCard match={friendlyMatchWithGuest} rawPlayers={mockPlayersFriendly as any} currentUserPlayer={null} />);
+        expect(screen.getByText('MATCH PRONTO')).toBeDefined();
+    });
+
+    it('dovrebbe mostrare OSPITE al posto di SLOT LIBERO per il quarto slot in amichevole', () => {
+        render(<PendingMatchCard match={friendlyMatchWithGuest} rawPlayers={mockPlayersFriendly as any} currentUserPlayer={null} />);
+        const ospiteDx = screen.getByText(/OSPITE \(DX\)/);
+        expect(ospiteDx).toBeDefined();
+        expect(screen.queryByText(/SLOT LIBERO/)).toBeNull();
+    });
+
+    it('dovrebbe mostrare il pulsante Risolvi per admin su amichevole 3+1 completa', () => {
+        vi.spyOn(matchRules, 'canUserResolveMatch').mockReturnValue(true);
+        render(<PendingMatchCard match={friendlyMatchWithGuest} rawPlayers={mockPlayersFriendly as any} currentUserPlayer={adminUser} />);
+        expect(screen.getByTestId('resolve-btn')).toBeDefined();
+        expect(screen.getAllByTestId('delete-btn')).toBeDefined();
+    });
+
+    it('dovrebbe mostrare OPEN MATCH per amichevole con soli 2 giocatori (2 ospiti)', () => {
+        render(<PendingMatchCard match={friendlyMatchTooFew} rawPlayers={mockPlayersFriendly as any} currentUserPlayer={null} />);
+        const openMatchBadges = screen.getAllByText('OPEN MATCH');
+        expect(openMatchBadges.length).toBeGreaterThanOrEqual(1);
+        const ospites = screen.getAllByText(/OSPITE/);
+        expect(ospites.length).toBe(3);
     });
 });
