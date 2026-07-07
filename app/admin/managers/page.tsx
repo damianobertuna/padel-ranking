@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import BackToHomeButton from "@/components/ui/BackToHomeButton";
 import InviteManagerModal from "@/components/admin/InviteManagerModal";
-import { updateManagerByAdmin, deleteManagerByAdmin } from '@/actions/manager-actions';
+import { updateManagerByAdmin } from '@/actions/manager-actions';
 import { SubmitButton } from '@/app/admin/players/SubmitButton';
 import DeleteManagerButton from './DeleteManagerButton';
 import { t } from '@/lib/i18n';
@@ -23,8 +23,8 @@ export default async function AdminManagersPage() {
     if (!adminCheck || adminCheck.role !== 'admin') {
         return (
             <main className="min-h-screen p-8 bg-slate-50 flex flex-col items-center justify-center">
-                <p className="text-red-600 font-black uppercase text-sm mb-4 tracking-widest">🚫 Accesso Negato.</p>
-                <Link href="/" className="text-blue-600 font-bold underline text-xs uppercase tracking-wider">Torna alla Home</Link>
+                <p className="text-red-600 font-black uppercase text-sm mb-4 tracking-widest">🚫 {t('error', 'PERMISSION_DENIED')}</p>
+                <Link href="/" className="text-blue-600 font-bold underline text-xs uppercase tracking-wider">{t('ui', 'BACK_TO_HOME')}</Link>
             </main>
         );
     }
@@ -49,7 +49,7 @@ export default async function AdminManagersPage() {
                     <div className="flex justify-between items-end mt-2">
                         <div>
                             <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">{t('admin', 'PAGE_TITLE_MANAGERS')}</h1>
-                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Area Amministrativa Federale</p>
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">{t('nav', 'ADMIN_AREA')}</p>
                         </div>
                         <InviteManagerModal clubs={allClubs || []} />
                     </div>
@@ -65,7 +65,7 @@ export default async function AdminManagersPage() {
                                     {/* Dati Anagrafici */}
                                     <div className="md:col-span-4 grid grid-cols-2 gap-2">
                                         <div>
-                                            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Nome</label>
+                                            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{t('form', 'LABEL_NOME')}</label>
                                             <input
                                                 type="text"
                                                 name="firstName"
@@ -75,7 +75,7 @@ export default async function AdminManagersPage() {
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Cognome</label>
+                                            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{t('form', 'LABEL_COGNOME')}</label>
                                             <input
                                                 type="text"
                                                 name="lastName"
@@ -88,7 +88,7 @@ export default async function AdminManagersPage() {
 
                                     {/* Circolo Assegnato */}
                                     <div className="md:col-span-3">
-                                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Circolo</label>
+                                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{t('form', 'LABEL_CLUB')}</label>
                                         <select
                                             name="clubId"
                                             defaultValue={manager.club_id}
@@ -104,7 +104,7 @@ export default async function AdminManagersPage() {
 
                                     {/* User ID (sola lettura) */}
                                     <div className="md:col-span-3">
-                                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">User ID</label>
+                                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{t('form', 'LABEL_USER_ID')}</label>
                                         <div className="w-full p-2 border border-slate-200 bg-slate-100 text-[10px] font-mono text-slate-500 rounded-sm truncate">
                                             {manager.user_id}
                                         </div>
@@ -123,8 +123,8 @@ export default async function AdminManagersPage() {
                         ))
                     ) : (
                         <div className="bg-white p-8 border border-slate-200 text-center rounded-sm">
-                            <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">Nessun gestore registrato.</p>
-                            <p className="text-slate-400 text-[10px] font-bold mt-2">Utilizza il pulsante &quot;Invita Gestore&quot; per aggiungerne uno.</p>
+                            <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">{t('ui', 'EMPTY_NO_MANAGERS')}</p>
+                            <p className="text-slate-400 text-[10px] font-bold mt-2">{t('ui', 'EMPTY_NO_MANAGERS_HINT')}</p>
                         </div>
                     )}
                 </div>

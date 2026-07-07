@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import dictError from '@/lib/i18n/dict-error';
 
 // ============================================================================
 // ADMIN MANAGERS PAGE — AUTHORIZATION TESTS
@@ -56,7 +57,7 @@ describe('AdminManagersPage - Authorization', () => {
     // ======================================================================
     // REGULAR USER (role = 'user')
     // ======================================================================
-    it('dovrebbe MOSTRARE "Accesso Negato" per un utente con ruolo "user"', async () => {
+    it(`dovrebbe MOSTRARE "${dictError.PERMISSION_DENIED}" per un utente con ruolo "user"`, async () => {
         mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'user-123' } } });
         mockSupabase.from().single.mockResolvedValue({ data: { role: 'user' }, error: null });
 
@@ -79,7 +80,7 @@ describe('AdminManagersPage - Authorization', () => {
     // ======================================================================
     // CLUB MANAGER (no player row, but user_roles.role = 'club_manager')
     // ======================================================================
-    it('dovrebbe MOSTRARE "Accesso Negato" per un club_manager senza profilo giocatore', async () => {
+    it(`dovrebbe MOSTRARE "${dictError.PERMISSION_DENIED}" per un club_manager senza profilo giocatore`, async () => {
         mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'manager-456' } } });
 
         // Club managers have NO row in `players` table
@@ -107,7 +108,7 @@ describe('AdminManagersPage - Authorization', () => {
     // CLUB MANAGER with player profile (role = 'club_manager' in players)
     // This is an edge case: a player who was later assigned manager role
     // ======================================================================
-    it('dovrebbe MOSTRARE "Accesso Negato" per un club_manager con profilo giocatore (ruolo club_manager)', async () => {
+    it(`dovrebbe MOSTRARE "${dictError.PERMISSION_DENIED}" per un club_manager con profilo giocatore (ruolo club_manager)`, async () => {
         mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'manager-789' } } });
 
         // Player row exists but role is 'club_manager', not 'admin'
