@@ -285,7 +285,7 @@ describe('resolveMatchWithRanking (Logica Punteggi e Regole)', () => {
         }));
     });
 
-    it('Feature Amichevoli: Partita Amichevole -> deve scrivere l audit log personalizzato con flag is_friendly', async () => {
+        it('Feature Amichevoli: Partita Amichevole -> deve scrivere l audit log personalizzato con flag is_friendly', async () => {
         await executeResolve([2, 5], [7, 8], 'A', true);
 
         expect(logAction).toHaveBeenCalledWith(
@@ -297,6 +297,94 @@ describe('resolveMatchWithRanking (Logica Punteggi e Regole)', () => {
                 deltas: { team_a: 0, team_b: 0 }
             })
         );
+    });
+
+    // ========================================================
+    // NUOVI TEST: AMICHEVOLI CON OSPITE (3 GIOCATORI + 1 OSPITE)
+    // ========================================================
+    it('Feature Amichevoli con Ospite: 3 giocatori registrati + 1 ospite -> risoluzione OK, delta zero', async () => {
+        const matchData = {
+            id: 'm-friendly-guest', status: 'pending',
+            team_a_left_id: 2, team_a_right_id: 5,
+            team_b_left_id: 7, team_b_right_id: null, // guest slot
+            is_friendly: true,
+            club_id: 1
+        };
+
+        const mockAll = [
+            {id:2, first_name: 'B', last_name: 'Player', preferred_side:'Left', ranking: 3.0},
+            {id:5, first_name: 'E', last_name: 'Player', preferred_side:'Right', ranking: 3.0},
+            {id:7, first_name: 'G', last_name: 'Player', preferred_side:'Left', ranking: 3.1},
+        ];
+
+        const mockSupabaseGuest = {
+            auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
+            from: vi.fn((table) => ({
+                select: vi.fn().mockReturnThis(),
+                eq: vi.fn().mockReturnThis(),
+                in: vi.fn().mockImplementation(() => Promise.resolve({ data: mockAll, error: null })),
+                update: updateSpy,
+                maybeSingle: vi.fn().mockResolvedValue({ data: { id: 99, role: 'admin', first_name: 'Op', last_name: 'Test' }, error: null }),
+                single: vi.fn().mockImplementation(() => {
+                    if (table === 'matches') return Promise.resolve({ data: matchData, error: null });
+                    return Promise.resolve({ data: { id: 99, role: 'admin', first_name: 'Op', last_name: 'Test' }, error: null });
+                }),
+                then: function(res: any) { res({ data: mockAll, error: null }); }
+            }))
+        };
+
+        (createClient as any).mockResolvedValueOnce(mockSupabaseGuest);
+        (createAdminClient as any).mockReturnValueOnce(mockSupabaseGuest);
+
+        await resolveMatchWithRanking({
+            matchId: 'm-friendly-guest',
+            score: [{team_a: 6, team_b: 4}, {team_a: 6, team_b: 4}]
+        });
+
+        expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({
+            status: 'completed',
+            team_a_delta: 0,
+            team_b_delta: 0
+        }));
+    });
+
+    it('Feature Amichevoli con Ospite: soli 2 giocatori registrati -> RIFIUTATO', async () => {
+        const matchData = {
+            id: 'm-friendly-too-few', status: 'pending',
+            team_a_left_id: 2, team_a_right_id: null,
+            team_b_left_id: 7, team_b_right_id: null,
+            is_friendly: true,
+            club_id: 1
+        };
+
+        const mockAll = [
+            {id:2, first_name: 'B', last_name: 'Player', preferred_side:'Left', ranking: 3.0},
+            {id:7, first_name: 'G', last_name: 'Player', preferred_side:'Left', ranking: 3.1},
+        ];
+
+        const mockSupabaseTooFew = {
+            auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
+            from: vi.fn((table) => ({
+                select: vi.fn().mockReturnThis(),
+                eq: vi.fn().mockReturnThis(),
+                in: vi.fn().mockImplementation(() => Promise.resolve({ data: mockAll, error: null })),
+                update: updateSpy,
+                maybeSingle: vi.fn().mockResolvedValue({ data: { id: 99, role: 'admin', first_name: 'Op', last_name: 'Test' }, error: null }),
+                single: vi.fn().mockImplementation(() => {
+                    if (table === 'matches') return Promise.resolve({ data: matchData, error: null });
+                    return Promise.resolve({ data: { id: 99, role: 'admin', first_name: 'Op', last_name: 'Test' }, error: null });
+                }),
+                then: function(res: any) { res({ data: mockAll, error: null }); }
+            }))
+        };
+
+        (createClient as any).mockResolvedValueOnce(mockSupabaseTooFew);
+        (createAdminClient as any).mockReturnValueOnce(mockSupabaseTooFew);
+
+        await expect(resolveMatchWithRanking({
+            matchId: 'm-friendly-too-few',
+            score: [{team_a: 6, team_b: 4}, {team_a: 6, team_b: 4}]
+        })).rejects.toThrow('almeno 3 giocatori registrati');
     });
 });
 
