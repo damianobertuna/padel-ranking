@@ -87,11 +87,11 @@ export default async function AdminLogsPage({ searchParams }: PageProps) {
 
         return (
             <div className="flex items-center justify-center gap-1 mt-6">
-                {renderButton(1, '«', 'Prima Pagina', current === 1)}
-                {renderButton(Math.max(1, current - 1), '‹', 'Precedente', current === 1)}
-                {visiblePages.map(p => renderButton(p, p, `Pagina ${p}`, false, p === current))}
-                {renderButton(Math.min(total, current + 1), '›', 'Successiva', current === total)}
-                {renderButton(total, '»', 'Ultima Pagina', current === total)}
+                {renderButton(1, '«', t('ui', 'PAGINATION_FIRST'), current === 1)}
+                {renderButton(Math.max(1, current - 1), '‹', t('ui', 'PAGINATION_PREV'), current === 1)}
+                {visiblePages.map(p => renderButton(p, p, `${t('ui', 'PAGINATION_PAGE')} ${p}`, false, p === current))}
+                {renderButton(Math.min(total, current + 1), '›', t('ui', 'PAGINATION_NEXT'), current === total)}
+                {renderButton(total, '»', t('ui', 'PAGINATION_LAST'), current === total)}
             </div>
         );
     };
@@ -102,7 +102,7 @@ export default async function AdminLogsPage({ searchParams }: PageProps) {
                 <div className="mb-8 mt-2 border-b-2 border-slate-900 pb-4">
                     <BackToHomeButton />
                     <h1 className="text-3xl font-black text-slate-900 mt-2 uppercase tracking-tighter">{t('admin', 'PAGE_TITLE_LOGS')}</h1>
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Audit di sistema - Tracciamento operazioni</p>
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">{t('nav', 'ADMIN_AUDIT_SUBTITLE')}</p>
                 </div>
 
                 {error && <div className="bg-red-600 text-white p-4 text-[10px] font-black uppercase mb-4">Errore: {error.message}</div>}
@@ -141,7 +141,7 @@ export default async function AdminLogsPage({ searchParams }: PageProps) {
                             ))}
                         </div>
                     ) : (
-                        <div className="p-8 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Nessun registro trovato con i filtri attuali</div>
+                        <div className="p-8 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('ui', 'EMPTY_NO_LOGS')}</div>
                     )}
                 </div>
 

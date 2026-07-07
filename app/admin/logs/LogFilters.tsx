@@ -59,7 +59,7 @@ export default function LogFilters() {
                     onChange={(e) => handleUpdateFilter('type', e.target.value)}
                     className="w-full h-[42px] px-3 bg-white border border-slate-200 rounded-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all appearance-none"
                 >
-                    <option value="">Tutte le azioni</option>
+                    <option value="">{t('admin', 'LOG_FILTER_TYPE_ALL')}</option>
 
                     <optgroup label="Gestione Giocatori">
                         <option value="UPDATE_PLAYER">UPDATE_PLAYER (Modifica Admin)</option>
@@ -90,18 +90,17 @@ export default function LogFilters() {
 
             {/* PULSANTE RESET E INDICATORE */}
             <div className="w-full md:w-auto flex items-center justify-end gap-3 h-[42px]">
-                {isPending && <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 animate-pulse">Aggiornamento...</span>}
+                {isPending && <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 animate-pulse">{t('ui', 'AGGIORNAMENTO')}</span>}
 
                 {(currentSearch || currentType) && (
                     <button
                         onClick={() => router.replace(pathname)}
                         className="text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-red-600 transition-colors"
                     >
-                        Resetta Filtri
+                        {t('ui', 'RESET_FILTERS')}
                     </button>
                 )}
             </div>
         </div>
     );
 }
-

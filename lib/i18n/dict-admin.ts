@@ -18,7 +18,7 @@ const dictAdmin = {
 
   LOG_FILTER_SEARCH: 'Cerca nei log...',
   LOG_FILTER_TYPE: 'Tipo',
-  LOG_FILTER_TYPE_ALL: 'Tutti',
+  LOG_FILTER_TYPE_ALL: 'Tutte le azioni',
 
   CLUB_PAGE_ADD_TITLE: 'Aggiungi Nuovo Circolo',
   CLUB_PAGE_ADD_SUBMIT: 'AGGIUNGI CIRCOLO',
