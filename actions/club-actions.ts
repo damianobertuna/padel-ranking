@@ -4,6 +4,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { logAction } from "@/lib/audit";
+import dictError from "@/lib/i18n/dict-error";
+import dictAudit from "@/lib/i18n/dict-audit";
 
 /**
  * CREAZIONE DI UN NUOVO CLUB/CAMPO
@@ -15,12 +17,12 @@ export async function createClub(formData: FormData) {
     const clubCity = formData.get('city') as string;
 
     if (!clubName || clubName.trim() === '') {
-        return { error: "Il nome del circolo è obbligatorio." };
+        return { error: dictError.CLUB_NAME_REQUIRED };
     }
 
     // 1. Controllo Autenticazione e Ruolo (Solo Admin)
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Non autenticato");
+    if (!user) throw new Error(dictError.AUTH_REQUIRED_ALT);
 
     const { data: adminPlayer } = await supabase
         .from('players')
@@ -29,7 +31,7 @@ export async function createClub(formData: FormData) {
         .single();
 
     if (!adminPlayer || adminPlayer.role !== 'admin') {
-        throw new Error("Accesso negato: Solo gli amministratori possono aggiungere campi.");
+        throw new Error(dictError.CLUB_CREATE_ADMIN_ONLY);
     }
 
     // Generazione Automatica Link Google Maps
@@ -62,7 +64,7 @@ export async function createClub(formData: FormData) {
     await logAction(
         'CLUB_CREATED',
         club.id,
-        `Creato circolo: ${clubName}`,
+        dictAudit.LOG_CLUB_CREATED.replace('{name}', clubName),
         { name: clubName, city: clubCity }
     );
 
@@ -79,7 +81,7 @@ export async function deleteClub(clubId: number) {
 
     // 1. Controllo Autenticazione e Ruolo
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Non autenticato");
+    if (!user) throw new Error(dictError.AUTH_REQUIRED_ALT);
 
     const { data: adminPlayer } = await supabase
         .from('players')
@@ -98,14 +100,14 @@ export async function deleteClub(clubId: number) {
         .delete()
         .eq('id', clubId);
 
-    if (deleteError) throw new Error(`Impossibile eliminare il circolo: ${deleteError.message}`);
+    if (deleteError) throw new Error(`${dictError.CLUB_DELETE_ERROR}${deleteError.message}`);
 
     // 3. Scrittura nell'Audit Log
     if (clubToDel) {
         await logAction(
             'CLUB_DELETED',
             clubId,
-            `Circolo eliminato: ${clubToDel.name}`,
+            dictAudit.LOG_CLUB_DELETED.replace('{name}', clubToDel.name),
             {
                 club_name: clubToDel.name,
                 action: 'deletion'

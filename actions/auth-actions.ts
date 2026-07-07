@@ -29,7 +29,7 @@ async function resolveUserIdentity(supabase: any, player: any, roleData: any, us
 
     // 3. Gestore puro (senza profilo giocatore)
     if (roleData?.role === 'club_manager') {
-        let operatore = "Gestore Campo";
+        let operatore = dictAudit.QUALIFICA_MANAGER;
         if (userId) {
             const { data: manager } = await supabase
                 .from('club_managers')
@@ -72,13 +72,15 @@ export async function logUserLogin(userId: string) {
             return;
         }
 
-                // Deleghiamo l'estrazione delle stringhe all'helper
-                const { qualifica, operatore } = await resolveUserIdentity(supabase, player, roleData, userId);
+        // Deleghiamo l'estrazione delle stringhe all'helper
+        const { qualifica, operatore } = await resolveUserIdentity(supabase, player, roleData, userId);
 
         await logAction(
-            'USER_LOGIN',
+            dictAudit.ACTION_LOGIN,
             userId,
-            `Accesso effettuato: ${qualifica} ${operatore}`,
+            dictAudit.LOG_USER_LOGIN
+                .replace('{qualifica}', qualifica)
+                .replace('{operatore}', operatore),
             {
                 user_id: userId,
                 method: 'email_password'
@@ -95,9 +97,9 @@ export async function logUserLogin(userId: string) {
 export async function logUserRegistration(userId: string, fullName: string) {
     try {
         await logAction(
-            'USER_REGISTERED',
+            dictAudit.ACTION_REGISTRATION,
             userId,
-            `Nuovo giocatore registrato: ${fullName}`
+            dictAudit.LOG_REGISTRATION.replace('{name}', fullName)
         );
     } catch (error) {
         console.error("Errore durante il log della registrazione:", error);
@@ -133,7 +135,7 @@ export async function inviteClubManager(email: string, clubId: number, firstName
 
         if (roleError) throw new Error(`Errore assegnazione ruolo: ${roleError.message}`);
 
-                // 3. Assegnazione del circolo nella tabella ponte (aggiornata al nuovo schema)
+        // 3. Assegnazione del circolo nella tabella ponte (aggiornata al nuovo schema)
         const { error: clubError } = await supabaseAdmin
             .from('club_managers')
             .insert([{

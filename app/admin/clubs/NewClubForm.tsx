@@ -14,7 +14,10 @@ export default function NewClubForm() {
         e.preventDefault();
         setError(null);
         const formData = new FormData();
-        formData.append('name', name); formData.append('address', address); formData.append('city', city);
+        formData.append('name', name);
+        formData.append('address', address);
+        formData.append('city', city);
+
         startTransition(async () => {
             const result = await createClub(formData);
             if (result?.error) setError(result.error);
@@ -24,11 +27,32 @@ export default function NewClubForm() {
 
     return (
         <form onSubmit={handleSubmit} className="bg-white p-5 border border-slate-200 shadow-sm rounded-sm flex flex-col gap-4">
-            <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Aggiungi Nuovo Circolo</h2>
+            <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                {t('admin', 'CLUB_PAGE_ADD_TITLE')}
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="NOME CIRCOLO" className="p-2 border border-slate-300 bg-slate-50 text-xs font-bold text-slate-900 rounded-sm focus:border-slate-900 outline-none" required />
-                <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="INDIRIZZO" className="p-2 border border-slate-300 bg-slate-50 text-xs font-bold text-slate-900 rounded-sm focus:border-slate-900 outline-none" />
-                <input type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder="CITTA'" className="p-2 border border-slate-300 bg-slate-50 text-xs font-bold text-slate-900 rounded-sm focus:border-slate-900 outline-none" />
+                <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder={t('form', 'CLUB_ADD_NAME')}
+                    className="p-2 border border-slate-300 bg-slate-50 text-xs font-bold text-slate-900 rounded-sm focus:border-slate-900 outline-none"
+                    required
+                />
+                <input
+                    type="text"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder={t('form', 'CLUB_ADD_ADDRESS')}
+                    className="p-2 border border-slate-300 bg-slate-50 text-xs font-bold text-slate-900 rounded-sm focus:border-slate-900 outline-none"
+                />
+                <input
+                    type="text"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder={t('form', 'CLUB_ADD_CITY')}
+                    className="p-2 border border-slate-300 bg-slate-50 text-xs font-bold text-slate-900 rounded-sm focus:border-slate-900 outline-none"
+                />
             </div>
             <button type="submit" disabled={isPending || !name.trim()} className="bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest py-3 rounded-sm disabled:opacity-50">
                 {isPending ? t('form', 'CLUB_ADD_SAVING') : t('admin', 'CLUB_PAGE_ADD_SUBMIT')}
@@ -37,4 +61,3 @@ export default function NewClubForm() {
         </form>
     );
 }
-

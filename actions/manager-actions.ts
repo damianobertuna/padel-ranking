@@ -1,15 +1,17 @@
+// actions/manager-actions.ts
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { logAction } from '@/lib/audit';
 import dictAudit from '@/lib/i18n/dict-audit';
+import dictError from '@/lib/i18n/dict-error';
 
 export async function updateManagerProfile(formData: FormData) {
     const supabase = await createClient();
 
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Devi effettuare l'accesso per modificare il tuo profilo.");
+    if (!user) throw new Error(dictError.AUTH_REQUIRED_OWN_PROFILE);
 
     const firstName = (formData.get('firstName') as string).trim();
     const lastName = (formData.get('lastName') as string).trim();
@@ -23,7 +25,7 @@ export async function updateManagerProfile(formData: FormData) {
         .maybeSingle();
 
     if (userRole?.role !== 'club_manager') {
-        throw new Error("Azione non autorizzata.");
+        throw new Error(dictError.AUTH_ACTION_NOT_ALLOWED);
     }
 
     const { data: updated, error } = await supabase
@@ -36,7 +38,7 @@ export async function updateManagerProfile(formData: FormData) {
 
     // Detect RLS silent failure
     if (!updated || updated.length === 0) {
-        throw new Error("ACCESSO NEGATO: Impossibile aggiornare il profilo. Verifica i permessi (RLS).");
+        throw new Error(dictError.MANAGER_RLS_BLOCKED);
     }
 
     await logAction(
@@ -57,7 +59,7 @@ export async function updateManagerByAdmin(formData: FormData) {
 
     // 1. Verifica admin loggato
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Non autenticato');
+    if (!user) throw new Error(dictError.AUTH_REQUIRED_ALT);
 
     const { data: currentPlayer } = await supabase
         .from('players')
@@ -66,7 +68,7 @@ export async function updateManagerByAdmin(formData: FormData) {
         .single();
 
     if (!currentPlayer || currentPlayer.role !== 'admin') {
-        throw new Error('Azione non autorizzata. Serve il ruolo Admin.');
+        throw new Error(dictError.PERMISSION_DENIED_NOT_ADMIN);
     }
 
     // 2. Estrai dati dal form
@@ -130,7 +132,7 @@ export async function deleteManagerByAdmin(managerId: string) {
 
     // 1. Verifica admin
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Non autenticato');
+    if (!user) throw new Error(dictError.AUTH_REQUIRED_ALT);
 
     const { data: currentPlayer } = await supabase
         .from('players')
@@ -139,7 +141,7 @@ export async function deleteManagerByAdmin(managerId: string) {
         .single();
 
     if (!currentPlayer || currentPlayer.role !== 'admin') {
-        throw new Error('Azione non autorizzata. Serve il ruolo Admin.');
+        throw new Error(dictError.PERMISSION_DENIED_NOT_ADMIN);
     }
 
     // 2. Recupera dati gestore prima dell'eliminazione
@@ -149,7 +151,7 @@ export async function deleteManagerByAdmin(managerId: string) {
         .eq('id', managerId)
         .single();
 
-    if (!targetManager) throw new Error("Gestore non trovato.");
+    if (!targetManager) throw new Error(dictError.MANAGER_NOT_FOUND);
 
     // 3. Elimina la riga da club_managers
     const { error: deleteError } = await supabase

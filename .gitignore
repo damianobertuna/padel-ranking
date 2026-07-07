@@ -62,3 +62,8 @@ project-context.txt
 .husky
 docs/
 lib/database.types.ts
+merge-i18n.sh
+lib/i18n/translations.ts
+backup_locale.sql
+backup_mac.sql
+backup_mac_2026-07-03.sql
