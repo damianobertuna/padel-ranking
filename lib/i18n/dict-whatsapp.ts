@@ -29,6 +29,12 @@ const dictWhatsapp = {
   MATCH_TYPE_RANKED: '🔥 Classificata',
   MATCH_TYPE_FRIENDLY: '🤝 Amichevole',
   LABEL_RESULT_INFO: '*Dettaglio completo su:*',
+
+  // --- Notification log messages ---
+  NOTIFY_CREATE_FAILED: 'Notifica WhatsApp creazione fallita:',
+  NOTIFY_RESULT_FAILED: 'Notifica WhatsApp fallita:',
+  NOTIFY_UPDATE_FAILED: 'Notifica WhatsApp fallita:',
+  NOTIFY_ERROR_PREFIX: 'Errore notifica WhatsApp:',
 } as const;
 
 export default dictWhatsapp;

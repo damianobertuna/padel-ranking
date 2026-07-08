@@ -5,8 +5,9 @@ import { revalidatePath } from "next/cache";
 import { logAction } from "@/lib/audit";
 import { computeKingAndFanalino } from "@/lib/rankingCalc";
 import { sendWhatsAppNotification } from '@/lib/whatsapp';
-import { buildResultMessage, buildUpdateMessage, PlayerBrief } from '@/lib/whatsapp-messages';
+import { buildResultMessage, buildSummonMessage, buildUpdateMessage, PlayerBrief, ClubBrief, MatchBrief } from '@/lib/whatsapp-messages';
 import dictAudit from "@/lib/i18n/dict-audit";
+import dictWhatsapp from "@/lib/i18n/dict-whatsapp";
 
 // Interfaccia per la struttura del set
 export interface SetScore {
@@ -300,6 +301,49 @@ export async function createPendingMatch(data: {
     );
 
     if (logError) console.error("❌ ERRORE LOG CREAZIONE MATCH:", logError.message);
+
+        // --- WHATSAPP NOTIFICATION: Match Created / Summon ---
+    try {
+        // Fetch full player data (including ranking, preferred_side) for the message builder
+        let players: PlayerBrief[] = [];
+        if (selectedPlayerIds.length > 0) {
+            const { data: fetchedPlayers } = await supabase
+                .from('players')
+                .select('id, first_name, last_name, ranking, preferred_side')
+                .in('id', selectedPlayerIds);
+            if (fetchedPlayers) players = fetchedPlayers;
+        }
+
+        // Fetch club data for location info
+        let club: ClubBrief | null = null;
+        if (data.clubId) {
+            const { data: clubData } = await supabase
+                .from('clubs')
+                .select('name, city')
+                .eq('id', data.clubId)
+                .single();
+            if (clubData) club = clubData;
+        }
+
+        const matchBrief: MatchBrief = {
+            id: matchId.id,
+            match_date: data.matchDate,
+            court_type: data.courtType ?? null,
+            is_friendly: data.isFriendly ?? false,
+            team_a_left_id: data.teamALeft,
+            team_a_right_id: data.teamARight,
+            team_b_left_id: data.teamBLeft,
+            team_b_right_id: data.teamBRight,
+        };
+
+        const whatsappMessage = buildSummonMessage(matchBrief, players, club);
+        sendWhatsAppNotification(whatsappMessage).then(res => {
+            if (!res.success) console.warn(dictWhatsapp.NOTIFY_CREATE_FAILED, res.error);
+        });
+    } catch (waError) {
+        console.error(dictWhatsapp.NOTIFY_ERROR_PREFIX, dictWhatsapp.NOTIFY_CREATE_FAILED, waError);
+    }
+    // -------------------------------------------------------------------------
 
     revalidatePath('/');
 }
