@@ -29,7 +29,7 @@ async function resolveUserIdentity(supabase: any, player: any, roleData: any, us
 
     // 3. Gestore puro (senza profilo giocatore)
     if (roleData?.role === 'club_manager') {
-        let operatore = dictAudit.QUALIFICA_MANAGER;
+        let operatore: string = dictAudit.QUALIFICA_MANAGER;
         if (userId) {
             const { data: manager } = await supabase
                 .from('club_managers')
