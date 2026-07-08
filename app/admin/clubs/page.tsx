@@ -92,11 +92,11 @@ export default async function AdminClubsPage({ searchParams }: PageProps) {
 
         return (
             <div className="flex items-center justify-center gap-1 mt-8 mb-4">
-                {renderButton(1, '«', 'Prima Pagina', current === 1)}
-                {renderButton(Math.max(1, current - 1), '‹', 'Precedente', current === 1)}
-                {visiblePages.map(p => renderButton(p, p, `Pagina ${p}`, false, p === current))}
-                {renderButton(Math.min(total, current + 1), '›', 'Successiva', current === total)}
-                {renderButton(total, '»', 'Ultima Pagina', current === total)}
+                {renderButton(1, '«', t('ui', 'PAGINATION_FIRST'), current === 1)}
+                {renderButton(Math.max(1, current - 1), '‹', t('ui', 'PAGINATION_PREV'), current === 1)}
+                {visiblePages.map(p => renderButton(p, p, `${t('ui', 'PAGINATION_PAGE')} ${p}`, false, p === current))}
+                {renderButton(Math.min(total, current + 1), '›', t('ui', 'PAGINATION_NEXT'), current === total)}
+                {renderButton(total, '»', t('ui', 'PAGINATION_LAST'), current === total)}
             </div>
         );
     };
@@ -110,7 +110,7 @@ export default async function AdminClubsPage({ searchParams }: PageProps) {
                     <div className="flex justify-between items-end mt-2">
                         <div>
                             <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">{t('admin', 'PAGE_TITLE_CLUBS')}</h1>
-                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Area Amministrativa Federale</p>
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">{t('nav', 'ADMIN_AREA')}</p>
                         </div>
 
                         {/* Il nuovo bottone per invitare i gestori */}
