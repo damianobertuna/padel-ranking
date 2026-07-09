@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import AvatarUpload from '@/components/players/AvatarUpload';
 import { updatePlayerAvatar } from '@/actions/player-actions';
+import dictProfile from '@/lib/i18n/dict-profile';
 
 interface EditAvatarProps {
     playerId: number;
@@ -15,10 +16,9 @@ export default function EditAvatar({ playerId, currentAvatarUrl }: EditAvatarPro
     const handleAvatarChange = async (newUrl: string) => {
         setIsUpdating(true);
         try {
-            // Chiama la Server Action che abbiamo appena creato
             await updatePlayerAvatar(playerId, newUrl);
         } catch (error: any) {
-            alert(`Errore durante il salvataggio: ${error.message}`);
+            alert(`${dictProfile.SAVE_ERROR}${error.message}`);
         } finally {
             setIsUpdating(false);
         }
@@ -32,7 +32,7 @@ export default function EditAvatar({ playerId, currentAvatarUrl }: EditAvatarPro
             />
             {isUpdating && (
                 <span className="text-[9px] font-black uppercase text-slate-500 tracking-widest animate-pulse mt-2">
-                    Salvataggio in corso...
+                    {dictProfile.BUTTON_SAVING}
                 </span>
             )}
         </div>
