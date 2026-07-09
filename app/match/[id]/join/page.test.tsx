@@ -4,6 +4,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import EditMatchPage from './page';
 import { createClient } from '@/lib/supabase/client';
 import { useParams } from 'next/navigation';
+import dictUi from '@/lib/i18n/dict-ui';
+import dictError from '@/lib/i18n/dict-error';
+import dictMatch from '@/lib/i18n/dict-match';
 
 // Mock dei moduli esterni
 vi.mock('next/navigation', () => ({
@@ -104,14 +107,14 @@ describe('JoinMatchPage Unit Tests (Edit Match Page)', () => {
         });
 
         render(<EditMatchPage />);
-        expect(screen.getByText(/Caricamento/i)).toBeDefined();
+        expect(screen.getByText(new RegExp(dictUi.LOADING, 'i'))).toBeDefined();
     });
 
     it('dovrebbe renderizzare correttamente il form dopo il caricamento se autorizzato', async () => {
         render(<EditMatchPage />);
 
         // Aspettiamo la transizione dello stato dal loader alla visualizzazione del form unificato
-        await screen.findByText('Modifica Partita');
+        await screen.findByText(dictMatch.EDIT_TITLE);
 
         // Poiché i dati iniziali passano i giocatori pre-esistenti della partita,
         // SearchableSelect mostrerà i loro nomi come opzioni correnti selezionate.
@@ -128,6 +131,6 @@ describe('JoinMatchPage Unit Tests (Edit Match Page)', () => {
         render(<EditMatchPage />);
 
         // Il form non deve apparire, ma deve apparire il banner di errore di sicurezza
-        await screen.findByText(/ACCESSO NEGATO: Non sei autorizzato a gestire/i);
+        await screen.findByText(new RegExp(dictError.PERMISSION_DENIED_EDIT, 'i'));
     });
 });

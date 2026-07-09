@@ -4,6 +4,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CreateMatchPage from './page';
 import { createClient } from '@/lib/supabase/client';
 import { createPendingMatch } from '@/actions/match-actions';
+import dictForm from '@/lib/i18n/dict-form';
+import dictPlayer from '@/lib/i18n/dict-player';
+import dictWhatsapp from '@/lib/i18n/dict-whatsapp';
+import dictUi from '@/lib/i18n/dict-ui';
+import dictError from '@/lib/i18n/dict-error';
 
 // Mock di Next Navigation
 const mockPush = vi.fn();
@@ -71,11 +76,8 @@ describe('CreateMatchForm Component (Page Integration)', () => {
     it('dovrebbe filtrare i giocatori in base alla categoria (Genere)', async () => {
         render(<CreateMatchPage />);
 
-        // Attendiamo che finisca il caricamento asincrono iniziale
-        await screen.findByText('Nuova Partita');
-
-        // Il tipo di match iniziale è MASCHILE. Apriamo la dropdown del Giocatore SX
-        const slotsSX = screen.getAllByText('GIOCATORE SX');
+        await screen.findByText(dictForm.CREATE_TITLE);
+        const slotsSX = screen.getAllByText(dictPlayer.PLAYER_SX);
         fireEvent.click(slotsSX[0]);
 
         // Dovrebbe mostrare Rossi (Maschio) ma nascondere Anna Neri (Femmina)
@@ -85,10 +87,10 @@ describe('CreateMatchForm Component (Page Integration)', () => {
 
     it('dovrebbe innescare l alert di scompenso se la forbice tecnica supera lo 0.25', async () => {
         render(<CreateMatchPage />);
-        await screen.findByText('Nuova Partita');
+        await screen.findByText(dictForm.CREATE_TITLE);
 
-        const slotsSX = screen.getAllByText('GIOCATORE SX');
-        const slotsDX = screen.getAllByText('GIOCATORE DX');
+        const slotsSX = screen.getAllByText(dictPlayer.PLAYER_SX);
+        const slotsDX = screen.getAllByText(dictPlayer.PLAYER_DX);
 
         // Selezioniamo Mario Rossi (4.00) nel Team A
         fireEvent.click(slotsSX[0]);
@@ -99,18 +101,18 @@ describe('CreateMatchForm Component (Page Integration)', () => {
         fireEvent.click(screen.getByText(/Bramieri Gino/i));
 
         // Verifica la comparsa del blocco sull'Elo
-        expect(screen.getByText(/ERRORE: DIVARIO TECNICO > 0.25/i)).toBeDefined();
+        // Use queryByText to avoid thrown error when element not found
+        const errorEl = screen.queryByText(new RegExp(dictError.PLAYER_LEVEL_ERROR.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+        expect(errorEl).not.toBeNull();
     });
 
     it('in modalità AMICHEVOLE, un giocatore SX dovrebbe apparire anche nel dropdown DX', async () => {
         render(<CreateMatchPage />);
-        await screen.findByText('Nuova Partita');
+        await screen.findByText(dictForm.CREATE_TITLE);
 
-        // Passa ad amichevole
-        fireEvent.click(screen.getByText('🤝 Amichevole'));
+        fireEvent.click(screen.getByText(dictWhatsapp.MATCH_TYPE_FRIENDLY));
 
-        // Apri dropdown DX del Team A
-        const slotsDX = screen.getAllByText('GIOCATORE DX');
+        const slotsDX = screen.getAllByText(dictPlayer.PLAYER_DX);
         fireEvent.click(slotsDX[0]);
 
         // Mario Rossi (Left) deve essere visibile
@@ -119,13 +121,11 @@ describe('CreateMatchForm Component (Page Integration)', () => {
 
     it('in modalità AMICHEVOLE, un giocatore DX dovrebbe apparire anche nel dropdown SX', async () => {
         render(<CreateMatchPage />);
-        await screen.findByText('Nuova Partita');
+        await screen.findByText(dictForm.CREATE_TITLE);
 
-        // Passa ad amichevole
-        fireEvent.click(screen.getByText('🤝 Amichevole'));
+        fireEvent.click(screen.getByText(dictWhatsapp.MATCH_TYPE_FRIENDLY));
 
-        // Apri dropdown SX del Team A
-        const slotsSX = screen.getAllByText('GIOCATORE SX');
+        const slotsSX = screen.getAllByText(dictPlayer.PLAYER_SX);
         fireEvent.click(slotsSX[0]);
 
         // Luigi Verdi (Right) deve essere visibile
@@ -134,13 +134,12 @@ describe('CreateMatchForm Component (Page Integration)', () => {
 
     it('dovrebbe inviare i dati corretti alla Server Action', async () => {
         render(<CreateMatchPage />);
-        await screen.findByText('Nuova Partita');
+        await screen.findByText(dictForm.CREATE_TITLE);
 
-        // Impostiamo il club
-        selectOption('NESSUN CIRCOLO DEFINITO', /Padel Club Catania/i);
+        selectOption(dictUi.CLUB_FILTER_NONE, /Padel Club Catania/i);
 
-        const slotsSX = screen.getAllByText('GIOCATORE SX');
-        const slotsDX = screen.getAllByText('GIOCATORE DX');
+        const slotsSX = screen.getAllByText(dictPlayer.PLAYER_SX);
+        const slotsDX = screen.getAllByText(dictPlayer.PLAYER_DX);
 
         // Compiliamo il Team A
         fireEvent.click(slotsSX[0]);

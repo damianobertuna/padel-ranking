@@ -83,6 +83,8 @@ const dictForm = {
 
   PLAYER_GENDER_M: 'MASCHILE',
   PLAYER_GENDER_F: 'FEMMINILE',
+  
+  CREATE_SUBMIT: 'Crea Partita',
 } as const;
 
 export default dictForm;
