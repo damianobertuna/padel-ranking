@@ -38,7 +38,8 @@ function formatDate(dateString: string | null | undefined): string {
     if (!dateString) return 'Da definire';
     return new Date(dateString).toLocaleString('it-IT', {
         weekday: 'short', day: '2-digit', month: 'short',
-        hour: '2-digit', minute: '2-digit'
+        hour: '2-digit', minute: '2-digit',
+        timeZone: 'Europe/Rome'
     });
 }
 
