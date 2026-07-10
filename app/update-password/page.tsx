@@ -212,4 +212,3 @@ export default function UpdatePasswordPage() {
         </main>
     );
 }
-```[cite: 21]
