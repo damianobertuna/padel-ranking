@@ -7,6 +7,10 @@ import { calculateRankingUpdates, MatchContext } from '@/lib/matchRules';
 import { resolveMatchWithRanking } from '@/actions/match-actions';
 import { Player, Match } from '@/types';
 import BackToHomeButton from "@/components/ui/BackToHomeButton";
+import dictError from '@/lib/i18n/dict-error';
+import dictMatch from '@/lib/i18n/dict-match';
+import dictPlayer from '@/lib/i18n/dict-player';
+import dictUi from '@/lib/i18n/dict-ui';
 
 export default function ResolveMatch() {
     const supabase = createClient();
@@ -33,12 +37,12 @@ export default function ResolveMatch() {
                 ]);
 
                 const user = authRes.data.user;
-                if (!user) throw new Error("Devi effettuare l'accesso.");
+                if (!user) throw new Error(dictError.AUTH_REQUIRED);
 
                 const matchData = matchRes.data;
-                if (!matchData) throw new Error("Partita non trovata o referto inesistente.");
+                if (!matchData) throw new Error(dictError.MATCH_NOT_FOUND_REPORT);
 
-                                const allPlayers = playersRes.data || [];
+                const allPlayers = playersRes.data || [];
                 const currentUserPlayer = allPlayers.find(p => p.user_id === user.id);
 
                 // --- CONTROLLO DI SICUREZZA LATO CLIENT ---
@@ -78,14 +82,14 @@ export default function ResolveMatch() {
                 const canResolve = isAdmin || isPlayerInMatch || isManagerForThisMatch;
 
                 if (!canResolve) {
-                    throw new Error("ACCESSO NEGATO: Non sei autorizzato a inserire il risultato per questa partita.");
+                    throw new Error(dictError.PERMISSION_DENIED_RESOLVE);
                 }
                 // -----------------------------------------
 
                 setMatch(matchData);
                 setPlayers(allPlayers);
             } catch (err: any) {
-                setError(err.message || "Si è verificato un errore.");
+                setError(err.message || dictError.GENERIC);
             } finally {
                 setPageLoading(false);
             }
@@ -96,7 +100,7 @@ export default function ResolveMatch() {
     const getPlayerName = (id: number | null) => {
         if (id === null) return 'OSPITE';
         const p = players.find(pl => pl.id === id);
-        if (!p || !p.last_name || !p.first_name) return 'N.D.';
+        if (!p || !p.last_name || !p.first_name) return dictMatch.LABEL_PLAYER_ND;
         return `${p.last_name.toUpperCase()} ${p.first_name[0]}.`;
     };
 
@@ -105,7 +109,7 @@ export default function ResolveMatch() {
         if (!match) return;
 
         const s1A = parseInt(sets.s1A), s1B = parseInt(sets.s1B), s2A = parseInt(sets.s2A), s2B = parseInt(sets.s2B);
-        if (isNaN(s1A) || isNaN(s1B) || isNaN(s2A) || isNaN(s2B)) { setError('I primi 2 set sono obbligatori.'); return; }
+        if (isNaN(s1A) || isNaN(s1B) || isNaN(s2A) || isNaN(s2B)) { setError(dictMatch.ERROR_SETS_INCOMPLETE); return; }
 
         const scoreArray = [{ team_a: s1A, team_b: s1B }, { team_a: s2A, team_b: s2B }];
         if (sets.s3A !== '' && sets.s3B !== '') scoreArray.push({ team_a: parseInt(sets.s3A), team_b: parseInt(sets.s3B) });
@@ -113,7 +117,7 @@ export default function ResolveMatch() {
         let setsWonA = 0, setsWonB = 0;
         scoreArray.forEach(s => { if (s.team_a > s.team_b) setsWonA++; else if (s.team_b > s.team_a) setsWonB++; });
 
-        if (setsWonA === setsWonB) { setError('Partita in pareggio: 3° set obbligatorio.'); return; }
+        if (setsWonA === setsWonB) { setError(dictMatch.ERROR_SETS_TIED); return; }
 
         setSubmitting(true);
         const finalWinningTeam = setsWonA > setsWonB ? 'A' : 'B';
@@ -142,7 +146,7 @@ export default function ResolveMatch() {
         } catch (err: any) { setError(err.message); setSubmitting(false); }
     };
 
-    if (pageLoading) return <main className="min-h-screen flex items-center justify-center text-[10px] font-black uppercase tracking-widest">Caricamento referto...</main>;
+    if (pageLoading) return <main className="min-h-screen flex items-center justify-center text-[10px] font-black uppercase tracking-widest">{dictMatch.REPORT_LOADING}</main>;
 
     // Se c'è un errore (es. Accesso Negato), mostriamo una schermata di stop
     if (error || !match) {
@@ -150,10 +154,10 @@ export default function ResolveMatch() {
             <main className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-50">
                 <div className="bg-white border border-slate-200 shadow-sm p-6 rounded-sm text-center max-w-sm w-full">
                     <h1 className="text-xl font-black text-red-600 uppercase tracking-tighter mb-2">
-                        {error ? 'ACCESSO NEGATO' : 'ERRORE 404'}
+                        {error ? dictError.PERMISSION_DENIED : dictError.NOT_FOUND_404}
                     </h1>
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">
-                        {error || 'Referto non trovato o partita non valida.'}
+                        {error || dictError.NOT_FOUND_REPORT}
                     </p>
                     <BackToHomeButton />
                 </div>
@@ -166,7 +170,7 @@ export default function ResolveMatch() {
             <div className=" w-full bg-white border border-slate-200 shadow-sm p-6 rounded-sm">
                 <div className="mb-6"><BackToHomeButton /></div>
                 <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-6">
-                    Referto Gara {match.is_friendly && <span className="text-slate-400 text-lg ml-2">(AMICHEVOLE)</span>}
+                    {dictMatch.REPORT_TITLE} {match.is_friendly && <span className="text-slate-400 text-lg ml-2">({dictMatch.BADGE_AMICHEVOLE})</span>}
                 </h1>
 
                 {error && <div className="p-3 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest mb-4">{error}</div>}
@@ -174,14 +178,14 @@ export default function ResolveMatch() {
                 <form onSubmit={handleSubmitScore} className="space-y-4">
                     <div className="grid grid-cols-2 gap-2 mb-6">
                         <div className="bg-blue-50 border border-blue-200 p-2 text-center">
-                            <p className="text-[9px] font-black text-blue-800 uppercase tracking-widest mb-1">TEAM A (BLU)</p>
+                            <p className="text-[9px] font-black text-blue-800 uppercase tracking-widest mb-1">{dictPlayer.TEAM_A_BLUE}</p>
                             <p className="text-[10px] font-bold text-slate-900 leading-tight">
                                 {getPlayerName(match.team_a_left_id)}<br/>
                                 {getPlayerName(match.team_a_right_id)}
                             </p>
                         </div>
                         <div className="bg-red-50 border border-red-200 p-2 text-center">
-                            <p className="text-[9px] font-black text-red-800 uppercase tracking-widest mb-1">TEAM B (ROSSO)</p>
+                            <p className="text-[9px] font-black text-red-800 uppercase tracking-widest mb-1">{dictPlayer.TEAM_B_RED}</p>
                             <p className="text-[10px] font-bold text-slate-900 leading-tight">
                                 {getPlayerName(match.team_b_left_id)}<br/>
                                 {getPlayerName(match.team_b_right_id)}
@@ -191,14 +195,14 @@ export default function ResolveMatch() {
 
                     <div className="text-center font-black text-[10px] uppercase text-slate-900 mb-4 border-b border-slate-100 pb-4">
                         {getPlayerName(match.team_a_left_id)} / {getPlayerName(match.team_a_right_id)}
-                        <span className="block text-[8px] text-slate-400 mt-1 mb-1">VS</span>
+                        <span className="block text-[8px] text-slate-400 mt-1 mb-1">{dictPlayer.VS}</span>
                         {getPlayerName(match.team_b_left_id)} / {getPlayerName(match.team_b_right_id)}
                     </div>
 
                     {[1, 2, 3].map(i => (
                         <div key={i} className={`grid grid-cols-3 gap-4 items-center p-2 ${i === 3 ? 'bg-slate-100' : ''}`}>
                             <input type="number" required={i < 3} min="0" max="7" value={sets[`s${i}A` as keyof typeof sets]} onChange={e => setSets({...sets, [`s${i}A`]: e.target.value})} className="w-full text-center p-2 border border-slate-300 font-black text-sm rounded-sm" placeholder="-" />
-                            <div className="text-center text-[9px] font-black uppercase text-slate-400">Set {i}</div>
+                            <div className="text-center text-[9px] font-black uppercase text-slate-400">{dictUi.SET_N.replace('{n}', String(i))}</div>
                             <input type="number" required={i < 3} min="0" max="7" value={sets[`s${i}B` as keyof typeof sets]} onChange={e => setSets({...sets, [`s${i}B`]: e.target.value})} className="w-full text-center p-2 border border-slate-300 font-black text-sm rounded-sm" placeholder="-" />
                         </div>
                     ))}
@@ -209,8 +213,8 @@ export default function ResolveMatch() {
                         className="w-full bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest py-4 rounded-sm hover:bg-black disabled:opacity-50 mt-4 cursor-pointer"
                     >
                         {submitting
-                            ? 'ELABORAZIONE...'
-                            : (match.is_friendly ? 'REGISTRA AMICHEVOLE' : 'CONFERMA E CALCOLA RANKING')}
+                            ? dictMatch.BUTTON_PROCESSING
+                            : (match.is_friendly ? dictMatch.BUTTON_RESOLVE_FRIENDLY : dictMatch.BUTTON_RESOLVE_RANKED)}
                     </button>
                 </form>
             </div>

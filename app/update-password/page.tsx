@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import dictUpdatePassword from '@/lib/i18n/dict-update-password';
+import dictError from '@/lib/i18n/dict-error';
 
 export default function UpdatePasswordPage() {
-        const [password, setPassword] = useState('');
+    const [password, setPassword] = useState('');
     const [confirm, setConfirm] = useState('');
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
@@ -37,7 +39,7 @@ export default function UpdatePasswordPage() {
                     });
 
                     if (sessionError) {
-                        if (mounted) setError("Errore di validazione: " + sessionError.message);
+                        if (mounted) setError(dictError.AUTH_SESSION_ERROR + sessionError.message);
                         return;
                     }
 
@@ -61,7 +63,7 @@ export default function UpdatePasswordPage() {
             if (mounted && !hash.includes('access_token')) {
                 setTimeout(() => {
                     if (mounted && !sessionReady) {
-                        setError("Nessun token valido trovato. Il link potrebbe essere scaduto.");
+                        setError(dictUpdatePassword.ERROR_NO_TOKEN);
                     }
                 }, 2000);
             }
@@ -87,16 +89,16 @@ export default function UpdatePasswordPage() {
         setError('');
 
         if (password.length < 6) {
-            setError("La password deve avere almeno 6 caratteri.");
+            setError(dictUpdatePassword.ERROR_MIN_LENGTH);
             return;
         }
 
         if (password !== confirm) {
-            setError("Le password non coincidono.");
+            setError(dictUpdatePassword.ERROR_MISMATCH);
             return;
         }
 
-                setLoading(true);
+        setLoading(true);
         try {
             const { error: updateError } = await supabase.auth.updateUser({
                 password: password,
@@ -113,7 +115,7 @@ export default function UpdatePasswordPage() {
             router.refresh();
 
         } catch (err: any) {
-            setError(err.message || "Impossibile aggiornare la password.");
+            setError(err.message || dictUpdatePassword.ERROR_UPDATE);
             setLoading(false);
         }
     };
@@ -122,18 +124,18 @@ export default function UpdatePasswordPage() {
         <main className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
             <div className="bg-white p-8 max-w-md w-full border border-slate-200 shadow-sm rounded-sm">
                 <h1 className="text-2xl font-black uppercase tracking-tighter text-slate-900 mb-2">
-                    Benvenuto Gestore
+                    {dictUpdatePassword.WELCOME}
                 </h1>
 
                 {!sessionReady && !error && (
                     <div className="mb-4 bg-amber-50 text-amber-700 p-3 text-[10px] font-bold uppercase rounded-sm border border-amber-100 flex items-center gap-2">
-                        <span className="animate-pulse">⏳</span> Verifica link sicuro in corso...
+                        <span className="animate-pulse">⏳</span> {dictUpdatePassword.VERIFYING}
                     </div>
                 )}
 
                 {sessionReady && !error && (
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-8 text-green-600">
-                        ✓ Identità verificata. Imposta la tua password.
+                        {dictUpdatePassword.VERIFIED}
                     </p>
                 )}
 
@@ -143,14 +145,14 @@ export default function UpdatePasswordPage() {
                     </div>
                 )}
 
-                                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
                         <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">
-                            Nome
+                            {dictUpdatePassword.LABEL_NOME}
                         </label>
                         <input
                             type="text"
-                            placeholder="Mario"
+                            placeholder={dictUpdatePassword.PLACEHOLDER_NOME}
                             value={firstName}
                             onChange={(e) => setFirstName(e.target.value)}
                             disabled={!sessionReady}
@@ -160,11 +162,11 @@ export default function UpdatePasswordPage() {
                     </div>
                     <div>
                         <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">
-                            Cognome
+                            {dictUpdatePassword.LABEL_COGNOME}
                         </label>
                         <input
                             type="text"
-                            placeholder="Rossi"
+                            placeholder={dictUpdatePassword.PLACEHOLDER_COGNOME}
                             value={lastName}
                             onChange={(e) => setLastName(e.target.value)}
                             disabled={!sessionReady}
@@ -174,7 +176,7 @@ export default function UpdatePasswordPage() {
                     </div>
                     <div>
                         <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">
-                            Nuova Password
+                            {dictUpdatePassword.LABEL_NEW_PASSWORD}
                         </label>
                         <input
                             type="password"
@@ -187,7 +189,7 @@ export default function UpdatePasswordPage() {
                     </div>
                     <div>
                         <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">
-                            Conferma Password
+                            {dictUpdatePassword.LABEL_CONFIRM}
                         </label>
                         <input
                             type="password"
@@ -203,10 +205,11 @@ export default function UpdatePasswordPage() {
                         disabled={loading || !sessionReady}
                         className="w-full mt-4 bg-slate-900 text-white px-4 py-3 text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-colors disabled:opacity-50"
                     >
-                        {loading ? 'Salvataggio...' : 'Salva e Accedi'}
+                        {loading ? dictUpdatePassword.BUTTON_SAVING : dictUpdatePassword.BUTTON_SAVE}
                     </button>
                 </form>
             </div>
         </main>
     );
 }
+```[cite: 21]
