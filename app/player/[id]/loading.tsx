@@ -1,3 +1,5 @@
+import dictUi from "@/lib/i18n/dict-ui";
+
 export default function PlayerLoading() {
     return (
         <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4">
@@ -7,7 +9,7 @@ export default function PlayerLoading() {
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
                 <p className="text-xs font-black text-slate-500 uppercase tracking-wider animate-pulse">
-                    Elaborazione Statistiche Giocatore...
+                    {dictUi.LOADING_DATA}
                 </p>
             </div>
         </div>

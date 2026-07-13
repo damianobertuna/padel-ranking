@@ -7,6 +7,9 @@ import { useRouter } from 'next/navigation';
 import { Player, Club } from '@/types';
 import BackToHomeButton from "@/components/ui/BackToHomeButton";
 import MatchForm, { MatchFormData } from '@/components/matches/MatchForm';
+import dictForm from '@/lib/i18n/dict-form';
+import dictUi from '@/lib/i18n/dict-ui';
+import dictError from '@/lib/i18n/dict-error';
 
 export default function CreateMatchPage() {
     const supabase = createClient();
@@ -93,18 +96,18 @@ export default function CreateMatchPage() {
             router.push('/?tab=pending');
             router.refresh();
         } catch (err: any) {
-            alert(`Errore durante la creazione: ${err.message}`);
+            alert(`${dictError.MATCH_CREATE_ERROR}${err.message}`);
         }
     };
 
-    if (loading) return <main className="min-h-screen flex items-center justify-center text-[10px] font-black uppercase tracking-widest">Caricamento dati...</main>;
+    if (loading) return <main className="min-h-screen flex items-center justify-center text-[10px] font-black uppercase tracking-widest">{dictUi.LOADING_DATA}</main>;
 
     return (
         <main className="w-full max-w-4xl mx-auto px-4 sm:px-8 mt-6 pb-12">
             <div className="mb-6"><BackToHomeButton tab="pending" /></div>
                         <MatchForm
-                title="Nuova Partita"
-                submitLabel="Crea Partita"
+                title={dictForm.CREATE_TITLE}
+                submitLabel={dictForm.CREATE_SUBMIT}
                 players={players}
                 clubs={clubs}
                 disabledClubId={disabledClubId}

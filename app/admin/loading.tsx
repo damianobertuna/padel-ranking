@@ -1,4 +1,4 @@
-import { t } from '@/lib/i18n';
+import dictAdmin from '@/lib/i18n/dict-admin';
 
 export default function AdminLoading() {
     return (
@@ -11,7 +11,7 @@ export default function AdminLoading() {
                 </svg>
 
                 <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest">
-                    {t('admin', 'LOADING_TEXT')}
+                    {dictAdmin.LOADING_TEXT}
                 </p>
             </div>
         </div>

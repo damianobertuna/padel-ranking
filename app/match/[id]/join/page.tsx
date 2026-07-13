@@ -7,6 +7,9 @@ import { updateMatchPlayers } from '@/actions/match-actions';
 import BackToHomeButton from '@/components/ui/BackToHomeButton';
 import { Player, Club } from '@/types';
 import MatchForm, { MatchFormData } from '@/components/matches/MatchForm';
+import dictError from '@/lib/i18n/dict-error';
+import dictMatch from '@/lib/i18n/dict-match';
+import dictUi from '@/lib/i18n/dict-ui';
 
 export default function EditMatchPage() {
     const supabase = createClient();
@@ -14,7 +17,7 @@ export default function EditMatchPage() {
     const router = useRouter();
     const matchId = params.id as string;
 
-        const [players, setPlayers] = useState<Player[]>([]);
+    const [players, setPlayers] = useState<Player[]>([]);
     const [clubs, setClubs] = useState<Club[]>([]);
     const [initialMatchData, setInitialMatchData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -33,10 +36,10 @@ export default function EditMatchPage() {
                 ]);
 
                 const user = authRes.data.user;
-                if (!user) throw new Error("Devi effettuare l'accesso.");
+                if (!user) throw new Error(dictError.AUTH_REQUIRED);
 
                 const match = matchRes.data;
-                if (!match) throw new Error("Partita non trovata.");
+                if (!match) throw new Error(dictError.MATCH_NOT_FOUND_GENERIC);
 
                 // Cerca profilo giocatore (esiste per player/admin, non per club_manager puro)
                 const currentUserPlayer = playersRes.data?.find(p => p.user_id === user.id);
@@ -81,7 +84,7 @@ export default function EditMatchPage() {
                 const canManage = isAdmin || isOrganizer || isManagerForThisMatch || (!match.organizer_id && isPlayerInMatch);
 
                 if (!canManage) {
-                    throw new Error("ACCESSO NEGATO: Non sei autorizzato a gestire o modificare questa partita.");
+                    throw new Error(dictError.PERMISSION_DENIED_EDIT);
                 }
                 // -----------------------------------------
 
@@ -110,7 +113,7 @@ export default function EditMatchPage() {
                 if (clubsRes.data) setClubs(clubsRes.data);
 
             } catch (err: any) {
-                setError(err.message || 'Errore caricamento dati.');
+                setError(err.message || dictError.MATCH_LOAD_ERROR);
             } finally {
                 setLoading(false);
             }
@@ -118,7 +121,7 @@ export default function EditMatchPage() {
         loadData();
     }, [matchId, supabase]);
 
-        const handleSubmit = async (data: MatchFormData) => {
+    const handleSubmit = async (data: MatchFormData) => {
         try {
             await updateMatchPlayers(matchId, {
                 match_date: data.matchDate,
@@ -138,7 +141,7 @@ export default function EditMatchPage() {
         }
     };
 
-    if (loading) return <main className="min-h-screen flex items-center justify-center text-[10px] font-black uppercase tracking-widest">Caricamento...</main>;
+    if (loading) return <main className="min-h-screen flex items-center justify-center text-[10px] font-black uppercase tracking-widest">{dictUi.LOADING}</main>;
 
     return (
         <main className="w-full max-w-4xl mx-auto px-4 sm:px-8 mt-6 pb-12">
@@ -152,8 +155,8 @@ export default function EditMatchPage() {
 
             {!error && initialMatchData && (
                 <MatchForm
-                    title="Modifica Partita"
-                    submitLabel="Salva Modifiche"
+                    title={dictMatch.EDIT_TITLE}
+                    submitLabel={dictMatch.EDIT_SUBMIT}
                     players={players}
                     clubs={clubs}
                     initialData={initialMatchData}

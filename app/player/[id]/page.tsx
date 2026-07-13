@@ -6,6 +6,12 @@ import GameAverageWidget from '@/components/stats/GameAverageWidget';
 import EditAvatar from '@/app/profile/EditAvatar';
 import BackToHomeButton from "@/components/ui/BackToHomeButton";
 import dictAuth from '@/lib/i18n/dict-auth';
+import dictPlayer from '@/lib/i18n/dict-player';
+import dictNav from '@/lib/i18n/dict-nav';
+import dictStats from '@/lib/i18n/dict-stats';
+import dictMatch from '@/lib/i18n/dict-match';
+import dictUi from '@/lib/i18n/dict-ui';
+import dictForm from '@/lib/i18n/dict-form';
 import Link from 'next/link';
 
 export const revalidate = 0;
@@ -29,7 +35,7 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
     // 1. Profilo Giocatore
     const { data: player } = await supabase.from('players').select('*').eq('id', playerId).single();
 
-    if (!player) return <main className="p-8 text-center text-red-600 font-black uppercase">Atleta non trovato.</main>;
+    if (!player) return <main className="p-8 text-center text-red-600 font-black uppercase">{dictPlayer.PROFILE_NOT_FOUND}</main>;
 
     // 2. Dati necessari
     const { data: { user } } = await supabase.auth.getUser();
@@ -60,7 +66,7 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
         return { ...match, userWon: won, pointsDelta: isTeamA ? Number(match.team_a_delta || 0) : Number(match.team_b_delta || 0) };
     });
 
-        const totalMatches = victories + defeats;
+    const totalMatches = victories + defeats;
     const totalPages = Math.ceil(totalMatches / MATCHES_PER_PAGE) || 1;
     const statsForWidget = { totalPlayed: totalMatches, totalWon: victories, totalLost: defeats, winRate: totalMatches > 0 ? parseFloat(((victories / totalMatches) * 100).toFixed(1)) : 0 };
     const paginatedMatches = enrichedMatches.slice((currentPage - 1) * MATCHES_PER_PAGE, currentPage * MATCHES_PER_PAGE);
@@ -103,7 +109,7 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
                         </div>
                     </div>
                     <div className="text-center bg-slate-900 text-white p-4 w-full sm:w-32 rounded-sm">
-                        <div className="text-[9px] uppercase font-black opacity-70 tracking-widest">Ranking</div>
+                        <div className="text-[9px] uppercase font-black opacity-70 tracking-widest">{dictForm.LABEL_RANKING}</div>
                         <div className="text-3xl font-black font-mono">{player.ranking.toFixed(2)}</div>
                     </div>
                 </div>
@@ -116,11 +122,11 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
                     <PartnersAndNemesisWidget playerId={playerId} enrichedMatches={enrichedMatches} allPlayers={allPlayers || []} />
                 </div>
 
-                                {/* Storico Partite - Versione COMPLETA */}
+                {/* Storico Partite - Versione COMPLETA */}
                 <h2 className="text-xs font-black uppercase text-slate-500 tracking-widest mb-4">
-                    Storico Partite
+                    {dictNav.TAB_COMPLETED_HISTORY}
                     {totalMatches > MATCHES_PER_PAGE && (
-                        <span className="ml-2 text-slate-400 font-normal normal-case">({totalMatches} totali)</span>
+                        <span className="ml-2 text-slate-400 font-normal normal-case">({totalMatches} {dictStats.LABEL_TOTALE.toLowerCase()})</span>
                     )}
                 </h2>
                 <div className="space-y-3">
@@ -137,9 +143,9 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
                         const opp2Id = isTeamA ? match.team_b_right_id : match.team_a_right_id;
 
                         const getName = (id: number | null) => {
-                            if (!id) return "NON ASSEGNATO";
+                            if (!id) return dictPlayer.STATS_PARTNER_NONE;
                             const p = allPlayers?.find(x => x.id === id);
-                            return p ? `${p.first_name} ${p.last_name}` : "GIOCATORE";
+                            return p ? `${p.first_name} ${p.last_name}` : dictPlayer.LABEL_PLAYER;
                         };
 
                         return (
@@ -148,7 +154,7 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2 mb-2">
                                         <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm uppercase ${match.userWon ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                                            {match.userWon ? 'Vittoria' : 'Sconfitta'}
+                                            {match.userWon ? dictMatch.BADGE_VITTORIA : dictMatch.BADGE_SCONFITTA}
                                         </span>
                                         <span className="text-[10px] font-mono text-slate-400 font-bold">
                                             {new Date(match.updated_at).toLocaleDateString('it-IT')}
@@ -156,10 +162,10 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
                                     </div>
                                     <div className="space-y-0.5">
                                         <div className="text-[11px] font-bold text-slate-500 uppercase">
-                                            In coppia con: <span className="text-slate-900">{getName(Number(compagnoId))}</span>
+                                            {dictMatch.LABEL_WITH} <span className="text-slate-900">{getName(Number(compagnoId))}</span>
                                         </div>
                                         <div className="text-[11px] font-bold text-slate-500 uppercase">
-                                            Contro: <span className="text-slate-900">{getName(Number(opp1Id))} & {getName(Number(opp2Id))}</span>
+                                            {dictMatch.LABEL_AGAINST} <span className="text-slate-900">{getName(Number(opp1Id))} & {getName(Number(opp2Id))}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -180,7 +186,7 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
                             </div>
                         );
                     })}
-                                </div>
+                </div>
 
                 {/* Paginazione Server-Side */}
                 {totalPages > 1 && (
@@ -209,11 +215,11 @@ export default async function PlayerProfile({ params, searchParams }: PageProps)
 
                             return (
                                 <>
-                                    {btn(1, '«', 'Prima Pagina', currentPage === 1)}
-                                    {btn(Math.max(1, currentPage - 1), '‹', 'Precedente', currentPage === 1)}
-                                    {pages.map(p => btn(p, p, `Pagina ${p}`, false, p === currentPage))}
-                                    {btn(Math.min(totalPages, currentPage + 1), '›', 'Successiva', currentPage === totalPages)}
-                                    {btn(totalPages, '»', 'Ultima Pagina', currentPage === totalPages)}
+                                    {btn(1, '«', dictUi.PAGINATION_FIRST, currentPage === 1)}
+                                    {btn(Math.max(1, currentPage - 1), '‹', dictUi.PAGINATION_PREV, currentPage === 1)}
+                                    {pages.map(p => btn(p, p, `${dictUi.PAGINATION_PAGE} ${p}`, false, p === currentPage))}
+                                    {btn(Math.min(totalPages, currentPage + 1), '›', dictUi.PAGINATION_NEXT, currentPage === totalPages)}
+                                    {btn(totalPages, '»', dictUi.PAGINATION_LAST, currentPage === totalPages)}
                                 </>
                             );
                         })()}
