@@ -53,6 +53,15 @@ const dictAuth = {
   UPDATE_PASSWORD_MIN_LENGTH: 'La password deve avere almeno 6 caratteri.',
   UPDATE_PASSWORD_MISMATCH: 'Le password non coincidono.',
   UPDATE_PASSWORD_ERROR: 'Impossibile aggiornare la password.',
+
+  // Forgot Password
+  LINK_FORGOT_PASSWORD: 'Password dimenticata?',
+  BUTTON_SEND_RESET: 'INVIA LINK DI RESET',
+  BUTTON_SENDING: 'INVIO...',
+  RESET_EMAIL_SENT: 'Se l\'email è registrata, riceverai un link di reset.',
+  PLACEHOLDER_EMAIL_FORGOT: 'LA TUA EMAIL',
+  TITLE_FORGOT_PASSWORD: 'Reset Password',
 } as const;
 
 export default dictAuth;
+

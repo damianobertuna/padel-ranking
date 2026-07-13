@@ -4,8 +4,10 @@
 
 const dictUpdatePassword = {
   WELCOME: 'Benvenuto Gestore',
+  WELCOME_RECOVERY: 'Reset della Password',
   VERIFYING: 'Verifica link sicuro in corso...',
   VERIFIED: '✓ Identità verificata. Imposta la tua password.',
+  VERIFIED_RECOVERY: '✓ Identità verificata. Inserisci la nuova password.',
   LABEL_NOME: 'Nome',
   LABEL_COGNOME: 'Cognome',
   LABEL_NEW_PASSWORD: 'Nuova Password',
@@ -21,3 +23,4 @@ const dictUpdatePassword = {
 } as const;
 
 export default dictUpdatePassword;
+
