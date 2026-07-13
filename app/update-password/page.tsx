@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/client';
 import dictUpdatePassword from '@/lib/i18n/dict-update-password';
 import dictError from '@/lib/i18n/dict-error';
 
+type FlowType = 'invite' | 'recovery' | null;
+
 export default function UpdatePasswordPage() {
     const [password, setPassword] = useState('');
     const [confirm, setConfirm] = useState('');
@@ -14,25 +16,30 @@ export default function UpdatePasswordPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [sessionReady, setSessionReady] = useState(false);
+    const [flowType, setFlowType] = useState<FlowType>(null);
 
     const router = useRouter();
     const [supabase] = useState(() => createClient());
+
+    const isRecovery = flowType === 'recovery';
 
     useEffect(() => {
         let mounted = true;
 
         const initializeSession = async () => {
-            // 1. Estrazione manuale bruta dall'URL (Forziamo la mano a Supabase)
             const hash = window.location.hash;
 
             if (hash && hash.includes('access_token')) {
-                // Trasformiamo l'hash in parametri leggibili
                 const hashParams = new URLSearchParams(hash.substring(1));
                 const accessToken = hashParams.get('access_token');
                 const refreshToken = hashParams.get('refresh_token');
+                const type = hashParams.get('type');
+
+                if (mounted) {
+                    setFlowType(type === 'recovery' ? 'recovery' : 'invite');
+                }
 
                 if (accessToken && refreshToken) {
-                    // Diciamo esplicitamente a Supabase di loggare l'utente con questi token
                     const { error: sessionError } = await supabase.auth.setSession({
                         access_token: accessToken,
                         refresh_token: refreshToken
@@ -45,21 +52,23 @@ export default function UpdatePasswordPage() {
 
                     if (mounted) {
                         setSessionReady(true);
-                        // Puliamo l'URL nascondendo i token per sicurezza
                         window.history.replaceState({}, document.title, window.location.pathname);
                     }
                     return;
                 }
             }
 
-            // 2. Fallback: se ricarica la pagina e la sessione c'era già
+            // Fallback: sessione già presente (es. ricarica pagina)
             const { data: { session } } = await supabase.auth.getSession();
             if (session && mounted) {
                 setSessionReady(true);
+                if (mounted && !flowType) {
+                    setFlowType('invite');
+                }
                 return;
             }
 
-            // 3. Se non c'è né hash né sessione, sblocchiamo l'attesa infinita
+            // Timeout se nessun token trovato
             if (mounted && !hash.includes('access_token')) {
                 setTimeout(() => {
                     if (mounted && !sessionReady) {
@@ -71,7 +80,6 @@ export default function UpdatePasswordPage() {
 
         initializeSession();
 
-        // Listener di sicurezza per catturare eventuali cambiamenti in ritardo
         const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
             if (session && mounted) {
                 setSessionReady(true);
@@ -82,7 +90,7 @@ export default function UpdatePasswordPage() {
             mounted = false;
             authListener.subscription.unsubscribe();
         };
-    }, [supabase, sessionReady]);
+    }, [supabase, sessionReady, flowType]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -100,14 +108,18 @@ export default function UpdatePasswordPage() {
 
         setLoading(true);
         try {
-            const { error: updateError } = await supabase.auth.updateUser({
-                password: password,
-                data: {
+            // RECOVERY: solo password. INVITE: password + user_metadata
+            const updatePayload: { password: string; data?: Record<string, string> } = { password };
+
+            if (!isRecovery) {
+                updatePayload.data = {
                     full_name: `${firstName} ${lastName}`.trim(),
                     first_name: firstName,
                     last_name: lastName,
-                }
-            });
+                };
+            }
+
+            const { error: updateError } = await supabase.auth.updateUser(updatePayload);
 
             if (updateError) throw new Error(updateError.message);
 
@@ -124,7 +136,7 @@ export default function UpdatePasswordPage() {
         <main className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
             <div className="bg-white p-8 max-w-md w-full border border-slate-200 shadow-sm rounded-sm">
                 <h1 className="text-2xl font-black uppercase tracking-tighter text-slate-900 mb-2">
-                    {dictUpdatePassword.WELCOME}
+                    {isRecovery ? dictUpdatePassword.WELCOME_RECOVERY : dictUpdatePassword.WELCOME}
                 </h1>
 
                 {!sessionReady && !error && (
@@ -135,7 +147,7 @@ export default function UpdatePasswordPage() {
 
                 {sessionReady && !error && (
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-8 text-green-600">
-                        {dictUpdatePassword.VERIFIED}
+                                                {isRecovery ? dictUpdatePassword.VERIFIED_RECOVERY : dictUpdatePassword.VERIFIED}
                     </p>
                 )}
 
@@ -146,34 +158,39 @@ export default function UpdatePasswordPage() {
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">
-                            {dictUpdatePassword.LABEL_NOME}
-                        </label>
-                        <input
-                            type="text"
-                            placeholder={dictUpdatePassword.PLACEHOLDER_NOME}
-                            value={firstName}
-                            onChange={(e) => setFirstName(e.target.value)}
-                            disabled={!sessionReady}
-                            className="w-full border border-slate-200 p-2 text-sm font-bold text-slate-900 focus:outline-none focus:border-slate-400 disabled:bg-slate-50 disabled:text-slate-400"
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">
-                            {dictUpdatePassword.LABEL_COGNOME}
-                        </label>
-                        <input
-                            type="text"
-                            placeholder={dictUpdatePassword.PLACEHOLDER_COGNOME}
-                            value={lastName}
-                            onChange={(e) => setLastName(e.target.value)}
-                            disabled={!sessionReady}
-                            className="w-full border border-slate-200 p-2 text-sm font-bold text-slate-900 focus:outline-none focus:border-slate-400 disabled:bg-slate-50 disabled:text-slate-400"
-                            required
-                        />
-                    </div>
+                    {/* NOME E COGNOME: renderizzati SOLO nel flusso invite, completamente assenti dal DOM in recovery */}
+                    {!isRecovery && (
+                        <>
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">
+                                    {dictUpdatePassword.LABEL_NOME}
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder={dictUpdatePassword.PLACEHOLDER_NOME}
+                                    value={firstName}
+                                    onChange={(e) => setFirstName(e.target.value)}
+                                    disabled={!sessionReady}
+                                    className="w-full border border-slate-200 p-2 text-sm font-bold text-slate-900 focus:outline-none focus:border-slate-400 disabled:bg-slate-50 disabled:text-slate-400"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">
+                                    {dictUpdatePassword.LABEL_COGNOME}
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder={dictUpdatePassword.PLACEHOLDER_COGNOME}
+                                    value={lastName}
+                                    onChange={(e) => setLastName(e.target.value)}
+                                    disabled={!sessionReady}
+                                    className="w-full border border-slate-200 p-2 text-sm font-bold text-slate-900 focus:outline-none focus:border-slate-400 disabled:bg-slate-50 disabled:text-slate-400"
+                                    required
+                                />
+                            </div>
+                        </>
+                    )}
                     <div>
                         <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">
                             {dictUpdatePassword.LABEL_NEW_PASSWORD}
