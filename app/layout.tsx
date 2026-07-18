@@ -167,7 +167,7 @@ export default async function RootLayout({
                             <p className="text-[9px] sm:text-[10px] font-bold text-slate-300 mt-1.5 leading-relaxed uppercase tracking-wide">
                                 Scopri come un'alimentazione strategica su misura può aumentare la tua resistenza nei match più lunghi e velocizzare il recovery muscolare. Affidati alla{' '}
                                 <a
-                                    href="https://www.bionutrimed.it/prenota/prenota-visita-in-studio.html"
+                                    href="https://www.bionutrimed.it/studio-nutrizione-a-catania/biologo-nutrizionista-catania.html"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-emerald-400 hover:text-emerald-300 font-black underline underline-offset-[3px] decoration-emerald-500/40 hover:decoration-emerald-400 transition-colors"
@@ -178,7 +178,7 @@ export default async function RootLayout({
                         </div>
                     </div>
                     <a
-                        href="https://www.bionutrimed.it/studio-nutrizione-a-catania/biologo-nutrizionista-catania.html"
+                        href="https://www.bionutrimed.it/prenota/prenota-visita-in-studio.html"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-black text-[10px] uppercase tracking-widest py-3 px-5 transition-colors text-center w-full md:w-auto shrink-0 rounded-sm shadow-sm"
