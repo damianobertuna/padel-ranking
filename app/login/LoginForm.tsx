@@ -97,8 +97,20 @@ export default function LoginForm() {
                         </div>
                     )}
 
-                                        <input type="email" placeholder={dictAuth.PLACEHOLDER_EMAIL} className="w-full p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm" value={email} onChange={e => setEmail(e.target.value)} required />
+                                                                                <input type="email" placeholder={dictAuth.PLACEHOLDER_EMAIL} className="w-full p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm" value={email} onChange={e => setEmail(e.target.value)} required />
                     <input type="password" placeholder={dictAuth.PLACEHOLDER_PASSWORD} className="w-full p-2 border border-slate-300 text-[10px] font-black uppercase rounded-sm" value={password} onChange={e => setPassword(e.target.value)} required />
+
+                    {/* LINK FORGOT PASSWORD — visibile solo in modalità Login */}
+                    {!isSignUp && (
+                        <div className="flex justify-end -mt-2">
+                            <a
+                                href="/forgot-password"
+                                className="text-[10px] font-bold text-slate-500 hover:text-blue-600 uppercase tracking-widest underline decoration-slate-300 hover:decoration-blue-400 transition-colors"
+                            >
+                                {dictAuth.LINK_FORGOT_PASSWORD}
+                            </a>
+                        </div>
+                    )}
 
                     {/* CHECKBOX PRIVACY POLICY (Mostrata SOLO durante la registrazione) */}
                     {isSignUp && (
