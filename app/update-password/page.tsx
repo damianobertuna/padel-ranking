@@ -28,7 +28,27 @@ export default function UpdatePasswordPage() {
 
         const initializeSession = async () => {
             const hash = window.location.hash;
+            const params = new URLSearchParams(window.location.search);
+            const codeFromQuery = params.get('code');
 
+            // PATH 1: PKCE recovery flow — code in query param, no hash fragment
+            if (codeFromQuery && !hash) {
+                const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(codeFromQuery);
+                if (exchangeError) {
+                    if (mounted) setError(dictError.AUTH_SESSION_ERROR + exchangeError.message);
+                    return;
+                }
+                if (mounted) {
+                    setFlowType('recovery');
+                }
+                if (mounted) {
+                    setSessionReady(true);
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+                return;
+            }
+
+            // PATH 2: Hash fragment with access_token (invite or legacy recovery)
             if (hash && hash.includes('access_token')) {
                 const hashParams = new URLSearchParams(hash.substring(1));
                 const accessToken = hashParams.get('access_token');
@@ -58,18 +78,18 @@ export default function UpdatePasswordPage() {
                 }
             }
 
-            // Fallback: sessione già presente (es. ricarica pagina)
+            // PATH 3: Fallback — already have a session (e.g. page reload)
             const { data: { session } } = await supabase.auth.getSession();
             if (session && mounted) {
                 setSessionReady(true);
-                if (mounted && !flowType) {
-                    setFlowType('invite');
+                if (mounted) {
+                    setFlowType(prev => prev === null ? 'invite' : prev);
                 }
                 return;
             }
 
-            // Timeout se nessun token trovato
-            if (mounted && !hash.includes('access_token')) {
+            // Timeout if no token found
+            if (mounted && !hash.includes('access_token') && !codeFromQuery) {
                 setTimeout(() => {
                     if (mounted && !sessionReady) {
                         setError(dictUpdatePassword.ERROR_NO_TOKEN);
@@ -90,7 +110,7 @@ export default function UpdatePasswordPage() {
             mounted = false;
             authListener.subscription.unsubscribe();
         };
-    }, [supabase, sessionReady, flowType]);
+    }, [supabase]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

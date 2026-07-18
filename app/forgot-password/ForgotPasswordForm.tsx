@@ -1,12 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { createClient } from '@supabase/supabase-js';
 import BackToHomeButton from "@/components/ui/BackToHomeButton";
 import dictAuth from '@/lib/i18n/dict-auth';
 
 export default function ForgotPasswordForm() {
-    const supabase = createClient();
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
     const [sent, setSent] = useState(false);
@@ -18,6 +17,18 @@ export default function ForgotPasswordForm() {
         setLoading(true);
 
         try {
+            const supabase = createClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                {
+                    auth: {
+                        flowType: 'implicit',
+                        autoRefreshToken: false,
+                        persistSession: false,
+                        detectSessionInUrl: false,
+                    },
+                }
+            );
             const redirectTo = `${window.location.origin}/update-password`;
             const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
                 redirectTo,
@@ -80,3 +91,4 @@ export default function ForgotPasswordForm() {
         </main>
     );
 }
+
